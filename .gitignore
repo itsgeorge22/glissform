@@ -1,0 +1,14 @@
+.build/
+build/
+.DS_Store
+.swiftpm/
+
+# Local settings, logs, credentials and signing material
+.env
+.env.*
+!.env.example
+*.log
+*.p12
+*.p8
+*.mobileprovision
+*.provisionprofile

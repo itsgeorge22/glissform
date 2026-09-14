@@ -1,0 +1,34 @@
+name: Build and motion checks
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Show toolchain
+        run: swift --version
+      - name: Build locally signed app
+        run: bash scripts/build.sh
+      - name: Check bundle version
+        run: |
+          expected="Glissform $(cat VERSION)"
+          actual="$(build/Glissform.app/Contents/MacOS/Glissform --version)"
+          test "$actual" = "$expected"
+      - name: Run motion checks (no physical sensor or GPU required)
+        run: bash scripts/test.sh --motion-only
