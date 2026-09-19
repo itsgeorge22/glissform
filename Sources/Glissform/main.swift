@@ -6,14 +6,53 @@ final class OverlayWindow: NSWindow {
     override var canBecomeMain: Bool { false }
 }
 
+private func makeGlissformAppIcon() -> NSImage {
+    let size = NSSize(width: 512, height: 512)
+    let image = NSImage(size: size)
+    image.lockFocus()
+
+    let background = NSBezierPath(
+        roundedRect: NSRect(x: 42, y: 42, width: 428, height: 428),
+        xRadius: 112,
+        yRadius: 112
+    )
+    background.addClip()
+    NSGradient(colors: [
+        NSColor(red: 0.24, green: 0.26, blue: 0.29, alpha: 1),
+        NSColor(red: 0.09, green: 0.10, blue: 0.12, alpha: 1),
+    ])?.draw(in: background, angle: -45)
+
+    NSColor.white.setStroke()
+    let rearScreen = NSBezierPath(
+        roundedRect: NSRect(x: 142, y: 188, width: 224, height: 150),
+        xRadius: 20,
+        yRadius: 20
+    )
+    rearScreen.lineWidth = 22
+    rearScreen.stroke()
+
+    let frontScreen = NSBezierPath(
+        roundedRect: NSRect(x: 188, y: 146, width: 224, height: 150),
+        xRadius: 20,
+        yRadius: 20
+    )
+    frontScreen.lineWidth = 22
+    frontScreen.stroke()
+
+    image.unlockFocus()
+    image.isTemplate = false
+    return image
+}
+
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private let statusLine = NSMenuItem(title: "Starting…", action: nil, keyEquivalent: "")
-    private let angleLabel = NSTextField(labelWithString: "")
-    private let angleSlider = NSSlider(value: 100, minValue: 20, maxValue: 130, target: nil, action: nil)
+    private let enableMenuItem = NSMenuItem(title: "Enable Infinite Screen", action: nil, keyEquivalent: "")
     private let sensor = LidSensor()
     private let capture = DesktopCapture()
+    private let settingsModel = SettingsModel()
+    private var settingsWindowController: SettingsWindowController?
     private var window: OverlayWindow?
     private var renderer: EffectRenderer?
     private var motion = ClosingMotion()
@@ -37,45 +76,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var permissionRequested = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
+        NSApp.applicationIconImage = makeGlissformAppIcon()
+        NSApp.setActivationPolicy(.regular)
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "macbook", accessibilityDescription: "Glissform")
         statusItem.button?.toolTip = "Glissform — lid animation"
-        let menu = NSMenu()
-        menu.addItem(withTitle: "Glissform · \(Bundle.main.object(forInfoDictionaryKey: "GlissformVersion") as? String ?? "Development")", action: nil, keyEquivalent: "")
-        menu.addItem(statusLine)
-        menu.addItem(.separator())
-        UserDefaults.standard.register(defaults: ["animationStartAngle": 100.0])
+        UserDefaults.standard.register(defaults: ["animationStartAngle": 100.0, "animationEnabled": true])
         let storedAngle = UserDefaults.standard.double(forKey: "animationStartAngle")
         let startAngle = storedAngle.isFinite ? min(130, max(20, storedAngle)).rounded() : 100
+        let animationEnabled = UserDefaults.standard.bool(forKey: "animationEnabled")
         motion.startAngle = startAngle
-        angleSlider.doubleValue = startAngle
-        angleSlider.target = self
-        angleSlider.action = #selector(changeStartAngle(_:))
-        angleSlider.isContinuous = true
-        angleSlider.setAccessibilityLabel("Animation start angle")
-        let controls = NSView(frame: NSRect(x: 0, y: 0, width: 270, height: 92))
-        angleLabel.frame = NSRect(x: 18, y: 65, width: 234, height: 18)
-        angleLabel.font = .menuFont(ofSize: 13)
-        angleLabel.stringValue = "Start animation at \(Int(startAngle))°"
-        angleSlider.frame = NSRect(x: 18, y: 34, width: 234, height: 24)
-        let hint = NSTextField(labelWithString: "20° · Nearly closed          130° · Wide open")
-        hint.frame = NSRect(x: 18, y: 10, width: 240, height: 16)
-        hint.font = .systemFont(ofSize: 10)
-        hint.textColor = .secondaryLabelColor
-        controls.addSubview(angleLabel)
-        controls.addSubview(angleSlider)
-        controls.addSubview(hint)
-        let sliderItem = NSMenuItem()
-        sliderItem.view = controls
-        menu.addItem(sliderItem)
+        let menu = NSMenu()
+        statusLine.isEnabled = false
+        menu.addItem(statusLine)
         menu.addItem(.separator())
-        let permission = menu.addItem(withTitle: "Screen Recording Settings…", action: #selector(openPermissions), keyEquivalent: "")
-        permission.target = self
+        enableMenuItem.target = self
+        enableMenuItem.action = #selector(toggleAnimation)
+        enableMenuItem.state = animationEnabled ? .on : .off
+        menu.addItem(enableMenuItem)
+        let settings = menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
+        settings.target = self
         menu.addItem(.separator())
         let quit = menu.addItem(withTitle: "Quit Glissform", action: #selector(quitApp), keyEquivalent: "q")
         quit.target = self
         statusItem.menu = menu
+        installApplicationMenu()
+
+        settingsModel.configure(
+            animationEnabled: animationEnabled,
+            startAngle: startAngle,
+            screenCaptureAllowed: CGPreflightScreenCaptureAccess()
+        )
+        settingsModel.onAnimationEnabledChange = { [weak self] enabled in
+            self?.applyAnimationEnabled(enabled)
+        }
+        settingsModel.onStartAngleChange = { [weak self] angle in
+            self?.applyStartAngle(angle)
+        }
+        settingsModel.onOpenPermissions = { [weak self] in self?.openPermissions() }
 
         let center = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.willSleepNotification, NSWorkspace.screensDidSleepNotification] {
@@ -97,31 +135,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         heartbeat = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
             guard let self, !self.sleeping, !self.quitting else { return }
+            self.settingsModel.refreshPermission()
             if Date().timeIntervalSince(self.lastReading) > 1 {
                 self.endGesture()
                 self.motion.reset()
+                self.settingsModel.updateSensorStatus("Sensor unavailable")
             }
             if !self.ready, !self.starting, Date() >= self.retryAfter { self.connect() }
             }
         }
         startSensor()
         connect()
+        DispatchQueue.main.async { [weak self] in
+            self?.showSettings()
+        }
     }
 
-    private func setStatus(_ text: String) { statusLine.title = text }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showSettings()
+        return true
+    }
+
+    private func setStatus(_ text: String) {
+        statusLine.title = text
+        settingsModel.updateRuntimeStatus(text)
+    }
 
     private func startSensor() {
         motion.reset()
         sensor.start(onReading: { [weak self] angle in
             guard let self, !self.sleeping, !self.quitting else { return }
             self.lastReading = Date()
+            self.settingsModel.updateAngle(angle)
+            guard self.settingsModel.animationEnabled else {
+                self.finishGesture()
+                self.motion.reset()
+                self.setStatus("Paused")
+                return
+            }
             guard self.ready else { return }
             let progress = self.motion.update(angle: angle)
             self.currentProgress = progress
             self.renderer?.setLidAngle(angle, referenceAngle: self.motion.activationAngle)
             guard self.motion.active else {
                 self.finishGesture()
-                self.setStatus("Ready · Lid \(Int(angle))°")
+                self.setStatus("Ready")
                 return
             }
             if self.finishingGesture {
@@ -134,6 +192,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.showProgress()
         }, onStatus: { [weak self] status in
             guard let self else { return }
+            self.settingsModel.updateSensorStatus(status)
             if !status.lowercased().contains("connected") { self.setStatus(status) }
         })
     }
@@ -317,16 +376,75 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         resume()
     }
 
-    @objc private func changeStartAngle(_ sender: NSSlider) {
-        let angle = sender.doubleValue.rounded()
-        sender.doubleValue = angle
+    private func applyStartAngle(_ angle: Double) {
         guard motion.startAngle != angle else { return }
         endGesture()
         motion.reset()
         motion.startAngle = angle
         UserDefaults.standard.set(angle, forKey: "animationStartAngle")
-        angleLabel.stringValue = "Start animation at \(Int(angle))°"
         setStatus("Ready · Close past \(Int(angle))° to animate")
+    }
+
+    private func applyAnimationEnabled(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: "animationEnabled")
+        enableMenuItem.state = enabled ? .on : .off
+        endGesture()
+        motion.reset()
+        if enabled {
+            setStatus("Ready · Close past \(Int(settingsModel.startAngle))° to animate")
+        } else {
+            setStatus("Infinite Screen is off")
+        }
+    }
+
+    @objc private func toggleAnimation() {
+        settingsModel.setAnimationEnabled(!settingsModel.animationEnabled)
+    }
+
+    @objc private func showAbout() {
+        settingsModel.selectedPage = .about
+        showSettings()
+    }
+
+    private func installApplicationMenu() {
+        let mainMenu = NSMenu()
+        let appItem = NSMenuItem()
+        let appMenu = NSMenu(title: "Glissform")
+        for (title, action, key) in [("About Glissform", #selector(showAbout), ""),
+                                     ("Settings…", #selector(showSettings), ",")] {
+            let item = appMenu.addItem(withTitle: title, action: action, keyEquivalent: key)
+            item.target = self
+        }
+        appMenu.addItem(.separator())
+        let hide = appMenu.addItem(withTitle: "Hide Glissform", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        hide.target = NSApp
+        appMenu.addItem(.separator())
+        let quit = appMenu.addItem(withTitle: "Quit Glissform", action: #selector(quitApp), keyEquivalent: "q")
+        quit.target = self
+        appItem.submenu = appMenu
+        mainMenu.addItem(appItem)
+        let editItem = NSMenuItem()
+        let edit = NSMenu(title: "Edit")
+        for (title, action, key) in [("Cut", "cut:", "x"), ("Copy", "copy:", "c"),
+                                     ("Paste", "paste:", "v"), ("Select All", "selectAll:", "a")] {
+            edit.addItem(withTitle: title, action: Selector(action), keyEquivalent: key)
+        }
+        editItem.submenu = edit
+        mainMenu.addItem(editItem)
+        let windowItem = NSMenuItem()
+        let windowMenu = NSMenu(title: "Window")
+        windowMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        windowItem.submenu = windowMenu
+        mainMenu.addItem(windowItem)
+        NSApp.mainMenu = mainMenu
+    }
+
+    @objc private func showSettings() {
+        if settingsWindowController == nil {
+            settingsWindowController = SettingsWindowController(model: settingsModel)
+        }
+        settingsModel.refreshPermission()
+        settingsWindowController?.present()
     }
 
     @objc private func openPermissions() {

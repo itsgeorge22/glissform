@@ -13,9 +13,12 @@ A small macOS menu bar app that makes your desktop appear to stay in place as yo
 - Starts at exactly zero stretch, blur, and shadow, then eases into the current angle.
 - Uses adaptive smoothing for the sensor's whole-degree readings and gradual entrance and return transitions.
 - Builds a shadow over the full animation: transparent at the bottom, darkest at the top, with only the top 5% reaching full black at the end.
-- Lets you choose a starting angle from 20° to 130° in the menu bar. The default is 100°; your choice is saved.
+- Provides a compact native window with a main experience page and a linked Privacy & About page, a live lid reading, an original perspective illustration, an Infinite Screen switch, and precise starting-angle controls.
+- Lets you preview a closing-and-reopening gesture inside the window using synthetic artwork, without taking a screenshot. With Reduce Motion, the preview shows a still illustration instead.
+- Explains readiness, missing screen access, sensor availability, and when to open above your chosen starting angle.
+- Saves the Infinite Screen toggle and starting angle. The default starting angle is 100°.
 - Covers the live Dock and menu bar during the effect so their captured images animate with the desktop. Mouse clicks cannot pass through the snapshot.
-- Runs in the background with a menu bar icon and Quit command.
+- Remains available from both the Dock and menu bar, with standard About, Settings, Edit, and Quit commands. Closing the settings window leaves the app running.
 
 ## Requirements
 
@@ -39,15 +42,17 @@ open build/Glissform.app
 
 The build script creates a locally ad-hoc-signed app. This alpha is **not Developer ID signed or notarized**; building from source is the supported installation path for now.
 
-Allow **Glissform** in System Settings → Privacy & Security → Screen & System Audio Recording. The setting's label can vary by macOS version. If macOS asks you to quit and reopen the app, do so. The menu reports readiness and your current lid angle.
+Allow **Glissform** in System Settings → Privacy & Security → Screen & System Audio Recording. The setting's label can vary by macOS version. If macOS asks you to quit and reopen the app, do so. The menu reports readiness; the settings window shows your current lid angle.
 
-Open the menu bar icon and adjust **Start animation at …°**. Begin above that angle and close through it. If you start the app or change the setting while already below the threshold, open above the chosen angle first.
+Opening Glissform presents its settings window. You can reopen it later from the menu bar icon with **Settings…**. Turn **Infinite Screen** on or off and adjust **Begin at** using the slider, number field, or stepper. Typed angles apply on Return or when you leave the field. Clicking anywhere outside the field clears its focus and applies the entered value; values are limited to 20–130°. **Use current angle** copies your live angle (when it is within 20–130°); **Reset** restores 100°. **Preview motion** plays a short illustration inside the window; it does not capture or cover your desktop and is not a physical hardware test. Begin above that angle and close through it. If you start the app or change the setting while already below the threshold, open above the chosen angle first.
 
 Reopen to the chosen angle to restore the live desktop. To stop the app, reopen the lid and choose **Quit Glissform** from its menu bar icon. Normal sleep stays enabled.
 
+Open **Privacy & About** from the main page footer and use **Back** (⌘[) to return. The interface uses a plain system background (white in Light Mode), flat adaptive surfaces, and the macOS accent colour for controls. Interactive controls have hover feedback: the solid-white slider thumb changes size slightly, stepper arrows brighten within their native control, and the Apple-style capsule switch highlights its track. Both the slider and switch handles stay pure white, including on hover and press. These controls have no separate hover background or border. Buttons have distinct pressed surfaces, and the angle field shows an editing outline. Disabled controls do not react to hover. The illustration follows the live lid reading except while previewing; its synthetic screen artwork is explanatory, not a pixel-accurate simulation of the desktop effect. Reduce Motion removes interpolation from the live illustration and replaces playback with a still preview. The actual desktop effect is unchanged.
+
 ## Privacy and system behavior
 
-Desktop screenshots stay in memory. The app does not save or transmit them, capture audio, or include networking or analytics. The rendering test saves only synthetic test images under `build/render-test/`.
+Desktop screenshots stay in memory. The app does not save or transmit them, capture audio, or include networking or analytics. The About page prominently explains these privacy boundaries and why macOS requires Screen Recording permission. The rendering test saves only synthetic test images under `build/render-test/`.
 
 Only the built-in display receives an overlay. The app does not change Dock/menu bar hiding preferences or take keyboard focus from your current application. Sleep, display changes, sensor loss, and quitting clear the overlay. The app does not prevent system sleep or alter lock-screen behavior.
 

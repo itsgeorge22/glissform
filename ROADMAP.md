@@ -14,7 +14,10 @@ Implemented: screenshot-based closing animation, awake reversal, configurable st
 - [ ] Strengthen recovery from denied/revoked permissions, unavailable screenshots, sensor disconnects, and display changes.
 - [ ] Test full-screen applications, Dock/menu behavior, external displays, multiple Spaces, sleep/wake, and quitting during transitions.
 - [ ] Build a compatibility table from additional MacBook testing.
-- [ ] Improve onboarding and diagnostics without adding a large settings interface.
+- [x] Refine the native interface with compact navigation, adaptive neutral surfaces, a distinctive perspective illustration, and a clearer control hierarchy.
+- [x] Add a capture-free, in-window gesture preview with a still alternative for Reduce Motion and contextual first-gesture guidance.
+- [x] Introduce and simplify native settings with a dedicated live-angle display, precise trigger controls, and screen-access status, and an About page with prominent privacy information.
+- [ ] Validate the settings, preview, and permission guidance with first-time testers, including keyboard and VoiceOver use, then refine onboarding and diagnostics.
 - [ ] Decide the project's license before describing it as open source.
 
 ## Beta gate — 0.1.0-beta.1
@@ -43,7 +46,7 @@ A release candidate is a complete proposed stable build. Publish 1.0.0 when thos
 ## Future possibilities — not committed
 
 - Wake/opening animation, only if macOS timing and permissions allow a dependable implementation.
-- Optional launch at login and a lightweight enable/pause control.
+- Optional launch at login; a lightweight enable/pause control is already available in the working settings and menu.
 - Carefully bounded blur, shadow, and motion preferences or presets.
 - Accessibility options and behavior that respects reduced-motion preferences.
 - Broader hardware support and calibration for different viewing angles.

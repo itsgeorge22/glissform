@@ -26,7 +26,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <key>GlissformVersion</key><string>$APP_VERSION</string>
 <key>CFBundleVersion</key><string>$APP_BUILD</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
-<key>LSUIElement</key><true/>
+<key>LSUIElement</key><false/>
 <key>NSHighResolutionCapable</key><true/>
 <key>NSScreenCaptureUsageDescription</key><string>Glissform animates your desktop as the lid closes. Screen images stay in memory and are never saved or transmitted.</string>
 </dict></plist>

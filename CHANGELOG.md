@@ -4,7 +4,27 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
-No unreleased changes yet.
+### Added
+
+- Native macOS settings with Experience and About pages, a live lid reading, Infinite Screen enable switch, precise start-angle controls, Use current angle, and reset.
+- An in-window motion preview using original vector artwork, with no screen capture, automatic completion, a stop control, and a still alternative for Reduce Motion.
+- Contextual readiness and setup guidance for screen access, unavailable sensors, and opening above the start angle.
+- A dedicated About page with privacy and alpha-support details, standard app menus, and keyboard shortcuts for settings, editing, closing the window, and quitting.
+
+### Changed
+
+- Made the switch and slider handles solid white in every state. Hover/press feedback uses the switch track and subtle slider-thumb size changes instead of tinting the handles.
+- Removed the redundant Enabled/Paused label beneath the Infinite Screen switch.
+- Added consistent hover and pressed feedback to buttons and links, integrated slider-thumb and stepper feedback, an Apple-style capsule switch, and an active outline for angle editing. Slider, switch, and stepper hover states have no outer container or border. Disabled actions stay subdued; feedback transitions respect Reduce Motion.
+- Refined settings into a compact window with a perspective illustration, adaptive neutral surfaces, and system-accent controls. Removed the logo header and segmented navigation; Privacy & About opens from the footer and has a Back button (⌘[).
+- The angle field now clears focus when clicking outside it and commits on Return or focus loss, so incomplete typing is not clamped mid-entry. Slider and stepper changes remain immediate.
+- Opening or reopening Glissform presents its settings window. Closing it keeps the app running. Glissform appears in both the Dock and menu bar, with a restrained graphite app mark.
+- Simplified the menu bar to readiness, animation enable, Settings, and Quit. Screen-access status refreshes while the app runs; unavailable sensor readings clear the displayed angle.
+
+### Removed
+
+- Removed the optional menu bar angle and its settings switch. The live angle remains in the settings window.
+- Removed the duplicate menu slider and oversized settings sidebar.
 
 ## 0.1.0-alpha.1 — 2026-09-14
 
