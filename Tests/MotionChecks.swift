@@ -115,6 +115,58 @@ import Foundation
                      "Even a late first display frame must start at exactly zero effect")
         precondition(handoff.step(toward: 1, elapsed: 0.010) < 0.01)
         print("PASS: exact zero first frame, gentle entry and exit, interrupted entrance, reclose continuity")
+        // Pause-to-resume uses a monotonic sample clock, not time since capture.
+        func pausingMotion(duration: Double = 2, enabled: Bool = true) -> ClosingMotion {
+            var state = ClosingMotion()
+            state.startAngle = 95
+            state.resumeAfterPause = enabled
+            state.pauseDuration = duration
+            _ = state.update(angle: 100, time: -0.05)
+            return state
+        }
+        for duration in [0.5, 2.0, 10.0] {
+            var state = pausingMotion(duration: duration)
+            for frame in 0..<Int(duration * 20) {
+                _ = state.update(angle: 80, time: Double(frame) / 20)
+                precondition(state.active && !state.desktopResumed, "Do not resume before the selected pause")
+            }
+            precondition(state.update(angle: 80, time: duration + 0.000001) == 0 && state.desktopResumed)
+            for angle in [80.0, 70, 90, 95, 80] {
+                precondition(state.update(angle: angle, time: duration + 1) == 0 && !state.active,
+                             "Stay usable below or exactly at the threshold after restoring")
+            }
+            _ = state.update(angle: 96, time: duration + 1.1)
+            precondition(!state.desktopResumed)
+            precondition(state.update(angle: 80, time: duration + 1.2) > 0 && state.active,
+                         "Opening above the threshold must arm a new gesture")
+            state.reset()
+            precondition(state.update(angle: 80, time: duration + 1.3) == 0 && !state.active)
+        }
+        var disabledPause = pausingMotion(enabled: false)
+        var movingPause = pausingMotion(duration: 0.5)
+        var jitterPause = pausingMotion(duration: 0.5)
+        for frame in 0...240 {
+            _ = disabledPause.update(angle: 80, time: Double(frame) / 20)
+            precondition(disabledPause.active, "Default off must preserve the effect during pauses")
+            _ = movingPause.update(angle: 90 - Double(frame) * 0.25, time: Double(frame) / 20)
+            precondition(movingPause.active, "Slow continuous drift must reset the pause")
+            _ = jitterPause.update(angle: frame.isMultiple(of: 2) ? 80 : 81, time: Double(frame) / 20)
+        }
+        precondition(jitterPause.desktopResumed, "One-degree sensor chatter must not prevent restoration")
+        var interruptedPause = pausingMotion(duration: 0.5)
+        for frame in 0...8 { _ = interruptedPause.update(angle: 80, time: Double(frame) / 20) }
+        _ = interruptedPause.update(angle: 82, time: 0.45)
+        _ = interruptedPause.update(angle: 82, time: 0.6)
+        precondition(interruptedPause.active, "Meaningful reopening resets the timer")
+        _ = interruptedPause.update(angle: 82, time: 5)
+        precondition(interruptedPause.active, "Missing sensor reports are not proof of a pause")
+        _ = interruptedPause.update(angle: .nan, time: 5.1)
+        _ = interruptedPause.update(angle: 82, time: 5.2)
+        precondition(interruptedPause.active, "Invalid reports reset pause tracking")
+        interruptedPause.pauseDuration = 2
+        _ = interruptedPause.update(angle: 82, time: 5.3)
+        precondition(interruptedPause.active, "Changing the delay starts a fresh wait")
+        print("PASS: pause durations, default off, jitter, slow movement, reversal, sensor gaps, restoration latch and rearming")
         var motion = ClosingMotion()
         for angle in [110.0, 109, 110, 111, 110] {
             precondition(motion.update(angle: angle) == 0, "Ordinary viewing must remain clear")

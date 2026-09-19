@@ -42,3 +42,9 @@ Record the app version, Mac model, macOS version, display arrangement, start ang
 - Reopen and quit. Confirm no overlay remains.
 
 Measure capture delay, frame timing, CPU/GPU use, memory, and power before making performance claims. Hardware tests are not complete merely because synthetic tests pass.
+
+## Pause-to-resume
+
+Automated checks cover the default-off behavior, 0.5/2/10-second delays, jitter tolerance, gradual movement, reversals, stale and invalid reports, rearming strictly above the threshold, delayed screenshot rejection, visible return-to-flat, and sleep/display/quit interruptions. These use synthetic sensor timestamps and screenshots; they do not replace physical lid testing.
+
+On hardware, enable Resume desktop after a pause, set a 95° trigger and a 2-second delay, open above 95°, then close to 80° and hold. Confirm the effect returns to zero and the desktop accepts input; subsequent movement below 95° must not retrigger it. Reopen above 95° and close to verify a new gesture. Repeat at 0.5 and 10 seconds, with slow movement, direction changes, sleep, and settings changes. Check that the toggle and duration survive relaunch.

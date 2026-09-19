@@ -86,11 +86,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "macbook", accessibilityDescription: "Glissform")
         statusItem.button?.toolTip = "Glissform — lid animation"
-        UserDefaults.standard.register(defaults: ["animationStartAngle": 100.0, "animationEnabled": true])
+        UserDefaults.standard.register(defaults: ["animationStartAngle": 100.0, "animationEnabled": true,
+                                                  "resumeAfterPause": false, "pauseDuration": 2.0])
         let storedAngle = UserDefaults.standard.double(forKey: "animationStartAngle")
         let startAngle = storedAngle.isFinite ? min(130, max(20, storedAngle)).rounded() : 100
         let animationEnabled = UserDefaults.standard.bool(forKey: "animationEnabled")
         motion.startAngle = startAngle
+        motion.resumeAfterPause = UserDefaults.standard.bool(forKey: "resumeAfterPause")
+        let storedPause = UserDefaults.standard.double(forKey: "pauseDuration")
+        motion.pauseDuration = storedPause.isFinite ? min(10, max(0.5, storedPause)) : 2
         let menu = NSMenu()
         statusLine.isEnabled = false
         menu.addItem(statusLine)
@@ -110,13 +114,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsModel.configure(
             animationEnabled: animationEnabled,
             startAngle: startAngle,
-            screenCaptureAllowed: CGPreflightScreenCaptureAccess()
+            screenCaptureAllowed: CGPreflightScreenCaptureAccess(),
+            resumeAfterPause: motion.resumeAfterPause, pauseDuration: motion.pauseDuration
         )
         settingsModel.onAnimationEnabledChange = { [weak self] enabled in
             self?.applyAnimationEnabled(enabled)
         }
         settingsModel.onStartAngleChange = { [weak self] angle in
             self?.applyStartAngle(angle)
+        }
+        settingsModel.onPauseSettingsChange = { [weak self] enabled, duration in
+            guard let self else { return }
+            self.motion.resumeAfterPause = enabled
+            self.motion.pauseDuration = duration
+            UserDefaults.standard.set(enabled, forKey: "resumeAfterPause")
+            UserDefaults.standard.set(duration, forKey: "pauseDuration")
         }
         settingsModel.onOpenPermissions = { [weak self] in self?.openPermissions() }
 
@@ -177,7 +189,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         })
     }
 
-    private func handleLidReading(_ angle: Double) {
+    private func handleLidReading(_ angle: Double, time: Double = ProcessInfo.processInfo.systemUptime) {
         guard !sleeping, !quitting else { return }
         lastReading = Date()
         settingsModel.updateAngle(angle)
@@ -188,12 +200,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         guard ready else { return }
-        let progress = motion.update(angle: angle)
+        let progress = motion.update(angle: angle, time: time)
         currentProgress = progress
         renderer?.setLidAngle(angle, referenceAngle: motion.activationAngle)
         guard motion.active else {
             finishGesture()
-            setStatus("Ready")
+            setStatus(motion.desktopResumed ? "Desktop restored" : "Ready")
             return
         }
         if finishingGesture {
@@ -577,6 +589,68 @@ extension AppDelegate {
                 try checkCleared(app)
                 print("PASS: \(visible ? "visible snapshot cleanup" : "delayed snapshot cancellation") on \(interruption)")
             }
+        }
+        // Expire the still-lid timer through the real coordinator with fresh
+        // synthetic timestamps, including captures that have not completed yet.
+        for visible in [false, true] {
+            let (app, source) = try makeGesture()
+            defer { app.shutdown(); app.window?.close() }
+            try await waitForCapture(source)
+            let pendingTask = app.snapshotTask
+            if visible {
+                try await Task.sleep(nanoseconds: 50_000_000)
+                source.pending?.resume(returning: buffer)
+                source.pending = nil
+                await pendingTask?.value
+                try await Task.sleep(nanoseconds: 100_000_000)
+            }
+            app.motion.resumeAfterPause = true
+            app.motion.pauseDuration = 0.5
+            for frame in 0...10 { app.handleLidReading(80, time: 100 + Double(frame) * 0.05) }
+            try check(app.motion.desktopResumed && !app.motion.active, "Still lid must latch desktop restoration")
+            if visible { try check(app.finishingGesture, "Visible restoration must return to flat before release") }
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await pendingTask?.value
+            if visible { try await waitForCleanup(app) }
+            try checkCleared(app)
+            app.handleLidReading(70, time: 101)
+            app.handleLidReading(100, time: 101.1)
+            app.handleLidReading(80, time: 101.2)
+            try check(source.count == 1 && !app.snapshotRequested,
+                      "At or below the starting angle, resumed desktop must not recapture")
+            app.handleLidReading(101, time: 101.3)
+            app.handleLidReading(80, time: 101.4)
+            try await waitForCapture(source)
+            try check(source.count == 2, "Opening above threshold must allow one fresh capture")
+            let rearmedTask = app.snapshotTask
+            app.suspend()
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await rearmedTask?.value
+            try checkCleared(app)
+            print("PASS: pause restoration with \(visible ? "visible" : "pending") snapshot, below-threshold suppression, fresh rearm and sleep cleanup")
+        }
+        for interruption in ["sleep", "display change", "quit"] {
+            let (app, source) = try makeGesture()
+            defer { app.shutdown(); app.window?.close() }
+            try await waitForCapture(source)
+            try await Task.sleep(nanoseconds: 50_000_000)
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await app.snapshotTask?.value
+            try await Task.sleep(nanoseconds: 100_000_000)
+            app.motion.resumeAfterPause = true
+            app.motion.pauseDuration = 0.5
+            for frame in 0...10 { app.handleLidReading(80, time: 100 + Double(frame) * 0.05) }
+            switch interruption {
+            case "sleep": app.suspend()
+            case "display change": app.restart(); app.sensor.stop()
+            default: app.shutdown()
+            }
+            try await Task.sleep(nanoseconds: 180_000_000)
+            try checkCleared(app)
+            print("PASS: pause return interrupted by \(interruption)")
         }
         let (app, source) = try makeGesture()
         defer { app.shutdown(); app.window?.close() }

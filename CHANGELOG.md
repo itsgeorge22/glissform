@@ -4,14 +4,28 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+No unreleased changes.
+
+## 0.1.0-alpha.3 — 2026-09-19
+
+Third public alpha, adding pause-to-resume desktop access and a refined settings layout. Source release; local builds remain ad-hoc signed and are not notarized.
+
+### Added
+
+- Optional “Resume desktop after a pause,” off by default, with a saved 0.5–10 second delay (default 2 seconds). Holding the lid still below the trigger smoothly restores desktop access. The effect stays inactive until reopening above the trigger; movement restarts the wait, one-degree sensor jitter is tolerated, and normal sleep remains unchanged.
+- Regression checks for pause timing, movement, sensor gaps, pending and visible captures, rearming, and interruption during automatic restoration.
+
 ### Changed
 
-- Motion preview starts immediately from the illustration's current lid angle and reference plane instead of pausing or resetting to 110°, then closes and returns to that starting angle.
-- Grouped the starting-angle controls inside the preview card, with a divider and readiness feedback directly below the card. Shortened the settings window, kept About content accessible by scrolling, clarified the explanatory copy, and lifted faint illustration details.
-- Simplified the preview to the live angle and illustration without extra captions or a slider marker. Matched the status and preview card surfaces, refined control and text spacing, and reserved bottom padding for the privacy footer.
-- Combined the starting-angle number and raised degree symbol in one rounded field, with arrows on the left that each have independent hover and pressed feedback and no background at rest.
-- Narrowed the combined angle input by 8 points.
-- Balanced the spacing above the main card and below the status card at 28 points, with 16 points between the cards and uniform 32-point content padding on both settings pages.
+- Motion preview starts immediately from the illustration's current lid angle and reference plane, then closes and returns to that starting angle.
+- Grouped starting-angle controls inside the preview card and pause-to-resume controls in a separate matching card, replacing the status card. Readiness remains in the menu bar; screen-access management remains in Privacy & About.
+- Removed extra illustration captions and the live-angle slider marker. Both card dividers span the full width, with controls inset and 20-point spacing around the pause-card divider.
+- Refined the angle field, independent arrow hover states, title styling, and text spacing. Kept 16 points between cards, balanced 28-point outer section gaps, and uniform 32-point content padding. About remains scrollable.
+
+### Validation and limitations
+
+- Build, motion, Metal-rendering, and synthetic lifecycle checks passed. The settings layout and preference persistence were checked in the running app.
+- Physical pause-to-resume timing, jitter tolerance, and sleep-transition acceptance remain pending; synthetic checks do not establish hardware compatibility or physical smoothness.
 
 ## 0.1.0-alpha.2 — 2026-09-19
 

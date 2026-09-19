@@ -2,11 +2,14 @@
 
 Glissform explores visual responses to the way a MacBook moves and changes state. Its immediate focus is a smooth, reliable lid-closing animation. This roadmap separates committed near-term work from ideas; it is not a release-date promise.
 
-## Current — 0.1.0-alpha.2
+## Current — 0.1.0-alpha.3
 
-Implemented: screenshot-based closing animation with full-angle hinge compensation, steadier adaptive smoothing, progressive full-image frost and shadow, awake reversal, native settings with a configurable starting angle and capture-free preview, menu bar controls, and lifecycle cleanup. Synthetic checks cover projection, tracking, and interrupted gestures; repeatable physical acceptance remains an upcoming gate. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
+Implemented: screenshot-based closing animation with full-angle hinge compensation, steadier adaptive smoothing, progressive full-image frost and shadow, awake reversal, native settings with a configurable starting angle and capture-free preview, optional desktop restoration after a configurable still-lid pause, menu bar controls, and lifecycle cleanup. Synthetic checks cover projection, tracking, and interrupted gestures; repeatable physical acceptance remains an upcoming gate. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
 
 ## Next alpha iterations
+
+- [x] Add optional desktop restoration after a configurable still-lid pause, with persisted controls and gesture/cancellation regression checks.
+- [ ] Physically validate pause-to-resume timing and jitter tolerance during slow movement, lower-angle work, and sleep transitions.
 
 - [x] Correct full-angle hinge compensation, smooth quantized-input tracking speed, reduce entrance delay, and tune progressive full-image frost toward the supplied Duo references; add synthetic desktop material previews alongside projection, tracking and lifecycle regression checks.
 - [ ] Evaluate slow/fast closing, pauses, abrupt reversals, and capture handoffs with repeatable physical tests.

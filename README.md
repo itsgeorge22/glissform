@@ -2,7 +2,7 @@
 
 A small macOS menu bar app that makes your desktop appear to stay in place as you close your MacBook lid. The moving screen reveals a gradually blurred, shadowed image behind it.
 
-**Current version: 0.1.0-alpha.2.** This is an experimental public alpha, developed on a MacBook Air M5 15-inch. Wider hardware compatibility and physical performance are still being evaluated.
+**Current version: 0.1.0-alpha.3.** This is an experimental public alpha, developed on a MacBook Air M5 15-inch. Wider hardware compatibility and physical performance are still being evaluated.
 
 [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
@@ -18,8 +18,9 @@ A small macOS menu bar app that makes your desktop appear to stay in place as yo
 - Builds a shadow over the full animation, gently at first so the frosted colours stay visible, then more strongly near closure: transparent at the bottom, darkest at the top, with only the top 5% reaching full black at the end.
 - Provides a compact native window with a main experience page and a linked Privacy & About page, a live lid reading, an original perspective illustration, an Infinite Screen switch, and precise starting-angle controls.
 - Lets you preview a closing-and-reopening gesture inside the window using synthetic artwork, without taking a screenshot. With Reduce Motion, the preview shows a still illustration instead.
-- Explains readiness, missing screen access, sensor availability, and when to open above your chosen starting angle.
+- Reports readiness in the menu bar; screen-access information and settings are available in Privacy & About.
 - Saves the Infinite Screen toggle and starting angle. The default starting angle is 100°.
+- Optionally restores the live desktop after the lid pauses below the starting angle, so you can keep working at that angle. This is off by default; the pause duration defaults to 2 seconds and can be set from 0.5–10 seconds.
 - Covers the live Dock and menu bar during the effect so their captured images animate with the desktop. Mouse clicks cannot pass through the snapshot.
 - Remains available from both the Dock and menu bar, with standard About, Settings, Edit, and Quit commands. Closing the settings window leaves the app running.
 
@@ -47,7 +48,9 @@ The build script creates a locally ad-hoc-signed app. This alpha is **not Develo
 
 Allow **Glissform** in System Settings → Privacy & Security → Screen & System Audio Recording. The setting's label can vary by macOS version. If macOS asks you to quit and reopen the app, do so. The menu reports readiness; the settings window shows your current lid angle.
 
-Opening Glissform presents its settings window. You can reopen it later from the menu bar icon with **Settings…**. Turn **Infinite Screen** on or off and adjust **Begin at** inside the preview card using the slider, number field, or stepper. Higher angles start the effect sooner. The current lid angle appears at the top of the preview; the slider sets the trigger. Readiness and permission guidance appear directly below the card. Typed angles apply on Return or when you leave the field. Clicking anywhere outside the field clears its focus and applies the entered value; values are limited to 20–130°. **Use current angle** copies your live angle (when it is within 20–130°); **Reset** restores 100°. **Preview motion** immediately plays a short closing-and-reopening illustration from the currently shown lid position; it does not capture or cover your desktop and is not a physical hardware test. Begin above that angle and close through it. If you start the app or change the setting while already below the threshold, open above the chosen angle first.
+Opening Glissform presents its settings window. You can reopen it later from the menu bar icon with **Settings…**. Turn **Infinite Screen** on or off and adjust **Begin at** inside the preview card using the slider, number field, or stepper. Higher angles start the effect sooner. The current lid angle appears at the top of the preview; the slider sets the trigger. The separate card below the preview contains the pause-to-resume toggle and duration. Typed angles apply on Return or when you leave the field. Clicking anywhere outside the field clears its focus and applies the entered value; values are limited to 20–130°. **Use current angle** copies your live angle (when it is within 20–130°); **Reset** restores 100°. **Preview motion** immediately plays a short closing-and-reopening illustration from the currently shown lid position; it does not capture or cover your desktop and is not a physical hardware test. Begin above that angle and close through it. If you start the app or change the setting while already below the threshold, open above the chosen angle first.
+
+**Resume desktop after a pause** restores the live desktop when the lid stays still below the starting angle for the selected duration. For example, with a 95° start and a 2-second pause, closing to 80° and holding there returns the effect to zero and releases the screenshot. Meaningful movement resets the wait; one degree of sensor fluctuation is tolerated. After restoration, the effect stays inactive until you open strictly above the starting angle, then close again. Changing the pause settings restarts any pending wait; disabling this option after restoration does not immediately reactivate the effect. The timer relies on fresh sensor readings and does not delay normal sleep.
 
 Reopen to the chosen angle to restore the live desktop. To stop the app, reopen the lid and choose **Quit Glissform** from its menu bar icon. Normal sleep stays enabled.
 

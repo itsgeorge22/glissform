@@ -14,12 +14,32 @@ final class SettingsModel: ObservableObject {
 
     var onAnimationEnabledChange: ((Bool) -> Void)?
     var onStartAngleChange: ((Double) -> Void)?
+    @Published private(set) var resumeAfterPause = false
+    @Published private(set) var pauseDuration = 2.0
+    var onPauseSettingsChange: ((Bool, Double) -> Void)?
+
     var onOpenPermissions: (() -> Void)?
 
-    func configure(animationEnabled: Bool, startAngle: Double, screenCaptureAllowed: Bool) {
+    func configure(animationEnabled: Bool, startAngle: Double, screenCaptureAllowed: Bool, resumeAfterPause: Bool = false, pauseDuration: Double = 2) {
         self.animationEnabled = animationEnabled
         self.startAngle = startAngle
         self.screenCaptureAllowed = screenCaptureAllowed
+        self.resumeAfterPause = resumeAfterPause
+        self.pauseDuration = pauseDuration.isFinite ? min(10, max(0.5, pauseDuration)) : 2
+    }
+
+    func setResumeAfterPause(_ enabled: Bool) {
+        guard resumeAfterPause != enabled else { return }
+        resumeAfterPause = enabled
+        onPauseSettingsChange?(enabled, pauseDuration)
+    }
+
+    func setPauseDuration(_ duration: Double) {
+        guard duration.isFinite else { return }
+        let normalized = min(10, max(0.5, (duration * 2).rounded() / 2))
+        guard pauseDuration != normalized else { return }
+        pauseDuration = normalized
+        onPauseSettingsChange?(resumeAfterPause, normalized)
     }
 
     func setAnimationEnabled(_ enabled: Bool) {
@@ -82,7 +102,7 @@ private final class SettingsWindow: NSWindow {
 final class SettingsWindowController: NSWindowController {
     init(model: SettingsModel) {
         let window = SettingsWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 720, height: 660),
+            contentRect: NSRect(x: 0, y: 0, width: 720, height: 721),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered, defer: false
         )
@@ -117,7 +137,7 @@ private struct SettingsRootView: View {
             case .about: AboutSettingsView(model: model)
             }
         }
-        .frame(width: 720, height: 660, alignment: .topLeading)
+        .frame(width: 720, height: 721, alignment: .topLeading)
         .background(Color(nsColor: .textBackgroundColor))
         .onAppear { model.refreshPermission() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -178,7 +198,9 @@ private struct AnimationSettingsView: View {
                     .padding(.top, 28)
                     .padding(.bottom, 16)
 
-                ReadinessView(model: model)
+                pauseControls
+                    .padding(.vertical, 20)
+                    .modifier(SettingsCardSurface())
 
             }
 
@@ -293,11 +315,44 @@ private struct AnimationSettingsView: View {
                 .padding(.bottom, 16)
 
             Divider().overlay(Color.primary.opacity(0.025))
-                .padding(.horizontal, 20)
             angleControls
                 .padding(.horizontal, 20).padding(.top, 28).padding(.bottom, 20)
         }
         .modifier(SettingsCardSurface())
+    }
+
+    private var pauseControls: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Resume desktop after a pause").font(.system(size: 13, weight: .semibold))
+                    Text("Restore your desktop when the lid stays still below the starting angle.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Toggle("Resume desktop after a pause", isOn: Binding(
+                    get: { model.resumeAfterPause }, set: { model.setResumeAfterPause($0) }
+                ))
+                .labelsHidden().toggleStyle(AppleSwitchStyle())
+                .accessibilityLabel("Resume desktop after a pause")
+            }
+            .padding(.horizontal, 20)
+            Divider().overlay(Color.primary.opacity(0.025))
+            HStack {
+                Text("Pause duration").font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Stepper(value: Binding(get: { model.pauseDuration }, set: { model.setPauseDuration($0) }),
+                        in: 0.5...10, step: 0.5) {
+                    Text("\(model.pauseDuration, specifier: "%.1f") seconds")
+                        .font(.system(size: 12)).monospacedDigit()
+                }
+                .fixedSize()
+                .accessibilityLabel("Pause duration")
+                .accessibilityValue("\(model.pauseDuration) seconds")
+                .disabled(!model.resumeAfterPause)
+            }
+            .padding(.horizontal, 20)
+        }
     }
 
     private var previewButtonTitle: String {
@@ -468,55 +523,6 @@ private struct SettingsCardSurface: ViewModifier {
         content
             .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 20))
             .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.primary.opacity(0.04)))
-    }
-}
-
-private struct ReadinessView: View {
-    @ObservedObject var model: SettingsModel
-
-    private var message: (symbol: String, title: String, detail: String, needsPermission: Bool) {
-        if !model.animationEnabled {
-            return ("pause.circle", "Take a pause", "Turn on Infinite Screen whenever you want it back.", false)
-        }
-        if !model.screenCaptureAllowed {
-            return ("rectangle.badge.checkmark", "One step to your first gesture", "Allow Screen Recording in macOS settings. No audio is captured.", true)
-        }
-        if model.currentAngle == nil {
-            return ("laptopcomputer", "Waiting for your MacBook", "A compatible built-in lid sensor is needed. The preview is still available.", false)
-        }
-        if model.runtimeStatus.contains("unavailable") || model.runtimeStatus.contains("Waiting") || model.runtimeStatus == "Starting…" {
-            return ("exclamationmark.circle", "Not ready yet", model.runtimeStatus, model.runtimeStatus.contains("permission"))
-        }
-        if model.runtimeStatus.contains("Animating") || model.runtimeStatus.contains("Taking screenshot") {
-            return ("arrow.uturn.backward.circle", "Following your gesture", "Reopen the lid to return to your live desktop.", false)
-        }
-        if let angle = model.currentAngle, angle <= model.startAngle {
-            return ("arrow.up.forward.circle", "Open a little farther to begin", "Open past \(Int(model.startAngle))°, then close slowly to see the effect.", false)
-        }
-        return ("checkmark.circle", "Ready when you close", "Close past \(Int(model.startAngle))°. Reopen before sleep to reverse the effect.", false)
-    }
-
-    var body: some View {
-        let state = message
-        HStack(alignment: .center, spacing: 12) {
-            Image(systemName: state.symbol).font(.system(size: 20, weight: .light))
-                .foregroundStyle(.secondary).frame(width: 24)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 8) {
-                Text(state.title).font(.system(size: 12, weight: .medium))
-                Text(state.detail).font(.system(size: 11)).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-            if state.needsPermission {
-                Button("Open Settings…") { model.onOpenPermissions?() }
-                    .buttonStyle(FeedbackButtonStyle(kind: .filled)).controlSize(.small)
-            }
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .modifier(SettingsCardSurface())
-        .accessibilityElement(children: .contain)
     }
 }
 
