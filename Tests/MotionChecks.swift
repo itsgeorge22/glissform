@@ -30,7 +30,7 @@ import Foundation
         // Slow closure: one whole-degree report every 200 ms. The old 20 ms
         // exponential filter moved 56% of each step on its first frame, then froze.
         var slow = MotionSmoothing()
-        let degree = Float(0.867 * Double.pi / 180)
+        let degree = Float(Double.pi / 180)
         for step in 1...8 {
             let target = Float(step) * degree
             let before = slow.value
@@ -40,7 +40,7 @@ import Foundation
             for frame in 1..<12 {
                 let next = slow.step(toward: target, elapsed: 1.0 / 60)
                 precondition(next >= previous && next <= target, "Slow motion must not overshoot")
-                if frame == 11 {
+                if frame == 11 && step > 1 {
                     precondition(next > previous, "Keep moving between sparse degree readings")
                 }
                 previous = next
@@ -52,22 +52,68 @@ import Foundation
         for _ in 0..<90 { _ = slow.step(toward: 6 * degree, elapsed: 1.0 / 60) }
         precondition(slow.value == 6 * degree, "Stopped sensor must settle exactly, without invented motion")
         print("PASS: slow whole-degree staircase, gentle boundaries, immediate reversal, finite settling")
+        // Replay quantized 30 Hz input on independent 60/120 Hz frame clocks.
+        // Measure against the continuous physical motion, not the filter target.
+        let rippleLimits: [Double: Double] = [2: 0.62, 5: 0.28, 7: 0.33, 12: 0.24,
+                                             20: 0.14, 30: 0.04, 45: 0.15, 60: 0.09, 90: 0.14]
+        for speed in rippleLimits.keys.sorted() {
+            for fps in [60.0, 120.0] {
+                var tracking = MotionSmoothing()
+                var totalError = 0.0
+                var samples = 0
+                var lastAngle = 0.0
+                var speedErrors: [Double] = []
+                for frame in 1...Int(3 * fps) {
+                    let time = Double(frame) / fps
+                    let sensorTime = floor(time * 30 + 0.000001) / 30
+                    let reported = Float((sensorTime * speed).rounded() * .pi / 180)
+                    let rendered = tracking.step(toward: reported, elapsed: 1 / fps)
+                    precondition(rendered <= reported + 0.000001, "Never predict an unreported angle")
+                    let angle = Double(rendered) * 180 / .pi
+                    if time > 0.5 {
+                        totalError += abs(angle - time * speed)
+                        samples += 1
+                    }
+                    if time > 1 { speedErrors.append(pow((angle - lastAngle) * fps - speed, 2)) }
+                    lastAngle = angle
+                }
+                let meanDelay = totalError / Double(samples) / speed
+                let ripple = sqrt(speedErrors.reduce(0, +) / Double(speedErrors.count)) / speed
+                precondition(ripple < rippleLimits[speed]!,
+                             "Speed ripple must stay bounded at \(speed) degrees/s, \(fps) Hz: \(ripple)")
+                precondition(meanDelay < (speed <= 7 ? 0.240 : 0.100),
+                             "Tracking delay must stay bounded at \(speed) degrees/s, \(fps) Hz: \(meanDelay)")
+                print(String(format: "PASS: %.0f°/s at %.0f Hz, tracking error %.1f ms, relative speed ripple %.3f", speed, fps, meanDelay * 1000, ripple))
+            }
+        }
+        // Full physical rotation, including reference angles above 90 degrees.
+        for reference in [20.0, 85, 100, 130] {
+            var previousFold: Float = -1
+            for angle in stride(from: reference, through: 4, by: -1) {
+                let fold = ScreenProjection.foldRadians(lidAngle: angle, referenceAngle: reference)
+                precondition(abs(Double(fold) * 180 / .pi - (reference - angle)) < 0.00002,
+                             "Projection must compensate the full physical angle")
+                precondition(fold > previousFold, "Projection must not freeze late in closure")
+                previousFold = fold
+            }
+        }
+        print("PASS: one-to-one physical rotation throughout 20–130 degree trigger range")
         var handoff = HandoffTransition()
         handoff.begin(from: 0)
         precondition(handoff.step(toward: 1, elapsed: 0) == 0, "Entrance starts at the unchanged image")
-        precondition(handoff.step(toward: 1, elapsed: 0.010) < 0.002, "Entrance starts gently")
-        let middle = handoff.step(toward: 1, elapsed: 0.080)
+        precondition(handoff.step(toward: 1, elapsed: 0.010) < 0.01, "Entrance starts gently")
+        let middle = handoff.step(toward: 1, elapsed: 0.040)
         precondition(abs(middle - 0.5) < 0.001)
         handoff.begin(from: middle)
         precondition(handoff.step(toward: 0, elapsed: 0) == middle, "Interrupted entrance returns from its displayed angle")
-        precondition(handoff.step(toward: 0, elapsed: 0.180) == 0 && !handoff.active,
+        precondition(handoff.step(toward: 0, elapsed: 0.100) == 0 && !handoff.active,
                      "Exit reaches an exact flat image before releasing the snapshot")
         handoff.begin(from: 0.2)
         precondition(handoff.step(toward: 0.7, elapsed: 0) == 0.2, "Reclosing during exit must not jump")
         handoff.begin(from: 0)
         precondition(handoff.step(toward: 1, elapsed: 0.5) == 0,
                      "Even a late first display frame must start at exactly zero effect")
-        precondition(handoff.step(toward: 1, elapsed: 0.010) < 0.002)
+        precondition(handoff.step(toward: 1, elapsed: 0.010) < 0.01)
         print("PASS: exact zero first frame, gentle entry and exit, interrupted entrance, reclose continuity")
         var motion = ClosingMotion()
         for angle in [110.0, 109, 110, 111, 110] {

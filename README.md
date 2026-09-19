@@ -2,7 +2,7 @@
 
 A small macOS menu bar app that makes your desktop appear to stay in place as you close your MacBook lid. The moving screen reveals a gradually blurred, shadowed image behind it.
 
-**Current version: 0.1.0-alpha.1.** This is an experimental first public version, built and physically tested during development on a MacBook Air M5 15-inch. Wider hardware compatibility and performance are still being evaluated.
+**Current version: 0.1.0-alpha.2.** This is an experimental public alpha, developed on a MacBook Air M5 15-inch. Wider hardware compatibility and physical performance are still being evaluated.
 
 [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
@@ -11,8 +11,11 @@ A small macOS menu bar app that makes your desktop appear to stay in place as yo
 - Takes one screenshot when closing crosses your chosen lid angle. No continuous screen recording or idle capture.
 - Animates that same image through closing, pauses, and reopening before sleep.
 - Starts at exactly zero stretch, blur, and shadow, then eases into the current angle.
-- Uses adaptive smoothing for the sensor's whole-degree readings and gradual entrance and return transitions.
-- Builds a shadow over the full animation: transparent at the bottom, darkest at the top, with only the top 5% reaching full black at the end.
+- Compensates the full lid rotation around a fixed hinge, including closures that travel more than 90° from the starting angle.
+- Uses measured sensor cadence and critically damped smoothing to keep tracking speed steadier across whole-degree readings. Motion settles without overshooting reported angles and responds immediately to reversals.
+- Overlaps the 80 ms screenshot fade with a 100 ms geometric handoff, reducing entrance delay while keeping the first frame unchanged.
+- Diffuses the entire image into a frosted-glass appearance as the lid closes, including the bottom. Fine text and icons soften while larger shapes retain enough definition to show the perspective skew; a smooth vertical gradient keeps the blur lighter at the hinge and heavier at the top. Reopening clears it continuously.
+- Builds a shadow over the full animation, gently at first so the frosted colours stay visible, then more strongly near closure: transparent at the bottom, darkest at the top, with only the top 5% reaching full black at the end.
 - Provides a compact native window with a main experience page and a linked Privacy & About page, a live lid reading, an original perspective illustration, an Infinite Screen switch, and precise starting-angle controls.
 - Lets you preview a closing-and-reopening gesture inside the window using synthetic artwork, without taking a screenshot. With Reduce Motion, the preview shows a still illustration instead.
 - Explains readiness, missing screen access, sensor availability, and when to open above your chosen starting angle.
@@ -74,7 +77,7 @@ build/Glissform.app/Contents/MacOS/Glissform --version
 build/Glissform.app/Contents/MacOS/Glissform --probe
 ```
 
-Tests cover motion, thresholds, reversals, boundary transitions, and Metal rendering against synthetic pixels. `--probe` reads the actual lid sensor. For a machine without Metal rendering support:
+Tests cover motion, thresholds, reversals, tracking delay, boundary transitions, Metal rendering against synthetic pixels, and snapshot cancellation through the real gesture coordinator using synthetic captures. `--probe` reads the actual lid sensor. For a machine without Metal rendering support:
 
 ```sh
 bash scripts/test.sh --motion-only

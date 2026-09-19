@@ -51,8 +51,8 @@ final class EffectRenderer: NSObject, MTKViewDelegate {
     /// Camera distance/height are in screen-height units, for a normal seated view.
     func setLidAngle(_ angle: Double, referenceAngle: Double) {
         guard angle.isFinite, referenceAngle.isFinite else { return }
-        fullClosureRadians = Float(max(1, referenceAngle - 4) * 0.867 * .pi / 180)
-        let next = Float(min(89, max(0, referenceAngle - angle)) * 0.867 * .pi / 180)
+        fullClosureRadians = ScreenProjection.foldRadians(lidAngle: 4, referenceAngle: referenceAngle)
+        let next = ScreenProjection.foldRadians(lidAngle: angle, referenceAngle: referenceAngle)
         guard next != foldRadians else { return }
         foldRadians = next
         scheduleSettling()
@@ -70,7 +70,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate {
         }
     }
 
-    init?(view: MTKView) {
+    init?(view: MTKView, framesPerSecond: Int = 60) {
         guard let device = MTLCreateSystemDefaultDevice(),
               let queue = device.makeCommandQueue() else { return nil }
         do {
@@ -96,7 +96,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate {
         view.colorspace = CGColorSpace(name: CGColorSpace.sRGB)
         view.framebufferOnly = true
         view.isPaused = true
-        view.preferredFramesPerSecond = 60
+        view.preferredFramesPerSecond = max(60, framesPerSecond)
         // Event-driven drawing disables MetalKit's frame loop, even when we
         // unpause it. Timed drawing lets the 60 ms settle fill sensor intervals.
         view.enableSetNeedsDisplay = false
@@ -216,12 +216,14 @@ final class EffectRenderer: NSObject, MTKViewDelegate {
             encoder.setRenderPipelineState(pipeline)
             encoder.setFragmentTexture(texture, index: 0)
             let visibleAngle = displayedFold ?? foldRadians
-            let fraction = min(1, max(0, visibleAngle / fullClosureRadians))
+            let fraction = min(1, max(0, visibleAngle / max(0.001, fullClosureRadians)))
             let visibleProgress = fraction * fraction * (3 - 2 * fraction)
             var uniforms = SIMD4<Float>(visibleProgress, Float(texture.width), Float(texture.height), visibleAngle)
             encoder.setFragmentBytes(&uniforms, length: MemoryLayout<SIMD4<Float>>.stride, index: 0)
             var frost = blurScale
             encoder.setFragmentBytes(&frost, length: MemoryLayout<Float>.stride, index: 1)
+            var eye = SIMD2<Float>(ScreenProjection.eyeDistance, ScreenProjection.eyeHeight)
+            encoder.setFragmentBytes(&eye, length: MemoryLayout<SIMD2<Float>>.stride, index: 2)
             encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         }
         encoder.endEncoding()
@@ -234,11 +236,11 @@ final class EffectRenderer: NSObject, MTKViewDelegate {
 
     /// Renders synthetic pixels only; does not request permission or read the user's screen.
     /// Writes outputURL at 65% progress and a sibling *.clear.png at zero progress.
-    static func selfTest(outputURL: URL) throws {
+    static func selfTest(outputURL: URL, benchmark: Bool = false) throws {
         func failure(_ message: String) -> NSError {
             NSError(domain: "Glissform.RendererTest", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
         }
-        let width = 960, height = 600
+        let width = benchmark ? 2880 : 960, height = benchmark ? 1864 : 600
         let view = MTKView(frame: NSRect(x: 0, y: 0, width: width, height: height))
         guard let renderer = EffectRenderer(view: view) else { throw failure("Metal initialization failed") }
         guard !view.enableSetNeedsDisplay, view.preferredFramesPerSecond == 60 else {
@@ -273,13 +275,17 @@ final class EffectRenderer: NSObject, MTKViewDelegate {
         try FileManager.default.createDirectory(at: outputURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         // The sharp intermediate frames test the actual shader independently of
         // the frosting. They must match rays through a rotating physical panel.
-        let cases: [(Float, Float, String)] = [(0, 1, "clear"), (0.5, 1, "zeroAngle"), (0.2, 0, "projection16"),
-                                             (0.5, 0, "projection40"), (0.25, 1, "frost20"),
-                                             (0.65, 1, "frost52"), (1, 1, "frost80"), (1.0125, 1, "fullShadow")]
-        for (amount, frost, label) in cases {
+        let cases: [(Float, Float, Double, String)] = [(0, 1, 85, "clear"), (0.5, 1, 85, "zeroAngle"),
+            (0.2, 0, 85, "projection16"), (0.5, 0, 85, "projection40"),
+            (1.125, 0, 100, "projection90"), (1.5, 0, 130, "projection120"),
+            (0.25, 1, 85, "frost20"), (0.5, 1, 85, "frost40"), (0.65, 1, 85, "frost52"),
+            (1, 1, 85, "frost80"), (1.0125, 1, 85, "fullShadow")]
+        var sharpBottomEdgeEnergy: Double?
+        for (amount, frost, reference, label) in cases {
             renderer.progress = amount
             renderer.blurScale = frost
-            renderer.setLidAngle(label == "zeroAngle" ? 85 : 85 - Double(amount) * 80, referenceAngle: 85)
+            renderer.setLidAngle(label == "zeroAngle" ? reference : reference - Double(amount) * 80,
+                                 referenceAngle: reference)
             let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: width, height: height, mipmapped: false)
             descriptor.usage = [.renderTarget, .shaderRead]
             descriptor.storageMode = .shared
@@ -298,6 +304,26 @@ final class EffectRenderer: NSObject, MTKViewDelegate {
                 destination.getBytes($0.baseAddress!, bytesPerRow: width * 4,
                                      from: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0)
             }
+            if label == "projection40" || label == "frost40" {
+                // Compare identical projection/shadow with and without frost.
+                // Thin synthetic grid edges at the hinge must actually soften;
+                // a gap-only blur leaves this band almost completely sharp.
+                var energy = 0.0
+                for y in (height - 12)..<(height - 2) {
+                    for x in (width / 10)..<(width * 9 / 10) {
+                        let offset = (y * width + x) * 4
+                        let difference = Double(rendered[offset]) - Double(rendered[offset - 4])
+                        energy += difference * difference
+                    }
+                }
+                if label == "projection40" { sharpBottomEdgeEnergy = energy }
+                else {
+                    guard let sharpBottomEdgeEnergy, sharpBottomEdgeEnergy > 0,
+                          energy < sharpBottomEdgeEnergy * 0.65 else {
+                        throw failure("Progressive frost must soften the bottom edge as well as the top")
+                    }
+                }
+            }
             if amount == 0 || label == "zeroAngle" {
                 // Asymmetric markers catch both vertical inversion and horizontal mirroring.
                 for (x, y) in [(17, 19), (911, 23), (29, 563), (901, 557)] {
@@ -309,7 +335,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate {
                 }
             }
             if frost == 0 {
-                let theta = Double(amount) * 80 * 0.867 * .pi / 180
+                let theta = Double(amount) * 80 * .pi / 180
                 for (x, y) in [(17, 19), (911, 23), (29, 563), (901, 557), (340, 230), (620, 390)] {
                     // Independent ray/plane intersection in screen-height units.
                     let surface = SIMD3<Double>((Double(x) + 0.5) / Double(width) - 0.5,
@@ -336,9 +362,9 @@ final class EffectRenderer: NSObject, MTKViewDelegate {
                             let t = min(1, max(0, (value - low) / (high - low)))
                             return t * t * (3 - 2 * t)
                         }
-                        let rawProgress = Double(amount) * 80 / 81
+                        let rawProgress = min(1, Double(amount) * 80 / (reference - 4))
                         let visibleProgress = rawProgress * rawProgress * (3 - 2 * rawProgress)
-                        let darkness = smoothstep(0, 1, visibleProgress)
+                        let darkness = pow(visibleProgress, 2.2)
                             * (1 - smoothstep(0.05, 1, 1 - heightFromHinge))
                         expected *= 1 - darkness
                         guard abs(Double(rendered[(y * width + x) * 4 + channel]) - expected) < 2 else {
@@ -372,9 +398,156 @@ final class EffectRenderer: NSObject, MTKViewDelegate {
             let target = label == "frost52" ? outputURL : outputURL.deletingPathExtension().appendingPathExtension("\(label).png")
             try png.write(to: target)
         }
-        print("PASS: stationary-plane GPU projection at 16° and 40°, orientation, opacity, top shadow, frost at 20°/52°/80°")
+        print("PASS: stationary-plane GPU projection at 16°/40°/90°/120°, orientation, opacity, top shadow, bottom-edge blur, frost at 20°/40°/52°/80°")
+        if benchmark {
+            let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm,
+                width: width, height: height, mipmapped: false)
+            descriptor.storageMode = .private
+            descriptor.usage = [.renderTarget]
+            guard let destination = renderer.device.makeTexture(descriptor: descriptor) else {
+                throw failure("Cannot allocate benchmark target")
+            }
+            let pass = MTLRenderPassDescriptor()
+            pass.colorAttachments[0].texture = destination
+            pass.colorAttachments[0].loadAction = .dontCare
+            pass.colorAttachments[0].storeAction = .store
+            var milliseconds: [Double] = []
+            for frame in 0..<130 {
+                // Warm up 10 frames, then sweep through closing and reopening.
+                let phase = Double(max(0, frame - 10)) / 119 * .pi
+                let fold = Float(sin(phase) * 95 * .pi / 180)
+                guard let command = renderer.encode(descriptor: pass, displayedFold: fold) else {
+                    throw failure("Cannot encode benchmark frame")
+                }
+                command.commit()
+                command.waitUntilCompleted()
+                if let error = command.error { throw error }
+                if frame >= 10 {
+                    milliseconds.append((command.gpuEndTime - command.gpuStartTime) * 1000)
+                }
+            }
+            milliseconds.sort()
+            print(String(format: "GPU-only synthetic %dx%d, 120 frames: mean %.2f ms, p95 %.2f ms, max %.2f ms (excludes capture, compositor and display pacing)",
+                         width, height, milliseconds.reduce(0, +) / Double(milliseconds.count),
+                         milliseconds[Int(Double(milliseconds.count - 1) * 0.95)], milliseconds.last!))
+        }
         renderer.clear()
         guard view.isPaused else { throw failure("Clearing must stop the frame loop") }
+    }
+
+    /// Original synthetic desktop artwork for material review, never a screen capture.
+    static func materialPreview(outputDirectory: URL) throws {
+        let width = 960, height = 600
+        let view = MTKView(frame: NSRect(x: 0, y: 0, width: width, height: height))
+        guard let renderer = EffectRenderer(view: view) else {
+            throw NSError(domain: "Glissform.MaterialPreview", code: 1)
+        }
+        var storage: CVPixelBuffer?
+        let attributes: [String: Any] = [kCVPixelBufferMetalCompatibilityKey as String: true,
+                                         kCVPixelBufferIOSurfacePropertiesKey as String: [:]]
+        CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCVPixelFormatType_32BGRA,
+                            attributes as CFDictionary, &storage)
+        guard let buffer = storage else { throw NSError(domain: "Glissform.MaterialPreview", code: 2) }
+        CVPixelBufferLockBaseAddress(buffer, [])
+        guard let context = CGContext(data: CVPixelBufferGetBaseAddress(buffer), width: width, height: height,
+                                      bitsPerComponent: 8, bytesPerRow: CVPixelBufferGetBytesPerRow(buffer),
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue) else {
+            CVPixelBufferUnlockBaseAddress(buffer, [])
+            throw NSError(domain: "Glissform.MaterialPreview", code: 3)
+        }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+        func card(_ rect: NSRect, _ color: NSColor, radius: CGFloat = 18) {
+            color.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+        }
+        func label(_ text: String, x: CGFloat, y: CGFloat, size: CGFloat, color: NSColor = .white,
+                   weight: NSFont.Weight = .regular) {
+            (text as NSString).draw(at: NSPoint(x: x, y: y), withAttributes: [
+                .font: NSFont.systemFont(ofSize: size, weight: weight), .foregroundColor: color])
+        }
+        NSGradient(colors: [NSColor(srgbRed: 0.13, green: 0.15, blue: 0.37, alpha: 1),
+                            NSColor(srgbRed: 0.55, green: 0.35, blue: 0.58, alpha: 1),
+                            NSColor(srgbRed: 0.91, green: 0.66, blue: 0.43, alpha: 1)])!
+            .draw(in: NSRect(x: 0, y: 0, width: width, height: height), angle: 35)
+        NSColor(srgbRed: 0.22, green: 0.34, blue: 0.57, alpha: 1).setFill()
+        let hill = NSBezierPath()
+        hill.move(to: NSPoint(x: 0, y: 0)); hill.line(to: NSPoint(x: 0, y: 230))
+        hill.curve(to: NSPoint(x: 960, y: 185), controlPoint1: NSPoint(x: 380, y: 450), controlPoint2: NSPoint(x: 540, y: 35))
+        hill.line(to: NSPoint(x: 960, y: 0)); hill.close(); hill.fill()
+        card(NSRect(x: 0, y: 574, width: 960, height: 26), NSColor.black.withAlphaComponent(0.2), radius: 0)
+        label("Studio    File    Edit    View", x: 22, y: 580, size: 12, weight: .semibold)
+        label("Monday   9:41", x: 842, y: 580, size: 12)
+        card(NSRect(x: 40, y: 359, width: 240, height: 174), NSColor(srgbRed: 0.90, green: 0.94, blue: 0.99, alpha: 1))
+        label("MONDAY", x: 60, y: 496, size: 13, color: .systemRed, weight: .semibold)
+        label("19", x: 57, y: 423, size: 64, color: .darkGray, weight: .light)
+        label("A little space to think.", x: 60, y: 384, size: 16, color: .darkGray)
+        card(NSRect(x: 40, y: 190, width: 240, height: 143), NSColor(srgbRed: 0.17, green: 0.54, blue: 0.86, alpha: 1))
+        label("Clear skies", x: 60, y: 297, size: 15, weight: .medium)
+        label("21°", x: 57, y: 233, size: 52, weight: .light)
+        label("A bright afternoon ahead", x: 60, y: 211, size: 13)
+        card(NSRect(x: 325, y: 156, width: 590, height: 377), NSColor(srgbRed: 0.97, green: 0.96, blue: 0.94, alpha: 1), radius: 12)
+        for (index, color) in [NSColor.systemRed, .systemYellow, .systemGreen].enumerated() {
+            card(NSRect(x: 344 + index * 20, y: 505, width: 12, height: 12), color, radius: 6)
+        }
+        label("Studio", x: 430, y: 503, size: 14, color: .darkGray, weight: .semibold)
+        label("Make room for ideas.", x: 360, y: 443, size: 30, color: .darkGray, weight: .semibold)
+        label("Notes, sketches and small discoveries.", x: 360, y: 412, size: 16, color: .gray)
+        for (index, color) in [NSColor.systemOrange, .systemPurple, .systemTeal].enumerated() {
+            let x = 360 + index * 172
+            card(NSRect(x: x, y: 245, width: 148, height: 140), color.withAlphaComponent(0.22), radius: 10)
+            card(NSRect(x: x + 16, y: 306, width: 49, height: 49), color, radius: 12)
+            label(["Explore", "Create", "Collect"][index], x: CGFloat(x + 16), y: 272,
+                  size: 16, color: .darkGray, weight: .semibold)
+        }
+        label("Everything starts with a little curiosity.", x: 360, y: 196, size: 15, color: .gray)
+        card(NSRect(x: 213, y: 25, width: 534, height: 80), NSColor.white.withAlphaComponent(0.32), radius: 22)
+        let colors: [NSColor] = [.systemBlue, .systemGreen, .systemOrange, .systemPink, .systemPurple, .systemTeal, .darkGray]
+        let symbols = ["folder.fill", "message.fill", "calendar", "music.note", "photo", "safari", "gearshape.fill"]
+        for index in 0..<7 {
+            let x = 229 + index * 73
+            card(NSRect(x: x, y: 38, width: 64, height: 54), colors[index], radius: 13)
+            if let icon = NSImage(systemSymbolName: symbols[index], accessibilityDescription: nil) {
+                icon.draw(in: NSRect(x: x + 15, y: 49, width: 34, height: 32))
+            }
+        }
+        NSGraphicsContext.restoreGraphicsState()
+        CVPixelBufferUnlockBaseAddress(buffer, [])
+        renderer.update(pixelBuffer: buffer)
+        try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm,
+            width: width, height: height, mipmapped: false)
+        descriptor.storageMode = .shared
+        descriptor.usage = [.renderTarget]
+        guard let target = renderer.device.makeTexture(descriptor: descriptor) else {
+            throw NSError(domain: "Glissform.MaterialPreview", code: 4)
+        }
+        let pass = MTLRenderPassDescriptor()
+        pass.colorAttachments[0].texture = target
+        pass.colorAttachments[0].loadAction = .clear
+        pass.colorAttachments[0].storeAction = .store
+        for degrees in [0, 12, 24, 40, 60] {
+            renderer.setLidAngle(95 - Double(degrees), referenceAngle: 95)
+            guard let command = renderer.encode(descriptor: pass) else {
+                throw NSError(domain: "Glissform.MaterialPreview", code: 5)
+            }
+            command.commit(); command.waitUntilCompleted()
+            if let error = command.error { throw error }
+            var pixels = [UInt8](repeating: 0, count: width * height * 4)
+            pixels.withUnsafeMutableBytes {
+                target.getBytes($0.baseAddress!, bytesPerRow: width * 4,
+                                from: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0)
+            }
+            let provider = CGDataProvider(data: Data(pixels) as CFData)!
+            let image = CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32,
+                bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGBitmapInfo.byteOrder32Little.union(CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedFirst.rawValue)),
+                provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)!
+            let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])!
+            try png.write(to: outputDirectory.appendingPathComponent("fold-\(degrees).png"))
+        }
+        renderer.clear()
     }
 
     private static let shader = """
@@ -387,7 +560,8 @@ final class EffectRenderer: NSObject, MTKViewDelegate {
         return {float4(p, 0, 1), float2((p.x + 1) * 0.5, (1 - p.y) * 0.5)};
     }
     fragment float4 hingeFragment(Vertex in [[stage_in]], texture2d<float> desktop [[texture(0)]],
-                                   constant float4 &uniforms [[buffer(0)]], constant float &frost [[buffer(1)]]) {
+                                   constant float4 &uniforms [[buffer(0)]], constant float &frost [[buffer(1)]],
+                                   constant float2 &eye [[buffer(2)]]) {
         constexpr sampler sampling(coord::normalized, address::clamp_to_zero, filter::linear, mip_filter::linear);
         float theta = max(0.0f, uniforms.w);
         // Only the displayed angle controls effect strength; a raw sensor
@@ -398,32 +572,45 @@ final class EffectRenderer: NSObject, MTKViewDelegate {
         // its viewing ray back to the ORIGINAL upright image plane (z = 0).
         // This is a projective window into stationary content, not a UV zoom.
         // At the hinge z=0 so source and screen coincide at every lid angle.
-        const float eyeDistance = 4.0f;
-        const float eyeHeight = 1.10f;
+        float eyeDistance = eye.x;
+        float eyeHeight = eye.y;
         float depth = heightFromHinge * sin(theta);
         float planeHeight = heightFromHinge * cos(theta);
         float rayScale = eyeDistance / (eyeDistance - depth);
         float2 uv = float2(0.5f + (in.uv.x - 0.5f) * rayScale,
                           1.0f - (eyeHeight + (planeHeight - eyeHeight) * rayScale));
-        // Frost comes from the physical gap to that plane: sharp near the hinge,
-        // diffuse where the moving surface is furthest away. No global dim/zoom.
-        float radius = depth * uniforms.z * 0.0495f * frost;
+        // Closing progressively diffuses the whole stretched image, including
+        // the hinge. Add more diffusion toward the top, furthest from the plane.
+        // Use displayed closure progress rather than sin(theta): blur must keep
+        // increasing even when a gesture rotates past 90 degrees, and reverse
+        // continuously on reopening. The prepared zero-angle frame stays sharp.
+        float verticalBlur = smoothstep(0.0f, 1.0f, heightFromHinge);
+        // Diffusion establishes the frosted material early, then keeps growing
+        // gently. Large colored shapes survive after text and icon detail merge.
+        float frostAmount = (1.0f - exp(-3.0f * uniforms.x)) / (1.0f - exp(-3.0f));
+        float radius = frostAmount * uniforms.z * mix(0.015f, 0.090f, verticalBlur) * frost;
         float2 pixel = 1.0f / max(uniforms.yz, float2(1));
-        float2 step = pixel * radius;
-        // Prefiltered mip levels avoid sparse-tap ghosting on text and thin edges.
-        float lod = log2(max(1.0f, radius * 0.55f));
-        float3 color = desktop.sample(sampling, uv, level(lod)).rgb * 0.20f;
-        for (uint i = 0; i < 8; ++i) {
-            float angle = float(i) * 0.78539816339f;
-            float2 offset = float2(cos(angle), sin(angle));
-            color += desktop.sample(sampling, uv + offset * step * 0.46f, level(lod)).rgb * 0.065f;
-            color += desktop.sample(sampling, uv + offset * step, level(lod)).rgb * 0.035f;
+        float2 step = pixel * radius * 0.5f;
+        // A normalized Gaussian-like kernel over prefiltered mip levels gives
+        // broad, continuous diffusion without the old concentric sample rings.
+        // Mip interpolation keeps changes in blur strength continuous in motion.
+        const float weights[] = {0.0625f, 0.25f, 0.375f, 0.25f, 0.0625f};
+        // The lower mip footprint must cover at least the half-radius spacing
+        // between taps. Smaller footprints leave gaps and repeat glyph edges.
+        float lod = log2(max(1.0f, radius));
+        float3 color = float3(0);
+        for (uint y = 0; y < 5; ++y) {
+            for (uint x = 0; x < 5; ++x) {
+                float2 offset = float2(float(x) - 2.0f, float(y) - 2.0f) * step;
+                color += desktop.sample(sampling, uv + offset, level(lod)).rgb * weights[x] * weights[y];
+            }
         }
         // The top recedes into shadow; the hinge stays lit. Use the displayed
         // angle so shadow, projection and frost share the same soft stop.
         // Build throughout the whole animation. The gradient extends from
         // transparent at the bottom to a black plateau across the top 5%.
-        float darkness = smoothstep(0.0f, 1.0f, uniforms.x)
+        // Keep blurred colors luminous until the deep shadow builds near closure.
+        float darkness = pow(uniforms.x, 2.2f)
                          * (1.0f - smoothstep(0.05f, 1.0f, in.uv.y));
         return float4(color * (1.0f - darkness), 1);
     }

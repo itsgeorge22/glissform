@@ -4,16 +4,35 @@
 
 Run `bash scripts/build.sh` followed by `bash scripts/test.sh`.
 
-Motion checks exercise thresholds, repeated closure, slow whole-degree readings, reversal, settling, zero-effect entrance, interrupted handoffs, low-lid startup, and reset behavior. Synthetic Metal checks compare projected pixels to a CPU calculation and verify orientation, opacity, zero-angle identity, and the final top shadow.
+Motion checks exercise thresholds, repeated closure, slow whole-degree readings, reversal, settling, zero-effect entrance, interrupted handoffs, low-lid startup, and reset behavior. Quantized 30 Hz sensor traces run on 60/120 Hz frame clocks at nine speeds from 2 to 90 degrees/second, including uneven report intervals and mixed one/two-degree reports. Both tracking error and frame-to-frame speed ripple are bounded; checking delay alone can reward visibly uneven movement. Full-angle checks cover starting angles from 20° to 130°.
 
-`bash scripts/test.sh --motion-only` explicitly omits Metal checks. GitHub Actions uses this mode; it does not verify physical lid behavior, permissions, or screen capture.
+Synthetic Metal checks compare projected pixels to independent CPU ray/plane intersections at 16°, 40°, 90° and 120° of physical rotation, and verify orientation, opacity, zero-angle identity and the final top shadow. Matching sharp/blurred frames at 40° verify that frost softens grid edges at the bottom of the image as well. Lifecycle checks use the real gesture coordinator and a synthetic capture source: a screenshot arriving after reversal, sleep, display change or shutdown must be rejected. An overlapping entrance, reclose during return, single-snapshot reuse and final desktop-access cleanup are also exercised. These checks briefly create a small synthetic Metal window; no desktop pixels are captured.
+
+For a local GPU rendering measurement using synthetic pixels at 2880 × 1864:
+
+```sh
+build/Glissform.app/Contents/MacOS/Glissform --render-benchmark
+```
+
+The benchmark reports mean, 95th-percentile and maximum GPU command duration over 120 closing/reopening frames after warmup. It excludes screenshot capture, the window compositor, sensor delivery and actual display frame pacing, so it cannot establish end-to-end smoothness or a guaranteed frame rate. Generated images stay under `build/`.
+
+`bash scripts/test.sh --motion-only` explicitly omits Metal and AppKit lifecycle checks. GitHub Actions uses this mode; it does not verify physical lid behavior, permissions, or screen capture.
 
 ## Physical acceptance
+
+For a repeatable material review with original synthetic desktop artwork (text, widgets, window panels and Dock icons):
+
+```sh
+build/Glissform.app/Contents/MacOS/Glissform --material-preview
+```
+
+This writes sharp and 12°/24°/40°/60° rotated frames to `build/material-preview/` through the production renderer. It does not capture the screen. Compare the shapes, diffusion and retained colour with the supplied reference stills; these images cannot establish the reference animation's timing or physical viewing geometry.
 
 Record the app version, Mac model, macOS version, display arrangement, start angle, and results:
 
 - Start above and below the selected angle; check that the effect starts only after an eligible close.
 - Leave the desktop unchanged, then close slowly and quickly.
+- Check that blur grows across the whole image as the lid closes, stays lighter at the bottom than at the top, and clears smoothly on reopening.
 - Pause at several angles; check settling and idle behavior.
 - Reverse before the screenshot returns, during entrance, midway, and during the exit fade.
 - Reclose during the return; check for image jumps or a lingering overlay.

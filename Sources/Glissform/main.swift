@@ -50,7 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let statusLine = NSMenuItem(title: "Starting…", action: nil, keyEquivalent: "")
     private let enableMenuItem = NSMenuItem(title: "Enable Infinite Screen", action: nil, keyEquivalent: "")
     private let sensor = LidSensor()
-    private let capture = DesktopCapture()
+    private let capture: DesktopScreenshotSource
     private let settingsModel = SettingsModel()
     private var settingsWindowController: SettingsWindowController?
     private var window: OverlayWindow?
@@ -74,6 +74,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var retryAfter = Date.distantPast
     private var starting = false
     private var permissionRequested = false
+
+    init(capture: DesktopScreenshotSource = DesktopCapture()) {
+        self.capture = capture
+        super.init()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.applicationIconImage = makeGlissformAppIcon()
@@ -164,37 +169,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func startSensor() {
         motion.reset()
         sensor.start(onReading: { [weak self] angle in
-            guard let self, !self.sleeping, !self.quitting else { return }
-            self.lastReading = Date()
-            self.settingsModel.updateAngle(angle)
-            guard self.settingsModel.animationEnabled else {
-                self.finishGesture()
-                self.motion.reset()
-                self.setStatus("Paused")
-                return
-            }
-            guard self.ready else { return }
-            let progress = self.motion.update(angle: angle)
-            self.currentProgress = progress
-            self.renderer?.setLidAngle(angle, referenceAngle: self.motion.activationAngle)
-            guard self.motion.active else {
-                self.finishGesture()
-                self.setStatus("Ready")
-                return
-            }
-            if self.finishingGesture {
-                self.finishingGesture = false
-                self.entrancePending = false
-                self.renderer?.beginAnimation()
-                self.revealOverlay()
-            }
-            if !self.snapshotRequested { self.takeSnapshot() }
-            self.showProgress()
+            self?.handleLidReading(angle)
         }, onStatus: { [weak self] status in
             guard let self else { return }
             self.settingsModel.updateSensorStatus(status)
             if !status.lowercased().contains("connected") { self.setStatus(status) }
         })
+    }
+
+    private func handleLidReading(_ angle: Double) {
+        guard !sleeping, !quitting else { return }
+        lastReading = Date()
+        settingsModel.updateAngle(angle)
+        guard settingsModel.animationEnabled else {
+            finishGesture()
+            motion.reset()
+            setStatus("Paused")
+            return
+        }
+        guard ready else { return }
+        let progress = motion.update(angle: angle)
+        currentProgress = progress
+        renderer?.setLidAngle(angle, referenceAngle: motion.activationAngle)
+        guard motion.active else {
+            finishGesture()
+            setStatus("Ready")
+            return
+        }
+        if finishingGesture {
+            finishingGesture = false
+            entrancePending = false
+            renderer?.beginAnimation()
+            revealOverlay()
+        }
+        if !snapshotRequested { takeSnapshot() }
+        showProgress()
     }
 
     private func connect() {
@@ -228,7 +237,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         overlay.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         overlay.animationBehavior = .none
         let view = MTKView(frame: NSRect(origin: .zero, size: screen.frame.size))
-        guard let effect = EffectRenderer(view: view) else {
+        guard let effect = EffectRenderer(view: view, framesPerSecond: screen.maximumFramesPerSecond) else {
             setStatus("Metal rendering unavailable")
             starting = false
             retryAfter = Date().addingTimeInterval(10)
@@ -269,8 +278,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 window?.ignoresMouseEvents = false
                 window?.orderFrontRegardless()
                 setStatus("Animating · Reopen to reverse")
-                // First reveal the identity screenshot. Start geometry only
-                // after the live-to-snapshot handoff has finished.
+                // Reveal the prepared identity frame, then blend geometry and
+                // opacity together so two handoffs do not accumulate latency.
                 entrancePending = true
                 showProgress()
                 revealOverlay()
@@ -296,15 +305,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let amount = min(1, (ProcessInfo.processInfo.systemUptime - started) / 0.08)
                 let blend = amount * amount * (3 - 2 * amount)
                 self.window?.alphaValue = initialAlpha + (targetAlpha - initialAlpha) * blend
+                if !hiding, self.entrancePending, !self.finishingGesture {
+                    self.entrancePending = false
+                    self.renderer?.beginAnimation()
+                    self.showProgress()
+                }
                 if amount == 1 {
                     timer.invalidate()
                     self.revealTimer = nil
                     if hiding, self.finishingGesture { self.endGesture() }
-                    else if !hiding, self.entrancePending, !self.finishingGesture {
-                        self.entrancePending = false
-                        self.renderer?.beginAnimation()
-                        self.showProgress()
-                    }
                 }
             }
         }
@@ -452,11 +461,145 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func quitApp() {
+        shutdown()
+        NSApp.terminate(nil)
+    }
+
+    private func shutdown() {
         quitting = true
         heartbeat?.invalidate()
         sensor.stop()
         endGesture()
-        NSApp.terminate(nil)
+    }
+}
+
+extension AppDelegate {
+    /// Real gesture/cancellation paths with synthetic pixels and no capture permission.
+    static func lifecycleSelfTest() async throws {
+        final class SyntheticCapture: DesktopScreenshotSource {
+            var pending: CheckedContinuation<CVPixelBuffer, Error>?
+            var count = 0
+            func screenshot(displayID: CGDirectDisplayID) async throws -> CVPixelBuffer {
+                count += 1
+                return try await withCheckedThrowingContinuation { pending = $0 }
+            }
+        }
+        func check(_ condition: Bool, _ message: String) throws {
+            if !condition {
+                throw NSError(domain: "Glissform.LifecycleTest", code: 1,
+                              userInfo: [NSLocalizedDescriptionKey: message])
+            }
+        }
+        var storage: CVPixelBuffer?
+        let attributes = [kCVPixelBufferMetalCompatibilityKey as String: true,
+                          kCVPixelBufferIOSurfacePropertiesKey as String: [:]] as [String: Any]
+        CVPixelBufferCreate(kCFAllocatorDefault, 64, 64, kCVPixelFormatType_32BGRA,
+                            attributes as CFDictionary, &storage)
+        guard let buffer = storage else { throw NSError(domain: "Glissform.LifecycleTest", code: 2) }
+        CVPixelBufferLockBaseAddress(buffer, [])
+        memset(CVPixelBufferGetBaseAddress(buffer), 0, CVPixelBufferGetDataSize(buffer))
+        CVPixelBufferUnlockBaseAddress(buffer, [])
+
+        func makeGesture() throws -> (AppDelegate, SyntheticCapture) {
+            let source = SyntheticCapture()
+            let app = AppDelegate(capture: source)
+            let window = OverlayWindow(contentRect: NSRect(x: 16, y: 16, width: 64, height: 64),
+                                       styleMask: .borderless, backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.alphaValue = 0
+            window.ignoresMouseEvents = true
+            let view = MTKView(frame: NSRect(x: 0, y: 0, width: 64, height: 64))
+            guard let renderer = EffectRenderer(view: view) else {
+                throw NSError(domain: "Glissform.LifecycleTest", code: 3)
+            }
+            window.contentView = view
+            window.orderFrontRegardless()
+            view.drawableSize = CGSize(width: 64, height: 64)
+            app.window = window
+            app.renderer = renderer
+            app.displayID = CGMainDisplayID()
+            app.ready = true
+            app.settingsModel.configure(animationEnabled: true, startAngle: 100, screenCaptureAllowed: true)
+            app.motion.startAngle = 100
+            app.handleLidReading(110)
+            app.handleLidReading(80)
+            return (app, source)
+        }
+        func checkCleared(_ app: AppDelegate) throws {
+            try check(!app.hasSnapshot && !app.snapshotRequested && app.snapshotTask == nil,
+                      "Snapshot state must be cleared (alpha \(app.window?.alphaValue ?? -1), finishing \(app.finishingGesture), entrance \(app.entrancePending), paused \((app.window?.contentView as? MTKView)?.isPaused ?? true))")
+            try check(app.window?.alphaValue == 0 && app.window?.ignoresMouseEvents == true,
+                      "Interrupted gesture must restore desktop access")
+            try check(!app.entrancePending && !app.finishingGesture && app.revealTimer == nil,
+                      "Interrupted transitions must not remain pending")
+        }
+        func waitForCapture(_ source: SyntheticCapture) async throws {
+            for _ in 0..<100 {
+                if source.pending != nil { return }
+                try await Task.sleep(nanoseconds: 5_000_000)
+            }
+            try check(false, "Gesture must request its screenshot")
+        }
+        func waitForCleanup(_ app: AppDelegate) async throws {
+            // Display callbacks can be deprioritized for a tiny diagnostic
+            // window. Verify eventual cleanup, without asserting frame pacing.
+            for _ in 0..<100 {
+                if !app.hasSnapshot { return }
+                try await Task.sleep(nanoseconds: 10_000_000)
+            }
+        }
+        // Resolve a capture *after* each interruption to prove stale work cannot reappear.
+        // Also interrupt a revealed snapshot to verify overlay and GPU cleanup.
+        for visible in [false, true] {
+            for interruption in ["reversal", "sleep", "display change", "quit"] {
+                let (app, source) = try makeGesture()
+                defer { app.shutdown(); app.window?.close() }
+                let task = app.snapshotTask
+                try await waitForCapture(source)
+                if visible {
+                    try await Task.sleep(nanoseconds: 50_000_000)
+                    source.pending?.resume(returning: buffer)
+                    source.pending = nil
+                    await task?.value
+                    try await Task.sleep(nanoseconds: 45_000_000)
+                    try check(app.hasSnapshot && app.window!.alphaValue > 0, "Test snapshot must be visible")
+                }
+                switch interruption {
+                case "reversal": app.handleLidReading(100)
+                case "sleep": app.suspend()
+                case "display change": app.restart(); app.sensor.stop()
+                default: app.shutdown()
+                }
+                source.pending?.resume(returning: buffer)
+                source.pending = nil
+                await task?.value
+                if visible && interruption == "reversal" { try await waitForCleanup(app) }
+                try checkCleared(app)
+                print("PASS: \(visible ? "visible snapshot cleanup" : "delayed snapshot cancellation") on \(interruption)")
+            }
+        }
+        let (app, source) = try makeGesture()
+        defer { app.shutdown(); app.window?.close() }
+        try await waitForCapture(source)
+        // Let AppKit attach the test window's Metal layer before preparing it.
+        try await Task.sleep(nanoseconds: 50_000_000)
+        source.pending?.resume(returning: buffer)
+        source.pending = nil
+        await app.snapshotTask?.value
+        try check(app.hasSnapshot, "Synthetic screenshot must reach the real renderer")
+        try await Task.sleep(nanoseconds: 45_000_000)
+        try check(!app.entrancePending && app.window!.alphaValue > 0,
+                  "Geometry must begin during the visibility fade")
+        app.handleLidReading(100)
+        try await Task.sleep(nanoseconds: 40_000_000)
+        app.handleLidReading(80)
+        try await Task.sleep(nanoseconds: 250_000_000)
+        try check(app.hasSnapshot && !app.finishingGesture && source.count == 1 && app.window!.alphaValue == 1,
+                  "Reclosing must retain one snapshot and reject the old return completion")
+        app.handleLidReading(100)
+        try await waitForCleanup(app)
+        try checkCleared(app)
+        print("PASS: overlapping entrance, interrupted return, one-snapshot reclose, flat-frame cleanup")
     }
 }
 
@@ -464,11 +607,36 @@ if CommandLine.arguments.contains("--version") {
     print("Glissform \(Bundle.main.object(forInfoDictionaryKey: "GlissformVersion") as? String ?? "Development")")
 } else if CommandLine.arguments.contains("--probe") {
     print(LidSensor.probe())
-} else if CommandLine.arguments.contains("--render-test") {
+} else if CommandLine.arguments.contains("--lifecycle-test") {
+    _ = NSApplication.shared
+    Task { @MainActor in
+        do {
+            try await AppDelegate.lifecycleSelfTest()
+            print("Synthetic lifecycle checks passed")
+            exit(0)
+        } catch {
+            fputs("Lifecycle test failed: \(error)\n", stderr)
+            exit(1)
+        }
+    }
+    NSApplication.shared.run()
+} else if CommandLine.arguments.contains("--material-preview") {
     _ = NSApplication.shared
     do {
-        let output = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("build/render-test/hinge.png")
-        try EffectRenderer.selfTest(outputURL: output)
+        let directory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("build/material-preview")
+        try EffectRenderer.materialPreview(outputDirectory: directory)
+        print("Synthetic desktop material previews: \(directory.path)")
+    } catch {
+        fputs("Material preview failed: \(error)\n", stderr)
+        exit(1)
+    }
+} else if CommandLine.arguments.contains("--render-test") || CommandLine.arguments.contains("--render-benchmark") {
+    _ = NSApplication.shared
+    do {
+        let benchmark = CommandLine.arguments.contains("--render-benchmark")
+        let directory = benchmark ? "render-benchmark" : "render-test"
+        let output = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("build/\(directory)/hinge.png")
+        try EffectRenderer.selfTest(outputURL: output, benchmark: benchmark)
         print("Metal rendering checks passed: \(output.path)")
     } catch {
         fputs("Render test failed: \(error)\n", stderr)

@@ -4,15 +4,23 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+## 0.1.0-alpha.2 — 2026-09-19
+
+Second public alpha, with improved Infinite Screen motion and material, native settings, and expanded synthetic regression checks. Source release; local builds remain ad-hoc signed and are not notarized.
+
 ### Added
 
 - Native macOS settings with Experience and About pages, a live lid reading, Infinite Screen enable switch, precise start-angle controls, Use current angle, and reset.
 - An in-window motion preview using original vector artwork, with no screen capture, automatic completion, a stop control, and a still alternative for Reduce Motion.
 - Contextual readiness and setup guidance for screen access, unavailable sensors, and opening above the start angle.
 - A dedicated About page with privacy and alpha-support details, standard app menus, and keyboard shortcuts for settings, editing, closing the window, and quitting.
+- Synthetic projection, tracking-speed, and gesture-lifecycle regression checks, plus material previews and a GPU-only rendering benchmark for development.
 
 ### Changed
 
+- Corrected Infinite Screen to compensate the full physical lid rotation, removing the reduced rotation gain and the late-closure limit that could make the image drift or stop following the hinge.
+- Smoothed changes in tracking speed, preserved velocity when the filter response changes, and shortened entrance/return handoffs to 100 ms. Entrance geometry now blends during the screenshot fade instead of waiting for it. Active rendering requests the display's maximum refresh rate.
+- Retuned the material toward the supplied Duo references: soft coloured shapes and less darkening during the middle of the gesture, with blur strength balanced to keep the perspective skew visible. A normalized Gaussian-like sampling kernel replaces concentric blur rings. Frost remains progressive across the entire image, lighter at the hinge and heavier at the top, and clears on reopening.
 - Made the switch and slider handles solid white in every state. Hover/press feedback uses the switch track and subtle slider-thumb size changes instead of tinting the handles.
 - Removed the redundant Enabled/Paused label beneath the Infinite Screen switch.
 - Added consistent hover and pressed feedback to buttons and links, integrated slider-thumb and stepper feedback, an Apple-style capsule switch, and an active outline for angle editing. Slider, switch, and stepper hover states have no outer container or border. Disabled actions stay subdued; feedback transitions respect Reduce Motion.

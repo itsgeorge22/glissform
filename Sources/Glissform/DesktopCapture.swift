@@ -2,8 +2,12 @@ import AppKit
 import ScreenCaptureKit
 import CoreMedia
 
+protocol DesktopScreenshotSource {
+    @MainActor func screenshot(displayID: CGDirectDisplayID) async throws -> CVPixelBuffer
+}
+
 /// One in-memory screenshot per gesture; never starts a recording stream.
-final class DesktopCapture {
+final class DesktopCapture: DesktopScreenshotSource {
     @MainActor func screenshot(displayID: CGDirectDisplayID) async throws -> CVPixelBuffer {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
         guard let display = content.displays.first(where: { $0.displayID == displayID }) else {
