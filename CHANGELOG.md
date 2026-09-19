@@ -4,6 +4,15 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+### Changed
+
+- Motion preview starts immediately from the illustration's current lid angle and reference plane instead of pausing or resetting to 110°, then closes and returns to that starting angle.
+- Grouped the starting-angle controls inside the preview card, with a divider and readiness feedback directly below the card. Shortened the settings window, kept About content accessible by scrolling, clarified the explanatory copy, and lifted faint illustration details.
+- Simplified the preview to the live angle and illustration without extra captions or a slider marker. Matched the status and preview card surfaces, refined control and text spacing, and reserved bottom padding for the privacy footer.
+- Combined the starting-angle number and raised degree symbol in one rounded field, with arrows on the left that each have independent hover and pressed feedback and no background at rest.
+- Narrowed the combined angle input by 8 points.
+- Balanced the spacing above the main card and below the status card at 28 points, with 16 points between the cards and uniform 32-point content padding on both settings pages.
+
 ## 0.1.0-alpha.2 — 2026-09-19
 
 Second public alpha, with improved Infinite Screen motion and material, native settings, and expanded synthetic regression checks. Source release; local builds remain ad-hoc signed and are not notarized.

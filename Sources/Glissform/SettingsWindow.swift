@@ -82,7 +82,7 @@ private final class SettingsWindow: NSWindow {
 final class SettingsWindowController: NSWindowController {
     init(model: SettingsModel) {
         let window = SettingsWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 720, height: 720),
+            contentRect: NSRect(x: 0, y: 0, width: 720, height: 660),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered, defer: false
         )
@@ -117,7 +117,7 @@ private struct SettingsRootView: View {
             case .about: AboutSettingsView(model: model)
             }
         }
-        .frame(width: 720, height: 720, alignment: .topLeading)
+        .frame(width: 720, height: 660, alignment: .topLeading)
         .background(Color(nsColor: .textBackgroundColor))
         .onAppear { model.refreshPermission() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -130,6 +130,8 @@ private struct SettingsRootView: View {
 private final class MotionPreviewState: ObservableObject {
     @Published var isPlaying = false
     @Published var angle = 110.0
+    var startingAngle = 110.0
+    var referenceAngle = 110.0
     @Published var isStill = false
 }
 
@@ -152,66 +154,34 @@ private struct AnimationSettingsView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Infinite Screen")
-                        .font(.system(size: 29, weight: .semibold, design: .rounded))
-                        .tracking(-0.6)
-                    Text("A little depth in an everyday gesture.")
-                        .font(.system(size: 13)).foregroundStyle(.secondary)
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 5) {
-                    Toggle("Infinite Screen", isOn: Binding(
-                        get: { model.animationEnabled }, set: { model.setAnimationEnabled($0) }
-                    ))
-                    .labelsHidden().toggleStyle(AppleSwitchStyle())
-                    .accessibilityLabel("Enable Infinite Screen")
-                }
-            }
-
-            previewPanel
-
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Begin at").font(.system(size: 14, weight: .semibold))
-                        Text("Close past this angle to start the effect.")
-                            .font(.caption).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .center) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Infinite Screen")
+                            .font(.system(size: 29, weight: .semibold, design: .rounded))
+                            .tracking(-0.6)
+                        Text("Your desktop stays in place as the lid closes.")
+                            .font(.system(size: 13)).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    AngleEntry(model: model)
-                    Text("°").font(.system(size: 20)).foregroundStyle(.secondary)
-                    Stepper("Start angle", value: angleBinding, in: 20...130, step: 1)
-                        .labelsHidden().fixedSize()
-                        .modifier(IntegratedControlHover())
-                }
-                AngleSlider(value: angleBinding)
-                    .frame(height: 22)
-                    .accessibilityLabel("Animation start angle")
-                    .accessibilityValue("\(Int(model.startAngle)) degrees")
-                HStack {
-                    Text("20° · Later").foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Use current angle") {
-                        if let angle = model.currentAngle { model.setStartAngle(angle) }
+                    VStack(alignment: .trailing, spacing: 5) {
+                        Toggle("Infinite Screen", isOn: Binding(
+                            get: { model.animationEnabled }, set: { model.setAnimationEnabled($0) }
+                        ))
+                        .labelsHidden().toggleStyle(AppleSwitchStyle())
+                        .accessibilityLabel("Enable Infinite Screen")
                     }
-                    .buttonStyle(FeedbackButtonStyle(kind: .link)).disabled(!canUseCurrentAngle)
-                    .help("Use the current lid angle. Open a little farther, then close to begin.")
-                    Text("·").foregroundStyle(.tertiary)
-                    Button("Reset") { model.setStartAngle(100) }
-                        .buttonStyle(FeedbackButtonStyle(kind: .link)).disabled(model.startAngle == 100)
-                        .help("Restore the default start angle of 100°")
-                        .accessibilityLabel("Reset start angle to 100 degrees")
-                    Spacer()
-                    Text("Earlier · 130°").foregroundStyle(.secondary)
                 }
-                .font(.caption)
+
+                previewPanel
+                    .padding(.top, 28)
+                    .padding(.bottom, 16)
+
+                ReadinessView(model: model)
+
             }
 
-            ReadinessView(model: model)
-            Spacer(minLength: 0)
             HStack(spacing: 6) {
                 Image(systemName: "lock").accessibilityHidden(true)
                 Text("One screenshot. Only in memory.")
@@ -220,22 +190,26 @@ private struct AnimationSettingsView: View {
                     .buttonStyle(FeedbackButtonStyle(kind: .link))
             }
             .font(.caption).foregroundStyle(.secondary)
+            .padding(.top, 28)
         }
-        .padding(.horizontal, 32).padding(.top, 24).padding(.bottom, 24)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .padding(32)
         .task(id: preview.isPlaying) {
             guard preview.isPlaying else { return }
             let start = ProcessInfo.processInfo.systemUptime
             while !Task.isCancelled {
                 let elapsed = ProcessInfo.processInfo.systemUptime - start
-                guard elapsed < 5.6 else { break }
-                let t = elapsed / 5.6
+                guard elapsed < 4.928 else { break }
+                // Remove the former 672 ms opening hold; retain the closing,
+                // closed pause, reopening and final settling durations.
+                let t = (elapsed + 0.672) / 5.6
                 let amount: Double
-                if t < 0.12 { amount = 0 }
-                else if t < 0.46 { amount = smooth((t - 0.12) / 0.34) }
+                if t < 0.46 { amount = smooth((t - 0.12) / 0.34) }
                 else if t < 0.56 { amount = 1 }
                 else if t < 0.94 { amount = 1 - smooth((t - 0.56) / 0.38) }
                 else { amount = 0 }
-                preview.angle = 110 - 88 * amount
+                preview.angle = preview.startingAngle
+                    - max(0, preview.startingAngle - 22) * amount
                 do { try await Task.sleep(for: .milliseconds(16)) }
                 catch { return }
             }
@@ -248,23 +222,59 @@ private struct AnimationSettingsView: View {
         .onDisappear { preview.isPlaying = false }
     }
 
+    private var angleControls: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Begin at").font(.system(size: 14, weight: .semibold))
+                    Text("Higher angles start the effect sooner.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                AngleEntry(model: model)
+            }
+            AngleSlider(value: angleBinding)
+                .frame(height: 22)
+                .accessibilityLabel("Animation start angle")
+                .accessibilityValue("\(Int(model.startAngle)) degrees")
+            HStack {
+                Text("20° · Later").foregroundStyle(.secondary)
+                Spacer()
+                Button("Use current angle") {
+                    if let angle = model.currentAngle { model.setStartAngle(angle) }
+                }
+                .buttonStyle(FeedbackButtonStyle(kind: .link)).disabled(!canUseCurrentAngle)
+                .help("Use the current lid angle. Open a little farther, then close to begin.")
+                Text("·").foregroundStyle(.tertiary)
+                Button("Reset") { model.setStartAngle(100) }
+                    .buttonStyle(FeedbackButtonStyle(kind: .link)).disabled(model.startAngle == 100)
+                    .help("Restore the default start angle of 100°")
+                    .accessibilityLabel("Reset start angle to 100 degrees")
+                Spacer()
+                Text("Earlier · 130°").foregroundStyle(.secondary)
+            }
+            .font(.caption)
+            .padding(.top, -6)
+        }
+    }
+
     private var previewPanel: some View {
         VStack(spacing: 0) {
             HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("LIVE LID").font(.system(size: 9, weight: .semibold)).tracking(1.5)
-                        .foregroundStyle(.secondary)
-                    Text(model.currentAngle.map { "\(Int($0))°" } ?? "—")
-                        .font(.system(size: 28, weight: .light, design: .rounded)).monospacedDigit()
-                        .accessibilityLabel("Current lid angle")
-                        .accessibilityValue(model.currentAngle.map { "\(Int($0)) degrees" } ?? "Unavailable")
-                }
+                Text(model.currentAngle.map { "\(Int($0))°" } ?? "—")
+                    .font(.system(size: 28, weight: .light, design: .rounded)).monospacedDigit()
+                    .accessibilityLabel("Current lid angle")
+                    .accessibilityValue(model.currentAngle.map { "\(Int($0)) degrees" } ?? "Unavailable")
                 Spacer()
                 Button {
+                    if !isIllustrating {
+                        preview.startingAngle = displayedAngle
+                        preview.referenceAngle = max(model.startAngle, displayedAngle)
+                        preview.angle = displayedAngle
+                    }
                     if reduceMotion {
                         preview.isStill.toggle()
                     } else {
-                        preview.angle = 110
                         preview.isPlaying.toggle()
                     }
                 } label: {
@@ -276,21 +286,18 @@ private struct AnimationSettingsView: View {
                 .help("An illustration of the effect. No screenshot or screen permission needed.")
             }
             .padding(.horizontal, 20).padding(.top, 18)
-            MotionIllustration(angle: displayedAngle, referenceAngle: isIllustrating ? 110 : max(model.startAngle, displayedAngle))
+            MotionIllustration(angle: displayedAngle, referenceAngle: isIllustrating ? preview.referenceAngle : max(model.startAngle, displayedAngle))
                 .frame(height: 165)
                 .animation(reduceMotion || preview.isPlaying ? nil : .easeOut(duration: 0.16), value: displayedAngle)
                 .accessibilityHidden(true)
-            HStack {
-                Text(isIllustrating ? "Your desktop stays. The lid moves." : (model.currentAngle == nil ? "Try the preview to explore the effect." : "Move your lid. Watch the perspective."))
-                Spacer()
-                Text(isIllustrating ? "Preview · no screen capture" : (model.currentAngle == nil ? "Sensor unavailable" : "Live illustration"))
-                    .foregroundStyle(.tertiary)
-            }
-            .font(.system(size: 10)).foregroundStyle(.secondary)
-            .padding(.horizontal, 20).padding(.bottom, 16)
+                .padding(.bottom, 16)
+
+            Divider().overlay(Color.primary.opacity(0.025))
+                .padding(.horizontal, 20)
+            angleControls
+                .padding(.horizontal, 20).padding(.top, 28).padding(.bottom, 20)
         }
-        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.primary.opacity(0.04)))
+        .modifier(SettingsCardSurface())
     }
 
     private var previewButtonTitle: String {
@@ -313,20 +320,52 @@ private struct AngleEntry: View {
     @FocusState private var isFocused: Bool
 
     var body: some View {
-        TextField("Start angle", text: $draft.text)
-            .labelsHidden().multilineTextAlignment(.trailing)
-            .font(.system(size: 20, weight: .medium, design: .rounded)).monospacedDigit()
-            .textFieldStyle(.plain).frame(width: 46)
-            .padding(.vertical, 7).padding(.horizontal, 8)
-            .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 9))
-            .focused($isFocused)
-            .modifier(ControlHoverFeedback(isActive: isFocused, inset: 0))
-            .accessibilityLabel("Start angle in degrees")
-            .help("Enter an angle from 20° to 130°, then press Return.")
-            .onAppear { draft.text = String(Int(model.startAngle)) }
-            .onChange(of: model.startAngle) { _, angle in draft.text = String(Int(angle)) }
-            .onChange(of: isFocused) { _, focused in if !focused { commit() } }
-            .onSubmit { commit() }
+        HStack(spacing: 4) {
+            VStack(spacing: 0) {
+                arrow("chevron.up", label: "Increase start angle", step: 1)
+                    .disabled(model.startAngle >= 130)
+                arrow("chevron.down", label: "Decrease start angle", step: -1)
+                    .disabled(model.startAngle <= 20)
+            }
+            .padding(.leading, 4)
+
+            HStack(alignment: .firstTextBaseline, spacing: 1) {
+                TextField("Start angle", text: $draft.text)
+                    .labelsHidden().multilineTextAlignment(.trailing)
+                    .font(.system(size: 20, weight: .medium, design: .rounded)).monospacedDigit()
+                    .textFieldStyle(.plain).frame(width: 38)
+                    .focused($isFocused)
+                    .accessibilityLabel("Start angle in degrees")
+                    .help("Enter an angle from 20° to 130°, then press Return.")
+                    .onSubmit { commit() }
+                Text("°")
+                    .font(.system(size: 20)).foregroundStyle(.secondary)
+                    .offset(y: -2)
+                    .accessibilityHidden(true)
+            }
+            .padding(.trailing, 8).padding(.vertical, 7)
+        }
+        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 9))
+        .modifier(ControlHoverFeedback(isActive: isFocused, inset: 0, showsHover: false))
+        .onAppear { draft.text = String(Int(model.startAngle)) }
+        .onChange(of: model.startAngle) { _, angle in draft.text = String(Int(angle)) }
+        .onChange(of: isFocused) { _, focused in if !focused { commit() } }
+    }
+
+    private func arrow(_ symbol: String, label: String, step: Double) -> some View {
+        Button {
+            commit()
+            model.setStartAngle(model.startAngle + step)
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 9, weight: .semibold))
+                .frame(width: 22, height: 17)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(AngleArrowStyle())
+        .buttonRepeatBehavior(.enabled)
+        .accessibilityLabel(label)
+        .help(label + " by 1°")
     }
 
     private func commit() {
@@ -373,15 +412,15 @@ private struct MotionIllustration: View, Animatable {
             let base = polygon([project(-112, 0, 0), project(112, 0, 0),
                                 project(112, -115, 0), project(-112, -115, 0)])
             context.fill(base, with: .color(.primary.opacity(0.045)))
-            context.stroke(base, with: .color(.primary.opacity(0.28)), style: StrokeStyle(lineWidth: 1.2, lineJoin: .round))
+            context.stroke(base, with: .color(.primary.opacity(0.36)), style: StrokeStyle(lineWidth: 1.2, lineJoin: .round))
             let trackpad = polygon([project(-34, -72, 0), project(34, -72, 0),
                                     project(34, -100, 0), project(-34, -100, 0)])
-            context.stroke(trackpad, with: .color(.primary.opacity(0.12)), lineWidth: 0.8)
+            context.stroke(trackpad, with: .color(.primary.opacity(0.22)), lineWidth: 0.8)
             for row in 0..<4 {
                 var line = Path()
                 line.move(to: project(-89, -Double(15 + row * 12), 0))
                 line.addLine(to: project(89, -Double(15 + row * 12), 0))
-                context.stroke(line, with: .color(.primary.opacity(0.08)), lineWidth: 3)
+                context.stroke(line, with: .color(.primary.opacity(0.16)), lineWidth: 3)
             }
 
             let desktop = panel(referenceAngle)
@@ -424,6 +463,14 @@ private struct MotionIllustration: View, Animatable {
     }
 }
 
+private struct SettingsCardSurface: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 20))
+            .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.primary.opacity(0.04)))
+    }
+}
+
 private struct ReadinessView: View {
     @ObservedObject var model: SettingsModel
 
@@ -455,7 +502,7 @@ private struct ReadinessView: View {
             Image(systemName: state.symbol).font(.system(size: 20, weight: .light))
                 .foregroundStyle(.secondary).frame(width: 24)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text(state.title).font(.system(size: 12, weight: .medium))
                 Text(state.detail).font(.system(size: 11)).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -468,7 +515,7 @@ private struct ReadinessView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 14))
+        .modifier(SettingsCardSurface())
         .accessibilityElement(children: .contain)
     }
 }
@@ -477,57 +524,59 @@ private struct AboutSettingsView: View {
     @ObservedObject var model: SettingsModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 26) {
-            Button {
-                model.selectedPage = .infiniteScreen
-            } label: {
-                Label("Back", systemImage: "chevron.left")
-            }
-            .buttonStyle(FeedbackButtonStyle(kind: .quiet))
-            .keyboardShortcut("[", modifiers: .command)
-            .help("Back to Infinite Screen")
+        ScrollView {
+            VStack(alignment: .leading, spacing: 26) {
+                Button {
+                    model.selectedPage = .infiniteScreen
+                } label: {
+                    Label("Back", systemImage: "chevron.left")
+                }
+                .buttonStyle(FeedbackButtonStyle(kind: .quiet))
+                .keyboardShortcut("[", modifiers: .command)
+                .help("Back to Infinite Screen")
 
-            HStack(spacing: 16) {
-                Image(nsImage: NSApp.applicationIconImage)
-                    .resizable().frame(width: 68, height: 68).accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("A little depth.\nA different perspective.")
-                        .font(.system(size: 25, weight: .semibold, design: .rounded)).tracking(-0.5)
-                    Text("Glissform \(Bundle.main.object(forInfoDictionaryKey: "GlissformVersion") as? String ?? "Development")")
-                        .font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 16) {
+                    Image(nsImage: NSApp.applicationIconImage)
+                        .resizable().frame(width: 68, height: 68).accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("A little depth.\nA different perspective.")
+                            .font(.system(size: 25, weight: .semibold, design: .rounded)).tracking(-0.5)
+                        Text("Glissform \(Bundle.main.object(forInfoDictionaryKey: "GlissformVersion") as? String ?? "Development")")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
-            }
-            Text("Your desktop appears to stay in place as your MacBook closes. One familiar gesture, with a little more dimension.")
-                .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            VStack(alignment: .leading, spacing: 20) {
-                Text("Your screen stays yours.")
-                    .font(.system(size: 19, weight: .semibold, design: .rounded))
-                privacyDetail("One gesture. One screenshot.", text: "Captured only when the effect begins. No continuous recording.", symbol: "rectangle.on.rectangle")
-                privacyDetail("Here for a moment.", text: "Kept in memory, then released. Never saved or uploaded.", symbol: "memorychip")
-                privacyDetail("Quiet by design.", text: "No audio capture, analytics, or network requests.", symbol: "hand.raised")
-                Divider()
-                HStack {
-                    Label(model.screenCaptureAllowed ? "Screen access allowed" : "Screen access needed", systemImage: model.screenCaptureAllowed ? "checkmark.circle" : "info.circle")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Manage…") { model.onOpenPermissions?() }
-                        .buttonStyle(FeedbackButtonStyle(kind: .filled)).controlSize(.small)
+                Text("Your desktop appears to stay in place as your MacBook closes. One familiar gesture, with a little more dimension.")
+                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Your screen stays yours.")
+                        .font(.system(size: 19, weight: .semibold, design: .rounded))
+                    privacyDetail("One gesture. One screenshot.", text: "Captured only when the effect begins. No continuous recording.", symbol: "rectangle.on.rectangle")
+                    privacyDetail("Here for a moment.", text: "Kept in memory, then released. Never saved or uploaded.", symbol: "memorychip")
+                    privacyDetail("Quiet by design.", text: "No audio capture, analytics, or network requests.", symbol: "hand.raised")
+                    Divider()
+                    HStack {
+                        Label(model.screenCaptureAllowed ? "Screen access allowed" : "Screen access needed", systemImage: model.screenCaptureAllowed ? "checkmark.circle" : "info.circle")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Manage…") { model.onOpenPermissions?() }
+                            .buttonStyle(FeedbackButtonStyle(kind: .filled)).controlSize(.small)
+                    }
+                    Text("macOS calls this Screen Recording, even for a single screenshot. Glissform captures only the built-in display for the effect.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
-                Text("macOS calls this Screen Recording, even for a single screenshot. Glissform captures only the built-in display for the effect.")
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                .padding(22)
+                .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 20))
+                VStack(alignment: .leading, spacing: 7) {
+                    Text("A small app. Still taking shape.").font(.system(size: 12, weight: .semibold))
+                    Text("This alpha has been tested on the MacBook Air M5 15-inch. Other models are still unverified. Normal sleep stays enabled; an opening effect after sleep is not yet available.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Text("Available in your menu bar. Close this window to keep Glissform running.")
+                    .font(.caption).foregroundStyle(.tertiary)
             }
-            .padding(22)
-            .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 20))
-            VStack(alignment: .leading, spacing: 7) {
-                Text("A small app. Still taking shape.").font(.system(size: 12, weight: .semibold))
-                Text("This alpha has been tested on the MacBook Air M5 15-inch. Other models are still unverified. Normal sleep stays enabled; an opening effect after sleep is not yet available.")
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-            Text("Available in your menu bar. Close this window to keep Glissform running.")
-                .font(.caption).foregroundStyle(.tertiary)
+            .padding(32)
         }
-        .padding(.horizontal, 32).padding(.top, 28).padding(.bottom, 24)
     }
 
     private func privacyDetail(_ title: String, text: String, symbol: String) -> some View {
@@ -597,12 +646,13 @@ private struct FeedbackButtonBody: View {
 private struct ControlHoverFeedback: ViewModifier {
     var isActive = false
     var inset: CGFloat = 4
+    var showsHover = true
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var hover = HoverState()
 
     func body(content: Content) -> some View {
-        let highlighted = isEnabled && hover.isHovered
+        let highlighted = showsHover && isEnabled && hover.isHovered
         let active = isEnabled && isActive
         content
             .background {
@@ -624,17 +674,31 @@ private struct ControlHoverFeedback: ViewModifier {
 }
 
 
-/// Highlight the native stepper itself, without an outer surface or focus-like ring.
-private struct IntegratedControlHover: ViewModifier {
+/// Each arrow reacts independently; neither has a background at rest.
+private struct AngleArrowStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        AngleArrowFeedback(configuration: configuration)
+    }
+}
+
+private struct AngleArrowFeedback: View {
+    let configuration: ButtonStyleConfiguration
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var hover = HoverState()
 
-    func body(content: Content) -> some View {
-        content
-            .brightness(isEnabled && hover.isHovered ? 0.12 : 0)
+    private var highlighted: Bool { isEnabled && hover.isHovered }
+    private var pressed: Bool { isEnabled && configuration.isPressed }
+
+    var body: some View {
+        configuration.label
+            .foregroundStyle(highlighted || pressed ? Color.primary : Color.secondary)
+            .background(Color.primary.opacity(pressed ? 0.16 : (highlighted ? 0.09 : 0)),
+                        in: RoundedRectangle(cornerRadius: 4))
+            .opacity(isEnabled ? 1 : 0.35)
             .onHover { hover.isHovered = $0 }
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: hover.isHovered)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: highlighted)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.08), value: pressed)
     }
 }
 
@@ -709,6 +773,7 @@ private struct AngleSlider: NSViewRepresentable {
         context.coordinator.value = $value
         slider.doubleValue = value
         slider.isEnabled = isEnabled
+        slider.toolTip = "Choose the lid angle at which the effect starts."
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(value: $value) }
