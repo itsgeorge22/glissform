@@ -1,14 +1,29 @@
 # Roadmap
 
-Glissform explores visual responses to the way a MacBook moves and changes state. Its immediate focus is a smooth, reliable lid-closing animation. This roadmap separates committed near-term work from ideas; it is not a release-date promise.
+Glissform adds subtle animations and quality-of-life improvements to everyday Mac interactions. The product is intended to grow into a cohesive collection of useful visual experiences for familiar gestures and system changes. Infinite Screen is the first available feature, not the boundary of the app.
 
-## Current — 0.1.0-alpha.3
+New experiences should feel native, have a clear purpose, stay lightweight, and respect privacy and normal system behaviour. Additional experiences are part of the product direction; their specific triggers, designs, and release dates are not announced here. This roadmap separates available work, near-term validation, and possibilities.
 
-Implemented: screenshot-based closing animation with full-angle hinge compensation, steadier adaptive smoothing, progressive full-image frost and shadow, awake reversal, native settings with a configurable starting angle and capture-free preview, optional desktop restoration after a configurable still-lid pause, menu bar controls, and lifecycle cleanup. Synthetic checks cover projection, tracking, and interrupted gestures; repeatable physical acceptance remains an upcoming gate. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
+## Current — 0.1.0-alpha.4
 
-## Next alpha iterations
+The first feature, Infinite Screen, implements screenshot-based closing animation with full-angle hinge compensation, steadier adaptive smoothing, progressive full-image frost and shadow, awake reversal, native settings with a configurable starting angle and capture-free preview, optional desktop restoration after a fixed two-second still-lid pause, menu bar controls, and lifecycle cleanup. Synthetic checks cover projection, tracking, and interrupted gestures; repeatable physical acceptance remains an upcoming gate. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
 
-- [x] Add optional desktop restoration after a configurable still-lid pause, with persisted controls and gesture/cancellation regression checks.
+## Product development
+
+- [ ] Design and validate additional animation and quality-of-life experiences for everyday Mac interactions.
+- [ ] Evolve feature discovery and settings as more experiences become available, keeping the interface coherent and easy to understand.
+- [ ] Define the purpose, controls, permissions, accessibility behaviour, and performance budget of each new experience before release.
+- [ ] Continue improving existing features alongside new work; expansion is not dependent on making Infinite Screen the entire product.
+
+## Next alpha iterations — shared foundations and Infinite Screen
+
+- [x] Unify interface iconography with locally bundled Iconly Bold / Regular vectors, retaining Bulk, Outline, and the previous Custom mix as alternatives with live switching in developer builds.
+
+- [x] Establish shared spacing, typography, surfaces, permission-state colours, and control feedback across settings and About.
+
+- [x] Show missing screen access on the main page, briefly confirm detected grants, and keep persistent access status and management in Privacy & About.
+
+- [x] Add optional desktop restoration after a fixed two-second still-lid pause, with a persisted toggle and gesture/cancellation regression checks.
 - [ ] Physically validate pause-to-resume timing and jitter tolerance during slow movement, lower-angle work, and sleep transitions.
 
 - [x] Correct full-angle hinge compensation, smooth quantized-input tracking speed, reduce entrance delay, and tune progressive full-image frost toward the supplied Duo references; add synthetic desktop material previews alongside projection, tracking and lifecycle regression checks.
@@ -26,16 +41,16 @@ Implemented: screenshot-based closing animation with full-angle hinge compensati
 
 ## Beta gate — 0.1.0-beta.1
 
-Move to beta when the intended closing-animation feature set is settled and:
+Move to beta when the feature set selected for that beta is settled and:
 
-- Core closing/reversal behavior is consistent across the documented supported configurations.
-- Capture and sensor failures reliably restore normal desktop interaction.
+- Each included experience behaves consistently across its documented supported configurations; Infinite Screen includes closing and reversal checks.
+- Failures in the resources each feature uses reliably leave or restore normal desktop interaction, including capture and sensor failures in Infinite Screen.
 - Performance and power measurements meet recorded acceptance targets.
 - Installation and permission instructions work for testers without developer assistance.
 - Known limitations and supported hardware are documented accurately.
 - There are no known blockers to broader voluntary testing.
 
-During beta, prioritize bug fixes, compatibility evidence, onboarding, and distribution over expanding the feature set.
+Stabilize the selected beta feature set through bug fixes, compatibility evidence, onboarding, and distribution work. Additional experiences can be explored separately without destabilizing the beta.
 
 ## Release candidate and stable — 1.0.0-rc.1 → 1.0.0
 
@@ -47,14 +62,14 @@ During beta, prioritize bug fixes, compatibility evidence, onboarding, and distr
 
 A release candidate is a complete proposed stable build. Publish 1.0.0 when those checks pass. A wake-opening animation is not a prerequisite.
 
-## Future possibilities — not committed
+## Further possibilities — not committed
 
 - Wake/opening animation, only if macOS timing and permissions allow a dependable implementation.
 - Optional launch at login; a lightweight enable/pause control is already available in the working settings and menu.
 - Carefully bounded blur, shadow, and motion preferences or presets.
 - Accessibility options and behavior that respects reduced-motion preferences.
 - Broader hardware support and calibration for different viewing angles.
-- Other subtle display-state transitions, where they fit the product and can be delivered reliably.
+- Other visual feedback and transitions for everyday Mac interactions, where they add clarity or enjoyment and can be delivered reliably.
 - A signed update experience and additional distribution channels after platform requirements are assessed.
 
 ## Version policy

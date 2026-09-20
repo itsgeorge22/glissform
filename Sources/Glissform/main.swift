@@ -84,17 +84,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.applicationIconImage = makeGlissformAppIcon()
         NSApp.setActivationPolicy(.regular)
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "macbook", accessibilityDescription: "Glissform")
-        statusItem.button?.toolTip = "Glissform — lid animation"
+        statusItem.button?.image = IconlySymbol.laptop.menuImage()
+        statusItem.button?.toolTip = "Glissform"
         UserDefaults.standard.register(defaults: ["animationStartAngle": 100.0, "animationEnabled": true,
-                                                  "resumeAfterPause": false, "pauseDuration": 2.0])
+                                                  "resumeAfterPause": false])
         let storedAngle = UserDefaults.standard.double(forKey: "animationStartAngle")
         let startAngle = storedAngle.isFinite ? min(130, max(20, storedAngle)).rounded() : 100
         let animationEnabled = UserDefaults.standard.bool(forKey: "animationEnabled")
         motion.startAngle = startAngle
         motion.resumeAfterPause = UserDefaults.standard.bool(forKey: "resumeAfterPause")
-        let storedPause = UserDefaults.standard.double(forKey: "pauseDuration")
-        motion.pauseDuration = storedPause.isFinite ? min(10, max(0.5, storedPause)) : 2
         let menu = NSMenu()
         statusLine.isEnabled = false
         menu.addItem(statusLine)
@@ -115,7 +113,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             animationEnabled: animationEnabled,
             startAngle: startAngle,
             screenCaptureAllowed: CGPreflightScreenCaptureAccess(),
-            resumeAfterPause: motion.resumeAfterPause, pauseDuration: motion.pauseDuration
+            resumeAfterPause: motion.resumeAfterPause
         )
         settingsModel.onAnimationEnabledChange = { [weak self] enabled in
             self?.applyAnimationEnabled(enabled)
@@ -123,12 +121,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsModel.onStartAngleChange = { [weak self] angle in
             self?.applyStartAngle(angle)
         }
-        settingsModel.onPauseSettingsChange = { [weak self] enabled, duration in
+        settingsModel.onResumeAfterPauseChange = { [weak self] enabled in
             guard let self else { return }
             self.motion.resumeAfterPause = enabled
-            self.motion.pauseDuration = duration
             UserDefaults.standard.set(enabled, forKey: "resumeAfterPause")
-            UserDefaults.standard.set(duration, forKey: "pauseDuration")
         }
         settingsModel.onOpenPermissions = { [weak self] in self?.openPermissions() }
 
@@ -457,7 +453,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         windowMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         windowItem.submenu = windowMenu
         mainMenu.addItem(windowItem)
+        if Bundle.main.object(forInfoDictionaryKey: "GlissformDeveloperTools") as? Bool == true {
+            let developerItem = NSMenuItem()
+            let developerMenu = NSMenu(title: "Developer")
+            let heading = developerMenu.addItem(withTitle: "Icon Style", action: nil, keyEquivalent: "")
+            heading.isEnabled = false
+            for (index, style) in [IconlyStyle.bulk, .bold, .outline, .custom].enumerated() {
+                let item = developerMenu.addItem(withTitle: style.rawValue, action: #selector(changeIconStyle(_:)), keyEquivalent: String(index + 1))
+                item.keyEquivalentModifierMask = [.command, .option]
+                item.representedObject = style.rawValue
+                item.target = self
+                item.state = style == .current ? .on : .off
+            }
+            developerItem.submenu = developerMenu
+            mainMenu.addItem(developerItem)
+        }
         NSApp.mainMenu = mainMenu
+    }
+
+    @objc private func changeIconStyle(_ sender: NSMenuItem) {
+        guard let value = sender.representedObject as? String, let style = IconlyStyle(rawValue: value) else { return }
+        IconlyAppearance.shared.style = style
+        statusItem.button?.image = IconlySymbol.laptop.menuImage()
+        for item in sender.menu?.items ?? [] {
+            guard let value = item.representedObject as? String else { continue }
+            item.state = value == style.rawValue ? .on : .off
+        }
     }
 
     @objc private func showSettings() {

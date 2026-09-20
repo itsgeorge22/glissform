@@ -6,6 +6,39 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 No unreleased changes.
 
+## 0.1.0-alpha.4 — 2026-09-20
+
+Fourth public alpha: a refined native interface, clearer permission flow, unified Iconly icons, and simpler pause-to-resume controls. Glissform is positioned as a broader app for animations and quality-of-life improvements, with Infinite Screen as its first feature. No additional experience is introduced in this release. Source release; local builds remain ad-hoc signed and are not notarized.
+
+### Added
+
+- Developer builds provide a live Bulk / Bold / Outline / Custom icon style switch in the Developer menu, with keyboard shortcuts and immediate updates across settings, About, and the menu bar. Normal builds hide it; each session starts with Bold.
+
+- A screen-access card above the preview explains required permission and opens macOS settings. After a detected grant it briefly confirms success, then leaves the main screen; the same card remains in Privacy & About for status and management. The card uses one supporting line and an Iconly shield inside a rounded tinted square: green when allowed and amber when required. The settings page scrolls on smaller displays.
+
+### Changed
+
+- Broadened product positioning and the roadmap beyond Infinite Screen, while keeping implemented features and future direction distinct. Updated architecture, design, contribution, and testing guidance to match the current app.
+
+- Simplified Privacy & About to the Glissform name and version above the privacy and access cards; removed the introductory description and text below the cards.
+
+- Replaced the access section inside the privacy information card with the shared standalone access card, removing the old section and divider. Already-authorized launches omit the main-screen access card; revocation brings it back.
+
+- Permission and pause card icons use vivid Dark Mode colours, with a modest darkening in Light Mode; tile backgrounds remain at 16% opacity. The previous Custom Bulk treatment remains available for comparison.
+
+- Replaced permission and pause icon gradients with solid semantic colours at 16% opacity, with appearance-aware icon colours and no decorative border.
+
+- Simplified slider endpoint labels to 20° and 130°, removing “Later” and “Earlier”.
+
+- Removed the angle field’s left inset so the arrow containers sit flush with its left edge. Moved each arrow glyph 2 points toward the centre, tightening their visual gap while preserving the full clickable containers.
+
+- Standardised interface and menu bar icons on Iconly Bold / Regular, including permission states, pause, preview playback, angle arrows, privacy details, and synthetic preview artwork. Bundled SVG vectors work offline and retain adaptive colours and existing control feedback. The complete Outline / Regular and Bulk / Regular sets and previous Custom mix are preserved, with a shared live developer style selector for easy comparison.
+
+- Simplified pause-to-resume into one row with a matching rounded tinted pause icon. Removed the internal divider and delay control; the feature now uses a fixed two-second pause and ignores previously saved custom delays.
+
+- Formalised shared settings styles: a 4-point spacing scale, consistent 14-point control titles, clearer supporting text, unified card surfaces and 8-point control corners, and shared hover, pressed, and disabled treatments.
+- Matched the About card to the main cards, removed the negative slider-footer spacing adjustment, and enlarged angle-arrow targets while retaining the compact number field.
+
 ## 0.1.0-alpha.3 — 2026-09-19
 
 Third public alpha, adding pause-to-resume desktop access and a refined settings layout. Source release; local builds remain ad-hoc signed and are not notarized.

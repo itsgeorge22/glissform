@@ -1,10 +1,10 @@
 # Contributing to Glissform
 
-Glissform is an early alpha. Small, focused bug reports and proposed changes are useful; discuss major feature work before implementing it. No open-source license has been selected yet.
+Glissform is an early-alpha macOS app for subtle animations and quality-of-life improvements. Infinite Screen is its first feature; the product is designed to grow beyond it. Small, focused bug reports and proposed changes are useful; discuss major feature work before implementing it. No open-source license has been selected yet.
 
 ## Report an issue
 
-Include your Mac model, macOS version, Glissform version, chosen start angle, steps to reproduce, and expected versus actual behavior. Mention external displays, full-screen apps, and whether the Mac slept. Remove private desktop content from any media you choose to share.
+Include the affected feature, Mac model, macOS version, Glissform version, steps to reproduce, and expected versus actual behaviour. For Infinite Screen, include the chosen start angle, external displays, full-screen apps, and whether the Mac slept. Remove private desktop content from any media you choose to share.
 
 ## Propose a change
 

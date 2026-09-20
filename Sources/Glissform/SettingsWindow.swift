@@ -15,31 +15,21 @@ final class SettingsModel: ObservableObject {
     var onAnimationEnabledChange: ((Bool) -> Void)?
     var onStartAngleChange: ((Double) -> Void)?
     @Published private(set) var resumeAfterPause = false
-    @Published private(set) var pauseDuration = 2.0
-    var onPauseSettingsChange: ((Bool, Double) -> Void)?
+    var onResumeAfterPauseChange: ((Bool) -> Void)?
 
     var onOpenPermissions: (() -> Void)?
 
-    func configure(animationEnabled: Bool, startAngle: Double, screenCaptureAllowed: Bool, resumeAfterPause: Bool = false, pauseDuration: Double = 2) {
+    func configure(animationEnabled: Bool, startAngle: Double, screenCaptureAllowed: Bool, resumeAfterPause: Bool = false) {
         self.animationEnabled = animationEnabled
         self.startAngle = startAngle
         self.screenCaptureAllowed = screenCaptureAllowed
         self.resumeAfterPause = resumeAfterPause
-        self.pauseDuration = pauseDuration.isFinite ? min(10, max(0.5, pauseDuration)) : 2
     }
 
     func setResumeAfterPause(_ enabled: Bool) {
         guard resumeAfterPause != enabled else { return }
         resumeAfterPause = enabled
-        onPauseSettingsChange?(enabled, pauseDuration)
-    }
-
-    func setPauseDuration(_ duration: Double) {
-        guard duration.isFinite else { return }
-        let normalized = min(10, max(0.5, (duration * 2).rounded() / 2))
-        guard pauseDuration != normalized else { return }
-        pauseDuration = normalized
-        onPauseSettingsChange?(resumeAfterPause, normalized)
+        onResumeAfterPauseChange?(enabled)
     }
 
     func setAnimationEnabled(_ enabled: Bool) {
@@ -101,8 +91,9 @@ private final class SettingsWindow: NSWindow {
 @MainActor
 final class SettingsWindowController: NSWindowController {
     init(model: SettingsModel) {
+        let contentHeight = min(SettingsDesign.Metrics.preferredHeight, (NSScreen.main?.visibleFrame.height ?? 900) - 48)
         let window = SettingsWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 720, height: 721),
+            contentRect: NSRect(x: 0, y: 0, width: SettingsDesign.Metrics.windowWidth, height: contentHeight),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered, defer: false
         )
@@ -113,7 +104,7 @@ final class SettingsWindowController: NSWindowController {
         window.isMovableByWindowBackground = true
         window.isReleasedWhenClosed = false
         window.center()
-        window.contentViewController = NSHostingController(rootView: SettingsRootView(model: model))
+        window.contentViewController = NSHostingController(rootView: SettingsRootView(model: model, height: contentHeight))
         super.init(window: window)
     }
 
@@ -129,16 +120,18 @@ final class SettingsWindowController: NSWindowController {
 
 private struct SettingsRootView: View {
     @ObservedObject var model: SettingsModel
+    let height: CGFloat
 
     var body: some View {
         Group {
             switch model.selectedPage {
-            case .infiniteScreen: AnimationSettingsView(model: model)
-            case .about: AboutSettingsView(model: model)
+            case .infiniteScreen:
+                ScrollView { AnimationSettingsView(model: model) }
+            case .about: AboutSettingsView(model: model, minimumHeight: height)
             }
         }
-        .frame(width: 720, height: 721, alignment: .topLeading)
-        .background(Color(nsColor: .textBackgroundColor))
+        .frame(width: SettingsDesign.Metrics.windowWidth, height: height, alignment: .topLeading)
+        .background(SettingsDesign.Palette.background)
         .onAppear { model.refreshPermission() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.refreshPermission()
@@ -155,10 +148,18 @@ private final class MotionPreviewState: ObservableObject {
     @Published var isStill = false
 }
 
+@MainActor
+private final class PermissionPresentationState: ObservableObject {
+    @Published var showConfirmation = false
+}
+
 private struct AnimationSettingsView: View {
     @ObservedObject var model: SettingsModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var preview = MotionPreviewState()
+    @StateObject private var permission = PermissionPresentationState()
+
+    private var showsAccessCard: Bool { !model.screenCaptureAllowed || permission.showConfirmation }
 
     private var angleBinding: Binding<Double> {
         Binding(get: { model.startAngle }, set: { model.setStartAngle($0) })
@@ -177,15 +178,15 @@ private struct AnimationSettingsView: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .center) {
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
                         Text("Infinite Screen")
-                            .font(.system(size: 29, weight: .semibold, design: .rounded))
+                            .font(SettingsDesign.Typography.pageTitle)
                             .tracking(-0.6)
                         Text("Your desktop stays in place as the lid closes.")
-                            .font(.system(size: 13)).foregroundStyle(.secondary)
+                            .font(SettingsDesign.Typography.body).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    VStack(alignment: .trailing, spacing: 5) {
+                    VStack(alignment: .trailing, spacing: SettingsDesign.Spacing.label) {
                         Toggle("Infinite Screen", isOn: Binding(
                             get: { model.animationEnabled }, set: { model.setAnimationEnabled($0) }
                         ))
@@ -194,28 +195,43 @@ private struct AnimationSettingsView: View {
                     }
                 }
 
+                if showsAccessCard {
+                    ScreenAccessCard(model: model)
+                        .padding(.top, SettingsDesign.Spacing.sections)
+                        .transition(.opacity)
+                }
+
                 previewPanel
-                    .padding(.top, 28)
-                    .padding(.bottom, 16)
+                    .padding(.top, showsAccessCard ? SettingsDesign.Spacing.cards : SettingsDesign.Spacing.sections)
+                    .padding(.bottom, SettingsDesign.Spacing.cards)
 
                 pauseControls
-                    .padding(.vertical, 20)
+                    .padding(.vertical, SettingsDesign.Spacing.cardInset)
                     .modifier(SettingsCardSurface())
 
             }
 
-            HStack(spacing: 6) {
-                Image(systemName: "lock").accessibilityHidden(true)
+            HStack(spacing: SettingsDesign.Spacing.label) {
+                IconlyIcon(.lock, size: 12)
                 Text("One screenshot. Only in memory.")
                 Spacer()
                 Button("Privacy & About") { model.selectedPage = .about }
                     .buttonStyle(FeedbackButtonStyle(kind: .link))
             }
-            .font(.caption).foregroundStyle(.secondary)
-            .padding(.top, 28)
+            .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
+            .padding(.top, SettingsDesign.Spacing.sections)
         }
-        .frame(maxHeight: .infinity, alignment: .top)
-        .padding(32)
+        .padding(SettingsDesign.Spacing.page)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: showsAccessCard)
+        .onChange(of: model.screenCaptureAllowed) { previous, allowed in
+            permission.showConfirmation = !previous && allowed
+        }
+        .task(id: permission.showConfirmation) {
+            guard permission.showConfirmation else { return }
+            do { try await Task.sleep(for: .seconds(3)) }
+            catch { return }
+            permission.showConfirmation = false
+        }
         .task(id: preview.isPlaying) {
             guard preview.isPlaying else { return }
             let start = ProcessInfo.processInfo.systemUptime
@@ -245,38 +261,39 @@ private struct AnimationSettingsView: View {
     }
 
     private var angleControls: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: SettingsDesign.Spacing.controls) {
             HStack {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Begin at").font(.system(size: 14, weight: .semibold))
+                VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
+                    Text("Begin at").font(SettingsDesign.Typography.controlTitle)
                     Text("Higher angles start the effect sooner.")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
                 AngleEntry(model: model)
             }
-            AngleSlider(value: angleBinding)
-                .frame(height: 22)
-                .accessibilityLabel("Animation start angle")
-                .accessibilityValue("\(Int(model.startAngle)) degrees")
-            HStack {
-                Text("20° · Later").foregroundStyle(.secondary)
-                Spacer()
-                Button("Use current angle") {
-                    if let angle = model.currentAngle { model.setStartAngle(angle) }
+            VStack(spacing: SettingsDesign.Spacing.detail) {
+                AngleSlider(value: angleBinding)
+                    .frame(height: 22)
+                    .accessibilityLabel("Animation start angle")
+                    .accessibilityValue("\(Int(model.startAngle)) degrees")
+                HStack {
+                    Text("20°").foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Use current angle") {
+                        if let angle = model.currentAngle { model.setStartAngle(angle) }
+                    }
+                    .buttonStyle(FeedbackButtonStyle(kind: .link)).disabled(!canUseCurrentAngle)
+                    .help("Use the current lid angle. Open a little farther, then close to begin.")
+                    Text("·").foregroundStyle(.tertiary)
+                    Button("Reset") { model.setStartAngle(100) }
+                        .buttonStyle(FeedbackButtonStyle(kind: .link)).disabled(model.startAngle == 100)
+                        .help("Restore the default start angle of 100°")
+                        .accessibilityLabel("Reset start angle to 100 degrees")
+                    Spacer()
+                    Text("130°").foregroundStyle(.secondary)
                 }
-                .buttonStyle(FeedbackButtonStyle(kind: .link)).disabled(!canUseCurrentAngle)
-                .help("Use the current lid angle. Open a little farther, then close to begin.")
-                Text("·").foregroundStyle(.tertiary)
-                Button("Reset") { model.setStartAngle(100) }
-                    .buttonStyle(FeedbackButtonStyle(kind: .link)).disabled(model.startAngle == 100)
-                    .help("Restore the default start angle of 100°")
-                    .accessibilityLabel("Reset start angle to 100 degrees")
-                Spacer()
-                Text("Earlier · 130°").foregroundStyle(.secondary)
+                .font(SettingsDesign.Typography.caption)
             }
-            .font(.caption)
-            .padding(.top, -6)
         }
     }
 
@@ -284,7 +301,7 @@ private struct AnimationSettingsView: View {
         VStack(spacing: 0) {
             HStack(alignment: .top) {
                 Text(model.currentAngle.map { "\(Int($0))°" } ?? "—")
-                    .font(.system(size: 28, weight: .light, design: .rounded)).monospacedDigit()
+                    .font(SettingsDesign.Typography.liveValue)
                     .accessibilityLabel("Current lid angle")
                     .accessibilityValue(model.currentAngle.map { "\(Int($0)) degrees" } ?? "Unavailable")
                 Spacer()
@@ -300,59 +317,43 @@ private struct AnimationSettingsView: View {
                         preview.isPlaying.toggle()
                     }
                 } label: {
-                    Label(previewButtonTitle, systemImage: isIllustrating ? "stop.fill" : "play.fill")
-                        .font(.system(size: 11, weight: .medium))
-                        .padding(.horizontal, 3).padding(.vertical, 3)
+                    IconlyLabel(previewButtonTitle, icon: isIllustrating ? .stop : .play)
+                        .font(SettingsDesign.Typography.action)
                 }
                 .buttonStyle(FeedbackButtonStyle(kind: .filled)).controlSize(.small)
                 .help("An illustration of the effect. No screenshot or screen permission needed.")
             }
-            .padding(.horizontal, 20).padding(.top, 18)
+            .padding(.horizontal, SettingsDesign.Spacing.cardInset).padding(.top, SettingsDesign.Spacing.cardInset)
             MotionIllustration(angle: displayedAngle, referenceAngle: isIllustrating ? preview.referenceAngle : max(model.startAngle, displayedAngle))
                 .frame(height: 165)
                 .animation(reduceMotion || preview.isPlaying ? nil : .easeOut(duration: 0.16), value: displayedAngle)
                 .accessibilityHidden(true)
-                .padding(.bottom, 16)
+                .padding(.bottom, SettingsDesign.Spacing.cards)
 
-            Divider().overlay(Color.primary.opacity(0.025))
+            SettingsDivider()
             angleControls
-                .padding(.horizontal, 20).padding(.top, 28).padding(.bottom, 20)
+                .padding(.horizontal, SettingsDesign.Spacing.cardInset).padding(.top, SettingsDesign.Spacing.sections).padding(.bottom, SettingsDesign.Spacing.cardInset)
         }
         .modifier(SettingsCardSurface())
     }
 
     private var pauseControls: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Resume desktop after a pause").font(.system(size: 13, weight: .semibold))
-                    Text("Restore your desktop when the lid stays still below the starting angle.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer()
-                Toggle("Resume desktop after a pause", isOn: Binding(
-                    get: { model.resumeAfterPause }, set: { model.setResumeAfterPause($0) }
-                ))
-                .labelsHidden().toggleStyle(AppleSwitchStyle())
-                .accessibilityLabel("Resume desktop after a pause")
+        HStack(spacing: SettingsDesign.Spacing.cards) {
+            PauseFeatureIcon().accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
+                Text("Resume desktop after a pause").font(SettingsDesign.Typography.controlTitle)
+                Text("Restore your desktop after a 2-second pause below the starting angle.")
+                    .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.horizontal, 20)
-            Divider().overlay(Color.primary.opacity(0.025))
-            HStack {
-                Text("Pause duration").font(.system(size: 13, weight: .semibold))
-                Spacer()
-                Stepper(value: Binding(get: { model.pauseDuration }, set: { model.setPauseDuration($0) }),
-                        in: 0.5...10, step: 0.5) {
-                    Text("\(model.pauseDuration, specifier: "%.1f") seconds")
-                        .font(.system(size: 12)).monospacedDigit()
-                }
-                .fixedSize()
-                .accessibilityLabel("Pause duration")
-                .accessibilityValue("\(model.pauseDuration) seconds")
-                .disabled(!model.resumeAfterPause)
-            }
-            .padding(.horizontal, 20)
+            Spacer(minLength: 0)
+            Toggle("Resume desktop after a pause", isOn: Binding(
+                get: { model.resumeAfterPause }, set: { model.setResumeAfterPause($0) }
+            ))
+            .labelsHidden().toggleStyle(AppleSwitchStyle())
+            .accessibilityLabel("Resume desktop after a pause")
         }
+        .padding(.horizontal, SettingsDesign.Spacing.cardInset)
     }
 
     private var previewButtonTitle: String {
@@ -375,46 +376,45 @@ private struct AngleEntry: View {
     @FocusState private var isFocused: Bool
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: SettingsDesign.Spacing.detail) {
             VStack(spacing: 0) {
-                arrow("chevron.up", label: "Increase start angle", step: 1)
+                arrow(rotation: 0, label: "Increase start angle", step: 1)
                     .disabled(model.startAngle >= 130)
-                arrow("chevron.down", label: "Decrease start angle", step: -1)
+                arrow(rotation: 180, label: "Decrease start angle", step: -1)
                     .disabled(model.startAngle <= 20)
             }
-            .padding(.leading, 4)
 
             HStack(alignment: .firstTextBaseline, spacing: 1) {
                 TextField("Start angle", text: $draft.text)
                     .labelsHidden().multilineTextAlignment(.trailing)
-                    .font(.system(size: 20, weight: .medium, design: .rounded)).monospacedDigit()
+                    .font(SettingsDesign.Typography.editableValue)
                     .textFieldStyle(.plain).frame(width: 38)
                     .focused($isFocused)
                     .accessibilityLabel("Start angle in degrees")
                     .help("Enter an angle from 20° to 130°, then press Return.")
                     .onSubmit { commit() }
                 Text("°")
-                    .font(.system(size: 20)).foregroundStyle(.secondary)
+                    .font(SettingsDesign.Typography.angleUnit).foregroundStyle(.secondary)
                     .offset(y: -2)
                     .accessibilityHidden(true)
             }
-            .padding(.trailing, 8).padding(.vertical, 7)
+            .padding(.trailing, SettingsDesign.Spacing.label).padding(.vertical, SettingsDesign.Spacing.label)
         }
-        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 9))
+        .background(SettingsDesign.Palette.field, in: RoundedRectangle(cornerRadius: SettingsDesign.Radius.control))
         .modifier(ControlHoverFeedback(isActive: isFocused, inset: 0, showsHover: false))
         .onAppear { draft.text = String(Int(model.startAngle)) }
         .onChange(of: model.startAngle) { _, angle in draft.text = String(Int(angle)) }
         .onChange(of: isFocused) { _, focused in if !focused { commit() } }
     }
 
-    private func arrow(_ symbol: String, label: String, step: Double) -> some View {
+    private func arrow(rotation: Double, label: String, step: Double) -> some View {
         Button {
             commit()
             model.setStartAngle(model.startAngle + step)
         } label: {
-            Image(systemName: symbol)
-                .font(.system(size: 9, weight: .semibold))
-                .frame(width: 22, height: 17)
+            IconlyIcon(.chevronUp, size: 16, rotation: rotation)
+                .offset(y: step > 0 ? 2 : -2)
+                .frame(width: SettingsDesign.Metrics.arrowWidth, height: SettingsDesign.Metrics.arrowHeight)
                 .contentShape(Rectangle())
         }
         .buttonStyle(AngleArrowStyle())
@@ -479,7 +479,7 @@ private struct MotionIllustration: View, Animatable {
             }
 
             let desktop = panel(referenceAngle)
-            context.fill(desktop, with: .color(Color(nsColor: .textBackgroundColor)))
+            context.fill(desktop, with: .color(SettingsDesign.Palette.background))
             context.fill(desktop, with: .color(.primary.opacity(0.035)))
             context.stroke(desktop, with: .color(.primary.opacity(0.32)), style: StrokeStyle(lineWidth: 1, lineJoin: .round))
             var artwork = context
@@ -505,7 +505,7 @@ private struct MotionIllustration: View, Animatable {
                                    style: StrokeStyle(lineWidth: 0.8, dash: [3, 4]))
                 }
                 let lid = panel(angle)
-                context.fill(lid, with: .color(Color(nsColor: .textBackgroundColor).opacity(0.68)))
+                context.fill(lid, with: .color(SettingsDesign.Palette.background.opacity(0.68)))
                 context.fill(lid, with: .color(.primary.opacity(0.055)))
                 context.stroke(lid, with: .color(.primary.opacity(0.6)), style: StrokeStyle(lineWidth: 1.8, lineJoin: .round))
             } else {
@@ -518,81 +518,148 @@ private struct MotionIllustration: View, Animatable {
     }
 }
 
+private struct SettingsDivider: View {
+    var body: some View {
+        Divider().overlay(SettingsDesign.Palette.dividerOverlay)
+    }
+}
+
 private struct SettingsCardSurface: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 20))
-            .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.primary.opacity(0.04)))
+            .background(SettingsDesign.Palette.card, in: RoundedRectangle(cornerRadius: SettingsDesign.Radius.card))
+            .overlay(RoundedRectangle(cornerRadius: SettingsDesign.Radius.card).strokeBorder(SettingsDesign.Palette.cardBorder))
+    }
+}
+
+private struct CardIconTile<Content: View>: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var appearance = IconlyAppearance.shared
+    let color: SettingsDesign.Palette.CardIconColor
+    let content: Content
+
+    init(color: SettingsDesign.Palette.CardIconColor, @ViewBuilder content: () -> Content) {
+        self.color = color
+        self.content = content()
+    }
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: SettingsDesign.Radius.icon, style: .continuous)
+                .fill(color.tile.opacity(SettingsDesign.Palette.iconTileOpacity))
+            content.foregroundStyle(appearance.style == .custom || appearance.style == .bold
+                ? SettingsDesign.Palette.cardIcon(color, scheme: colorScheme) : color.tile)
+        }
+        .frame(width: SettingsDesign.Metrics.iconSize, height: SettingsDesign.Metrics.iconSize)
+    }
+}
+
+private struct PauseFeatureIcon: View {
+    var body: some View {
+        CardIconTile(color: .feature) {
+            IconlyIcon(.pause, size: 24, isCardIcon: true)
+        }
+    }
+}
+
+private struct ScreenAccessIcon: View {
+    let allowed: Bool
+
+    var body: some View {
+        CardIconTile(color: allowed ? .success : .attention) {
+            IconlyIcon(allowed ? .shieldDone : .shieldInfo, size: 24, isCardIcon: true)
+        }
+    }
+}
+
+private struct ScreenAccessCard: View {
+    @ObservedObject var model: SettingsModel
+
+    var body: some View {
+        HStack(alignment: .center, spacing: SettingsDesign.Spacing.cards) {
+            ScreenAccessIcon(allowed: model.screenCaptureAllowed)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
+                Text(model.screenCaptureAllowed ? "Screen access allowed" : "Screen access required")
+                    .font(SettingsDesign.Typography.controlTitle)
+                Text(model.screenCaptureAllowed
+                     ? "One screenshot per gesture, kept in memory. No audio captured."
+                     : "Allow Screen & System Audio Recording to use the lid effect.")
+                    .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Button(model.screenCaptureAllowed ? "Manage Access…" : "Open Settings…") {
+                model.onOpenPermissions?()
+            }
+            .buttonStyle(FeedbackButtonStyle(kind: .filled)).controlSize(.small)
+            .fixedSize()
+            .help("Open Screen & System Audio Recording in System Settings to enable or revoke access for Glissform.")
+        }
+        .padding(SettingsDesign.Spacing.cardInset)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .modifier(SettingsCardSurface())
+        .accessibilityElement(children: .contain)
     }
 }
 
 private struct AboutSettingsView: View {
     @ObservedObject var model: SettingsModel
+    let minimumHeight: CGFloat
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 26) {
+            VStack(alignment: .leading, spacing: SettingsDesign.Spacing.groups) {
                 Button {
                     model.selectedPage = .infiniteScreen
                 } label: {
-                    Label("Back", systemImage: "chevron.left")
+                    IconlyLabel("Back", icon: .chevronUp, rotation: -90)
                 }
                 .buttonStyle(FeedbackButtonStyle(kind: .quiet))
                 .keyboardShortcut("[", modifiers: .command)
                 .help("Back to Infinite Screen")
 
-                HStack(spacing: 16) {
+                HStack(spacing: SettingsDesign.Spacing.cards) {
                     Image(nsImage: NSApp.applicationIconImage)
                         .resizable().frame(width: 68, height: 68).accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("A little depth.\nA different perspective.")
-                            .font(.system(size: 25, weight: .semibold, design: .rounded)).tracking(-0.5)
-                        Text("Glissform \(Bundle.main.object(forInfoDictionaryKey: "GlissformVersion") as? String ?? "Development")")
-                            .font(.caption).foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
+                        Text("Glissform")
+                            .font(SettingsDesign.Typography.aboutTitle).tracking(-0.5)
+                        Text("\(Bundle.main.object(forInfoDictionaryKey: "GlissformVersion") as? String ?? "Development")")
+                            .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
                     }
                 }
-                Text("Your desktop appears to stay in place as your MacBook closes. One familiar gesture, with a little more dimension.")
-                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                VStack(alignment: .leading, spacing: 20) {
-                    Text("Your screen stays yours.")
-                        .font(.system(size: 19, weight: .semibold, design: .rounded))
-                    privacyDetail("One gesture. One screenshot.", text: "Captured only when the effect begins. No continuous recording.", symbol: "rectangle.on.rectangle")
-                    privacyDetail("Here for a moment.", text: "Kept in memory, then released. Never saved or uploaded.", symbol: "memorychip")
-                    privacyDetail("Quiet by design.", text: "No audio capture, analytics, or network requests.", symbol: "hand.raised")
-                    Divider()
-                    HStack {
-                        Label(model.screenCaptureAllowed ? "Screen access allowed" : "Screen access needed", systemImage: model.screenCaptureAllowed ? "checkmark.circle" : "info.circle")
-                            .font(.caption).foregroundStyle(.secondary)
-                        Spacer()
-                        Button("Manage…") { model.onOpenPermissions?() }
-                            .buttonStyle(FeedbackButtonStyle(kind: .filled)).controlSize(.small)
-                    }
-                    Text("macOS calls this Screen Recording, even for a single screenshot. Glissform captures only the built-in display for the effect.")
-                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                VStack(spacing: SettingsDesign.Spacing.cards) {
+                    privacyCard
+                    ScreenAccessCard(model: model)
                 }
-                .padding(22)
-                .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 20))
-                VStack(alignment: .leading, spacing: 7) {
-                    Text("A small app. Still taking shape.").font(.system(size: 12, weight: .semibold))
-                    Text("This alpha has been tested on the MacBook Air M5 15-inch. Other models are still unverified. Normal sleep stays enabled; an opening effect after sleep is not yet available.")
-                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-                Text("Available in your menu bar. Close this window to keep Glissform running.")
-                    .font(.caption).foregroundStyle(.tertiary)
+
             }
-            .padding(32)
+            .frame(minHeight: max(0, minimumHeight - 2 * SettingsDesign.Spacing.page), alignment: .top)
+            .padding(SettingsDesign.Spacing.page)
         }
     }
 
-    private func privacyDetail(_ title: String, text: String, symbol: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: symbol).font(.system(size: 17, weight: .light))
-                .foregroundStyle(.secondary).frame(width: 22).padding(.top, 2)
+    private var privacyCard: some View {
+        VStack(alignment: .leading, spacing: SettingsDesign.Spacing.cardInset) {
+            Text("Your screen stays yours.").font(SettingsDesign.Typography.sectionTitle)
+            privacyDetail("One gesture. One screenshot.", text: "Captured only when the effect begins. No continuous recording.", symbol: .copy)
+            privacyDetail("Here for a moment.", text: "Kept in memory, then released. Never saved or uploaded.", symbol: .memory)
+            privacyDetail("Quiet by design.", text: "No audio capture, analytics, or network requests.", symbol: .lock)
+        }
+        .padding(SettingsDesign.Spacing.cardInset)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .modifier(SettingsCardSurface())
+    }
+
+    private func privacyDetail(_ title: String, text: String, symbol: IconlySymbol) -> some View {
+        HStack(alignment: .top, spacing: SettingsDesign.Spacing.controls) {
+            IconlyIcon(symbol, size: 20)
+                .foregroundStyle(.secondary).frame(width: 22).padding(.top, SettingsDesign.Spacing.optical)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.system(size: 12, weight: .medium))
-                Text(text).font(.caption).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
+                Text(title).font(SettingsDesign.Typography.controlTitle)
+                Text(text).font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -628,23 +695,24 @@ private struct FeedbackButtonBody: View {
 
     var body: some View {
         configuration.label
-            .foregroundStyle(isEnabled ? tint : Color.secondary)
-            .padding(.horizontal, kind == .filled ? 10 : 6)
-            .padding(.vertical, kind == .filled ? 6 : 4)
+            .font(SettingsDesign.Typography.action)
+            .foregroundStyle(tint)
+            .padding(.horizontal, kind == .filled ? SettingsDesign.Spacing.controls : SettingsDesign.Spacing.label)
+            .padding(.vertical, kind == .filled ? SettingsDesign.Spacing.label : SettingsDesign.Spacing.detail)
             .background {
-                RoundedRectangle(cornerRadius: 7)
-                    .fill(tint.opacity(isPressed ? 0.18 : (isHovered ? 0.10 : (kind == .filled ? 0.06 : 0))))
+                RoundedRectangle(cornerRadius: SettingsDesign.Radius.control)
+                    .fill(tint.opacity(isPressed ? SettingsDesign.Feedback.pressedFill : (isHovered ? SettingsDesign.Feedback.hoverFill : (kind == .filled ? SettingsDesign.Feedback.idleFill : 0))))
             }
             .overlay {
-                RoundedRectangle(cornerRadius: 7)
-                    .strokeBorder(tint.opacity(isPressed ? 0.3 : (isHovered ? 0.18 : 0)), lineWidth: 1)
+                RoundedRectangle(cornerRadius: SettingsDesign.Radius.control)
+                    .strokeBorder(tint.opacity(isPressed ? SettingsDesign.Feedback.pressedBorder : (isHovered ? SettingsDesign.Feedback.hoverBorder : 0)), lineWidth: 1)
                     .allowsHitTesting(false)
             }
-            .opacity(isEnabled ? 1 : 0.45)
-            .contentShape(RoundedRectangle(cornerRadius: 7))
+            .opacity(isEnabled ? 1 : SettingsDesign.Feedback.disabledOpacity)
+            .contentShape(RoundedRectangle(cornerRadius: SettingsDesign.Radius.control))
             .onHover { hover.isHovered = $0 }
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isHovered)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.08), value: isPressed)
+            .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.hoverDuration), value: isHovered)
+            .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.pressedDuration), value: isPressed)
     }
 }
 
@@ -662,20 +730,20 @@ private struct ControlHoverFeedback: ViewModifier {
         let active = isEnabled && isActive
         content
             .background {
-                RoundedRectangle(cornerRadius: 9)
-                    .fill(Color.primary.opacity(highlighted ? 0.07 : 0))
+                RoundedRectangle(cornerRadius: SettingsDesign.Radius.control)
+                    .fill(Color.primary.opacity(highlighted ? SettingsDesign.Feedback.hoverFill : 0))
                     .padding(-inset)
                     .allowsHitTesting(false)
             }
             .overlay {
-                RoundedRectangle(cornerRadius: 9)
-                    .strokeBorder(active ? Color.accentColor.opacity(0.65) : Color.primary.opacity(highlighted ? 0.18 : 0), lineWidth: 1)
+                RoundedRectangle(cornerRadius: SettingsDesign.Radius.control)
+                    .strokeBorder(active ? SettingsDesign.Palette.focus : Color.primary.opacity(highlighted ? SettingsDesign.Feedback.hoverBorder : 0), lineWidth: 1)
                     .padding(-inset)
                     .allowsHitTesting(false)
             }
             .onHover { hover.isHovered = $0 }
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: highlighted)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.08), value: active)
+            .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.hoverDuration), value: highlighted)
+            .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.pressedDuration), value: active)
     }
 }
 
@@ -699,12 +767,12 @@ private struct AngleArrowFeedback: View {
     var body: some View {
         configuration.label
             .foregroundStyle(highlighted || pressed ? Color.primary : Color.secondary)
-            .background(Color.primary.opacity(pressed ? 0.16 : (highlighted ? 0.09 : 0)),
-                        in: RoundedRectangle(cornerRadius: 4))
-            .opacity(isEnabled ? 1 : 0.35)
+            .background(Color.primary.opacity(pressed ? SettingsDesign.Feedback.pressedFill : (highlighted ? SettingsDesign.Feedback.hoverFill : 0)),
+                        in: RoundedRectangle(cornerRadius: SettingsDesign.Radius.small))
+            .opacity(isEnabled ? 1 : SettingsDesign.Feedback.disabledOpacity)
             .onHover { hover.isHovered = $0 }
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: highlighted)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.08), value: pressed)
+            .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.hoverDuration), value: highlighted)
+            .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.pressedDuration), value: pressed)
     }
 }
 
@@ -738,8 +806,7 @@ private struct SwitchFeedbackBody: View {
 
     var body: some View {
         Capsule()
-            .fill(isOn ? Color.accentColor : Color(nsColor: .tertiaryLabelColor))
-            .opacity(isEnabled ? 1 : 0.45)
+            .fill(isOn ? Color.accentColor : SettingsDesign.Palette.switchOff)
             .overlay {
                 Capsule().fill(isEnabled && isPressed ? Color.black.opacity(0.14) : Color.white.opacity(isEnabled && hover.isHovered ? 0.1 : 0))
             }
@@ -747,14 +814,15 @@ private struct SwitchFeedbackBody: View {
                 Capsule()
                     .fill(Color.white)
                     .frame(width: 26, height: 18)
-                    .padding(2)
+                    .padding(SettingsDesign.Spacing.optical)
             }
+            .opacity(isEnabled ? 1 : SettingsDesign.Feedback.disabledOpacity)
             .frame(width: 44, height: 22)
             .contentShape(Capsule())
             .onHover { hover.isHovered = $0 }
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.16), value: isOn)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.1), value: hover.isHovered)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.08), value: isPressed)
+            .animation(reduceMotion ? nil : .easeInOut(duration: SettingsDesign.Feedback.switchDuration), value: isOn)
+            .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.hoverDuration), value: hover.isHovered)
+            .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.pressedDuration), value: isPressed)
     }
 }
 

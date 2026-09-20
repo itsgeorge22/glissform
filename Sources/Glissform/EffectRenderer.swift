@@ -504,13 +504,11 @@ final class EffectRenderer: NSObject, MTKViewDelegate {
         label("Everything starts with a little curiosity.", x: 360, y: 196, size: 15, color: .gray)
         card(NSRect(x: 213, y: 25, width: 534, height: 80), NSColor.white.withAlphaComponent(0.32), radius: 22)
         let colors: [NSColor] = [.systemBlue, .systemGreen, .systemOrange, .systemPink, .systemPurple, .systemTeal, .darkGray]
-        let symbols = ["folder.fill", "message.fill", "calendar", "music.note", "photo", "safari", "gearshape.fill"]
+        let symbols: [IconlySymbol] = [.copy, .shieldDone, .pause, .play, .laptop, .lock, .memory]
         for index in 0..<7 {
             let x = 229 + index * 73
             card(NSRect(x: x, y: 38, width: 64, height: 54), colors[index], radius: 13)
-            if let icon = NSImage(systemSymbolName: symbols[index], accessibilityDescription: nil) {
-                icon.draw(in: NSRect(x: x + 15, y: 49, width: 34, height: 32))
-            }
+            symbols[index].image.draw(in: NSRect(x: x + 15, y: 49, width: 34, height: 32))
         }
         NSGraphicsContext.restoreGraphicsState()
         CVPixelBufferUnlockBaseAddress(buffer, [])

@@ -1,12 +1,14 @@
 # Glissform
 
-A small macOS menu bar app that makes your desktop appear to stay in place as you close your MacBook lid. The moving screen reveals a gradually blurred, shadowed image behind it.
+Glissform brings subtle animations and quality-of-life improvements to everyday interactions on your Mac. It is designed to make familiar gestures and system changes feel more expressive, clear, and enjoyable.
 
-**Current version: 0.1.0-alpha.3.** This is an experimental public alpha, developed on a MacBook Air M5 15-inch. Wider hardware compatibility and physical performance are still being evaluated.
+**Infinite Screen is its first available feature:** your desktop appears to stay in place as you close your MacBook lid, with perspective, blur, and shadow responding to the movement. Glissform’s scope extends beyond this effect; additional experiences will be introduced as they are designed and validated.
+
+**Current version: 0.1.0-alpha.4.** This is an experimental public alpha, developed on a MacBook Air M5 15-inch. Wider hardware compatibility and physical performance are still being evaluated.
 
 [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
-## What it does today
+## Available today — Infinite Screen
 
 - Takes one screenshot when closing crosses your chosen lid angle. No continuous screen recording or idle capture.
 - Animates that same image through closing, pauses, and reopening before sleep.
@@ -18,13 +20,13 @@ A small macOS menu bar app that makes your desktop appear to stay in place as yo
 - Builds a shadow over the full animation, gently at first so the frosted colours stay visible, then more strongly near closure: transparent at the bottom, darkest at the top, with only the top 5% reaching full black at the end.
 - Provides a compact native window with a main experience page and a linked Privacy & About page, a live lid reading, an original perspective illustration, an Infinite Screen switch, and precise starting-angle controls.
 - Lets you preview a closing-and-reopening gesture inside the window using synthetic artwork, without taking a screenshot. With Reduce Motion, the preview shows a still illustration instead.
-- Reports readiness in the menu bar; screen-access information and settings are available in Privacy & About.
+- Shows a screen-access card above the preview while permission is required. When access becomes available during the session, the card confirms success for three seconds, then disappears. The same card stays in Privacy & About for access status and management; already-authorized launches start without the main-screen card. Runtime readiness remains in the menu bar.
 - Saves the Infinite Screen toggle and starting angle. The default starting angle is 100°.
-- Optionally restores the live desktop after the lid pauses below the starting angle, so you can keep working at that angle. This is off by default; the pause duration defaults to 2 seconds and can be set from 0.5–10 seconds.
+- Optionally restores the live desktop after the lid pauses below the starting angle, so you can keep working at that angle. This is off by default and uses a fixed 2-second pause.
 - Covers the live Dock and menu bar during the effect so their captured images animate with the desktop. Mouse clicks cannot pass through the snapshot.
 - Remains available from both the Dock and menu bar, with standard About, Settings, Edit, and Quit commands. Closing the settings window leaves the app running.
 
-## Requirements
+## Current alpha requirements
 
 - macOS 14 or later and a Metal-capable MacBook with a compatible lid-angle sensor.
 - Development target: MacBook Air M5 15-inch, model identifier Mac17,4. Other Macs are **not yet verified**.
@@ -46,23 +48,23 @@ open build/Glissform.app
 
 The build script creates a locally ad-hoc-signed app. This alpha is **not Developer ID signed or notarized**; building from source is the supported installation path for now.
 
-Allow **Glissform** in System Settings → Privacy & Security → Screen & System Audio Recording. The setting's label can vary by macOS version. If macOS asks you to quit and reopen the app, do so. The menu reports readiness; the settings window shows your current lid angle.
+Allow **Glissform** in System Settings → Privacy & Security → Screen & System Audio Recording. The setting's label can vary by macOS version. If macOS asks you to quit and reopen the app, do so. The screen-access card appears above the preview while access is needed, and stays available in Privacy & About after access is granted. **Open Settings…** or **Manage Access…** opens this macOS permission page, where you can enable or revoke access for Glissform. The card refreshes when you return to the app and while it runs. The lid effect requires access; the illustration preview remains available without it. The settings page scrolls on smaller displays. The menu reports runtime readiness.
 
-Opening Glissform presents its settings window. You can reopen it later from the menu bar icon with **Settings…**. Turn **Infinite Screen** on or off and adjust **Begin at** inside the preview card using the slider, number field, or stepper. Higher angles start the effect sooner. The current lid angle appears at the top of the preview; the slider sets the trigger. The separate card below the preview contains the pause-to-resume toggle and duration. Typed angles apply on Return or when you leave the field. Clicking anywhere outside the field clears its focus and applies the entered value; values are limited to 20–130°. **Use current angle** copies your live angle (when it is within 20–130°); **Reset** restores 100°. **Preview motion** immediately plays a short closing-and-reopening illustration from the currently shown lid position; it does not capture or cover your desktop and is not a physical hardware test. Begin above that angle and close through it. If you start the app or change the setting while already below the threshold, open above the chosen angle first.
+Opening Glissform presents its settings window. You can reopen it later from the menu bar icon with **Settings…**. Turn **Infinite Screen** on or off and adjust **Begin at** inside the preview card using the slider, number field, or stepper. Higher angles start the effect sooner. The current lid angle appears at the top of the preview; the slider sets the trigger. The separate card below the preview contains the pause-to-resume toggle and a matching pause icon on a solid blue tile at 16% opacity. Access and pause card icons use Bold shapes with appearance-specific colours for contrast. Typed angles apply on Return or when you leave the field. Clicking anywhere outside the field clears its focus and applies the entered value; values are limited to 20–130°. **Use current angle** copies your live angle (when it is within 20–130°); **Reset** restores 100°. **Preview motion** immediately plays a short closing-and-reopening illustration from the currently shown lid position; it does not capture or cover your desktop and is not a physical hardware test. Begin above that angle and close through it. If you start the app or change the setting while already below the threshold, open above the chosen angle first.
 
-**Resume desktop after a pause** restores the live desktop when the lid stays still below the starting angle for the selected duration. For example, with a 95° start and a 2-second pause, closing to 80° and holding there returns the effect to zero and releases the screenshot. Meaningful movement resets the wait; one degree of sensor fluctuation is tolerated. After restoration, the effect stays inactive until you open strictly above the starting angle, then close again. Changing the pause settings restarts any pending wait; disabling this option after restoration does not immediately reactivate the effect. The timer relies on fresh sensor readings and does not delay normal sleep.
+**Resume desktop after a pause** restores the live desktop when the lid stays still below the starting angle for 2 seconds. For example, with a 95° start and a 2-second pause, closing to 80° and holding there returns the effect to zero and releases the screenshot. Meaningful movement resets the wait; one degree of sensor fluctuation is tolerated. After restoration, the effect stays inactive until you open strictly above the starting angle, then close again. Changing the pause toggle restarts any pending wait; disabling this option after restoration does not immediately reactivate the effect. The delay is no longer adjustable, and custom delays saved by earlier builds are ignored. The timer relies on fresh sensor readings and does not delay normal sleep.
 
 Reopen to the chosen angle to restore the live desktop. To stop the app, reopen the lid and choose **Quit Glissform** from its menu bar icon. Normal sleep stays enabled.
 
-Open **Privacy & About** from the main page footer and use **Back** (⌘[) to return. The interface uses a plain system background (white in Light Mode), flat adaptive surfaces, and the macOS accent colour for controls. Interactive controls have hover feedback: the solid-white slider thumb changes size slightly, each stepper arrow highlights independently within the angle field, and the Apple-style capsule switch highlights its track. Both the slider and switch handles stay pure white, including on hover and press. The slider and switch have no separate hover background or border. The angle number and raised degree symbol share one rounded field with up/down arrows on the left. Each arrow has its own hover and pressed highlight, with no separate background at rest. Buttons have distinct pressed surfaces, and the angle field shows an editing outline. Disabled controls do not react to hover. The illustration follows the live lid reading except while previewing; its synthetic screen artwork is explanatory, not a pixel-accurate simulation of the desktop effect. Reduce Motion removes interpolation from the live illustration and replaces playback with a still preview. The actual desktop effect is unchanged.
+Open **Privacy & About** from the main page footer and use **Back** (⌘[) to return. The interface uses a plain system background (white in Light Mode), flat adaptive surfaces, and the macOS accent colour for controls. Both pages share a 4-point spacing scale, consistent text roles, and card styling. Interface icons use Iconly Bold / Regular throughout, bundled locally as vectors; no icon downloads or account connection are needed at runtime. The previous Outline, Bulk, and Custom sets remain available for instant developer comparisons. The screen-access icon is green with a check when allowed and amber with an attention mark when permission is required. See [the design system](docs/DESIGN_SYSTEM.md) for the current UI foundations. Interactive controls have hover feedback: the solid-white slider thumb changes size slightly, each stepper arrow highlights independently within the angle field, and the Apple-style capsule switch highlights its track. Both the slider and switch handles stay pure white, including on hover and press. The slider and switch have no separate hover background or border. The angle number and raised degree symbol share one rounded field with up/down arrows on the left. Each arrow has its own hover and pressed highlight, with no separate background at rest. Buttons have distinct pressed surfaces, and the angle field shows an editing outline. Disabled controls do not react to hover. The illustration follows the live lid reading except while previewing; its synthetic screen artwork is explanatory, not a pixel-accurate simulation of the desktop effect. Reduce Motion removes interpolation from the live illustration and replaces playback with a still preview. The actual desktop effect is unchanged.
 
 ## Privacy and system behavior
 
-Desktop screenshots stay in memory. The app does not save or transmit them, capture audio, or include networking or analytics. The About page prominently explains these privacy boundaries and why macOS requires Screen Recording permission. The rendering test saves only synthetic test images under `build/render-test/`.
+Infinite Screen’s desktop screenshots stay in memory. The app does not save or transmit them, capture audio, or include networking or analytics. Privacy & About shows the Glissform name and version above the privacy information and screen-access cards. These cards explain the privacy boundaries and provide access status and management. The rendering test saves only synthetic test images under `build/render-test/`.
 
-Only the built-in display receives an overlay. The app does not change Dock/menu bar hiding preferences or take keyboard focus from your current application. Sleep, display changes, sensor loss, and quitting clear the overlay. The app does not prevent system sleep or alter lock-screen behavior.
+For Infinite Screen, only the built-in display receives an overlay. The app does not change Dock/menu bar hiding preferences or take keyboard focus from your current application. Sleep, display changes, sensor loss, and quitting clear the overlay. The app does not prevent system sleep or alter lock-screen behavior.
 
-## Known alpha limitations
+## Known Infinite Screen alpha limitations
 
 - The lid sensor exposes an undocumented protocol and whole-degree readings. Smoothing improves the appearance but cannot recover motion the sensor never reported.
 - Reopening during an awake gesture reverses the animation. An opening animation after actual sleep is not implemented.
@@ -100,4 +102,10 @@ Public versions follow `0.1.0-alpha.1` → subsequent alpha builds → `0.1.0-be
 
 The [LidAngleSensor project](https://github.com/samhenrigold/LidAngleSensor) was consulted for the HID protocol. Glissform's sensor implementation and visual effect were written independently; no competitor animation code or assets are bundled.
 
+Interface icons are by [Iconly](https://iconly.pro), used under the project owner's paid license. These third-party assets retain their own licensing terms; see [icon provenance](docs/ICONLY.md).
+
 An open-source license has not been selected. Public availability of this repository does not itself grant an open-source license.
+
+### Developer icon comparison
+
+Build with `bash scripts/build.sh --dev` to show **Developer → Icon Style** in the app menu bar. Select **Bulk**, **Bold**, **Outline**, or **Custom** (⌥⌘1, ⌥⌘2, ⌥⌘3, ⌥⌘4) to update the interface and menu bar icon immediately. The choice lasts for this app session; restarting restores Bold. Bold is the default product set; the previous Custom mix and all three original sets stay available. A normal build omits the Developer menu.

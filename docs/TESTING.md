@@ -1,5 +1,7 @@
 # Testing
 
+Glissform’s current feature-specific checks cover Infinite Screen. Shared UI checks cover settings, permissions, and appearance. Add appropriate behavioural, interruption, accessibility, and performance checks as new experiences are implemented; passing the lid-animation suite is not validation of a different feature.
+
 ## Automated
 
 Run `bash scripts/build.sh` followed by `bash scripts/test.sh`.
@@ -45,6 +47,22 @@ Measure capture delay, frame timing, CPU/GPU use, memory, and power before makin
 
 ## Pause-to-resume
 
-Automated checks cover the default-off behavior, 0.5/2/10-second delays, jitter tolerance, gradual movement, reversals, stale and invalid reports, rearming strictly above the threshold, delayed screenshot rejection, visible return-to-flat, and sleep/display/quit interruptions. These use synthetic sensor timestamps and screenshots; they do not replace physical lid testing.
+Automated checks cover the default-off behavior, 0.5/2/10-second motion-model test delays (the app uses a fixed two seconds), jitter tolerance, gradual movement, reversals, stale and invalid reports, rearming strictly above the threshold, delayed screenshot rejection, visible return-to-flat, and sleep/display/quit interruptions. These use synthetic sensor timestamps and screenshots; they do not replace physical lid testing.
 
-On hardware, enable Resume desktop after a pause, set a 95° trigger and a 2-second delay, open above 95°, then close to 80° and hold. Confirm the effect returns to zero and the desktop accepts input; subsequent movement below 95° must not retrigger it. Reopen above 95° and close to verify a new gesture. Repeat at 0.5 and 10 seconds, with slow movement, direction changes, sleep, and settings changes. Check that the toggle and duration survive relaunch.
+On hardware, enable Resume desktop after a pause, set a 95° trigger, open above 95°, then close to 80° and hold. Confirm the effect returns to zero and the desktop accepts input; subsequent movement below 95° must not retrigger it. Reopen above 95° and close to verify a new gesture. The app uses a fixed two-second delay. Repeat with slow movement, direction changes, sleep, and toggle changes. Check that the toggle survives relaunch and that older saved custom delays have no effect.
+
+### Permission card presentation
+
+- Without permission, the main page shows the access-required card and Open Settings.
+- A false-to-true permission update while the main page is visible shows Screen access allowed for three seconds, then removes the card. Relaunch with access already allowed shows no main-page card.
+- Privacy & About always shows the shared access card below the privacy information card, with 16-point spacing; the old embedded access section and divider are absent.
+- Revocation restores the main-page required card and updates the Privacy card. A rapid grant/revoke must cancel the success dismissal. Leaving the main page cancels the transient confirmation task.
+- Reduce Motion suppresses the card transition animation. Opening settings does not itself grant or revoke access.
+
+## Settings and icon verification
+
+- Verify Light and Dark appearances, keyboard navigation, focus, disabled controls, and VoiceOver labels on both pages.
+- Confirm Bold is the default throughout, with flat 16%-opacity card icon containers and slightly darker icon colours in Light Mode.
+- Build with `--dev` to compare Bulk, Bold, Outline, and Custom with ⌥⌘1–4. Check live updates in settings, Privacy & About, and the menu bar; restart returns to Bold. A normal build hides Developer tools.
+- Verify Privacy & About has the Glissform name/version and the two cards, with no old descriptive paragraph, alpha text, or footer text beneath them.
+- Confirm local icon resources load from the built app bundle without an account connection or network request.

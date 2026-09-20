@@ -2,8 +2,11 @@
 
 ## Scope and product
 
-- The final product name is Glissform. The first public version is 0.1.0-alpha.1.
-- Preserve the menu bar app, one-screenshot-per-gesture model, normal system sleep, and privacy behavior unless the user explicitly changes the scope.
+- The product name is Glissform: a macOS app for subtle animations and quality-of-life improvements across everyday gestures and system changes.
+- Infinite Screen is the first available feature. Never describe Glissform itself as only a lid-closing or screen-animation app; distinguish the broader product direction from implemented features.
+- Do not announce specific future experiences before the owner approves their disclosure. Keep unimplemented ideas clearly separate from current capabilities.
+- VERSION is the source for the current release; the first public version was 0.1.0-alpha.1.
+- Preserve menu bar access, Infinite Screen’s one-screenshot-per-gesture model, normal system sleep, and privacy behaviour unless the user explicitly changes the scope.
 - Do not add continuous recording, networking, analytics, wake guarantees, or broad hardware claims implicitly.
 - The source is public, but no open-source license has been selected. Do not add a license without the owner's choice.
 
