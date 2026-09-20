@@ -104,7 +104,20 @@ final class SettingsWindowController: NSWindowController {
         window.isMovableByWindowBackground = true
         window.isReleasedWhenClosed = false
         window.center()
-        window.contentViewController = NSHostingController(rootView: SettingsRootView(model: model, height: contentHeight))
+        window.contentViewController = NSHostingController(rootView: SettingsRootView(model: model) { [weak window] naturalHeight in
+            guard let window else { return naturalHeight }
+            let visible = (window.screen ?? NSScreen.main)?.visibleFrame
+            let maximumHeight = min(SettingsDesign.Metrics.preferredHeight, (visible?.height ?? 900) - 48)
+            let height = min(ceil(naturalHeight), maximumHeight)
+            var frame = window.frameRect(forContentRect: NSRect(x: 0, y: 0,
+                width: SettingsDesign.Metrics.windowWidth, height: height))
+            frame.origin = CGPoint(x: window.frame.minX, y: window.frame.maxY - frame.height)
+            if let visible { frame.origin.y = max(visible.minY, frame.origin.y) }
+            if abs(window.frame.height - frame.height) > 0.5 {
+                window.setFrame(frame, display: true)
+            }
+            return height
+        })
         super.init(window: window)
     }
 
@@ -118,23 +131,53 @@ final class SettingsWindowController: NSWindowController {
     }
 }
 
+private struct SettingsContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+@MainActor
+private final class SettingsLayoutState: ObservableObject {
+    @Published var height = SettingsDesign.Metrics.preferredHeight
+    var naturalHeight: CGFloat = 0
+}
+
 private struct SettingsRootView: View {
     @ObservedObject var model: SettingsModel
-    let height: CGFloat
+    @StateObject private var layout = SettingsLayoutState()
+    let resizeWindow: (CGFloat) -> CGFloat
 
     var body: some View {
-        Group {
-            switch model.selectedPage {
-            case .infiniteScreen:
-                ScrollView { AnimationSettingsView(model: model) }
-            case .about: AboutSettingsView(model: model, minimumHeight: height)
+        ScrollView {
+            Group {
+                switch model.selectedPage {
+                case .infiniteScreen: AnimationSettingsView(model: model)
+                case .about: AboutSettingsView(model: model)
+                }
+            }
+            .frame(width: SettingsDesign.Metrics.windowWidth)
+            .fixedSize(horizontal: false, vertical: true)
+            .background {
+                GeometryReader { geometry in
+                    Color.clear.preference(key: SettingsContentHeightKey.self, value: geometry.size.height)
+                }
             }
         }
-        .frame(width: SettingsDesign.Metrics.windowWidth, height: height, alignment: .topLeading)
+        .frame(width: SettingsDesign.Metrics.windowWidth, height: layout.height, alignment: .topLeading)
         .background(SettingsDesign.Palette.background)
+        .onPreferenceChange(SettingsContentHeightKey.self) { height in
+            guard height > 0 else { return }
+            layout.naturalHeight = height
+            layout.height = resizeWindow(height)
+        }
         .onAppear { model.refreshPermission() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.refreshPermission()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
+            if layout.naturalHeight > 0 { layout.height = resizeWindow(layout.naturalHeight) }
         }
     }
 }
@@ -605,21 +648,21 @@ private struct ScreenAccessCard: View {
 
 private struct AboutSettingsView: View {
     @ObservedObject var model: SettingsModel
-    let minimumHeight: CGFloat
-
     var body: some View {
-        ScrollView {
             VStack(alignment: .leading, spacing: SettingsDesign.Spacing.groups) {
                 Button {
                     model.selectedPage = .infiniteScreen
                 } label: {
-                    IconlyLabel("Back", icon: .chevronUp, rotation: -90)
+                    HStack(spacing: SettingsDesign.Spacing.optical) {
+                        IconlyIcon(.chevronUp, rotation: -90)
+                        Text("Back")
+                    }
                 }
-                .buttonStyle(FeedbackButtonStyle(kind: .quiet))
+                .buttonStyle(FeedbackButtonStyle(kind: .filled)).controlSize(.small)
                 .keyboardShortcut("[", modifiers: .command)
                 .help("Back to Infinite Screen")
 
-                HStack(spacing: SettingsDesign.Spacing.cards) {
+                HStack(spacing: SettingsDesign.Spacing.label) {
                     Image(nsImage: NSApp.applicationIconImage)
                         .resizable().frame(width: 68, height: 68).accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
@@ -635,9 +678,7 @@ private struct AboutSettingsView: View {
                 }
 
             }
-            .frame(minHeight: max(0, minimumHeight - 2 * SettingsDesign.Spacing.page), alignment: .top)
             .padding(SettingsDesign.Spacing.page)
-        }
     }
 
     private var privacyCard: some View {

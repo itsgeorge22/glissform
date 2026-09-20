@@ -4,7 +4,7 @@ Glissform brings subtle animations and quality-of-life improvements to everyday 
 
 **Infinite Screen is its first available feature:** your desktop appears to stay in place as you close your MacBook lid, with perspective, blur, and shadow responding to the movement. Glissform’s scope extends beyond this effect; additional experiences will be introduced as they are designed and validated.
 
-**Current version: 0.1.0-alpha.4.** This is an experimental public alpha, developed on a MacBook Air M5 15-inch. Wider hardware compatibility and physical performance are still being evaluated.
+**Current version: 0.1.0-alpha.5.** This is an experimental public alpha, developed on a MacBook Air M5 15-inch. Wider hardware compatibility and physical performance are still being evaluated.
 
 [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
@@ -31,7 +31,7 @@ Glissform brings subtle animations and quality-of-life improvements to everyday 
 - macOS 14 or later and a Metal-capable MacBook with a compatible lid-angle sensor.
 - Development target: MacBook Air M5 15-inch, model identifier Mac17,4. Other Macs are **not yet verified**.
 - Screen Recording permission, even though Glissform takes individual screenshots.
-- To build: Apple's Command Line Tools or Xcode, with Swift 5.9 or later. Local development has used Swift 6.4.
+- To build: Xcode 26 or later, opened once to finish setup. Its asset compiler is required for the native app icon; Command Line Tools alone are insufficient. Swift 5.9 or later is required by the package.
 
 The macOS minimum is the software deployment target, not a claim that every MacBook running it has a supported sensor.
 
@@ -48,7 +48,9 @@ open build/Glissform.app
 
 The build script creates a locally ad-hoc-signed app. This alpha is **not Developer ID signed or notarized**; building from source is the supported installation path for now.
 
-Allow **Glissform** in System Settings → Privacy & Security → Screen & System Audio Recording. The setting's label can vary by macOS version. If macOS asks you to quit and reopen the app, do so. The screen-access card appears above the preview while access is needed, and stays available in Privacy & About after access is granted. **Open Settings…** or **Manage Access…** opens this macOS permission page, where you can enable or revoke access for Glissform. The card refreshes when you return to the app and while it runs. The lid effect requires access; the illustration preview remains available without it. The settings page scrolls on smaller displays. The menu reports runtime readiness.
+The app icon uses a centred rounded blue glass wave on a pearl-white/light-silver base in Default and a graphite base in Dark. On macOS 26 or later, **System Settings → Appearance → Icon & widget style** controls its default, dark, clear, or tinted appearance. Clear and tinted preserve the same wave shading and glass highlights; macOS supplies the selected tint and outer material. Glissform has no separate icon-style setting. Earlier macOS versions use the compiler-generated legacy icon. See [app icon artwork](Artwork/README.md) for editable sources and verification guidance.
+
+Allow **Glissform** in System Settings → Privacy & Security → Screen & System Audio Recording. The setting's label can vary by macOS version. If macOS asks you to quit and reopen the app, do so. The screen-access card appears above the preview while access is needed, and stays available in Privacy & About after access is granted. **Open Settings…** or **Manage Access…** opens this macOS permission page, where you can enable or revoke access for Glissform. The card refreshes when you return to the app and while it runs. The lid effect requires access; the illustration preview remains available without it. The settings window fits the current page with 32-point content padding and scrolls when screen space is limited. The menu reports runtime readiness.
 
 Opening Glissform presents its settings window. You can reopen it later from the menu bar icon with **Settings…**. Turn **Infinite Screen** on or off and adjust **Begin at** inside the preview card using the slider, number field, or stepper. Higher angles start the effect sooner. The current lid angle appears at the top of the preview; the slider sets the trigger. The separate card below the preview contains the pause-to-resume toggle and a matching pause icon on a solid blue tile at 16% opacity. Access and pause card icons use Bold shapes with appearance-specific colours for contrast. Typed angles apply on Return or when you leave the field. Clicking anywhere outside the field clears its focus and applies the entered value; values are limited to 20–130°. **Use current angle** copies your live angle (when it is within 20–130°); **Reset** restores 100°. **Preview motion** immediately plays a short closing-and-reopening illustration from the currently shown lid position; it does not capture or cover your desktop and is not a physical hardware test. Begin above that angle and close through it. If you start the app or change the setting while already below the threshold, open above the chosen angle first.
 

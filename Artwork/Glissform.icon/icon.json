@@ -1,0 +1,60 @@
+{
+  "fill-specializations": [
+    {
+      "value": {
+        "linear-gradient": [
+          "srgb:0.96471,0.97647,0.99216,1.00000",
+          "srgb:0.77255,0.80784,0.85490,1.00000"
+        ]
+      }
+    },
+    {
+      "appearance": "dark",
+      "value": {
+        "linear-gradient": [
+          "srgb:0.20392,0.23529,0.28627,1.00000",
+          "srgb:0.06667,0.09412,0.13725,1.00000"
+        ]
+      }
+    },
+    {
+      "appearance": "tinted",
+      "value": "automatic"
+    }
+  ],
+  "groups": [
+    {
+      "name": "Glass wave material",
+      "layers": [
+        {
+          "name": "Rounded glass wave",
+          "image-name": "BlueGlass.png",
+          "glass": false
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.35
+      },
+      "lighting": "individual",
+      "specular": false,
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      },
+      "position": {
+        "scale": 0.84,
+        "translation-in-points": [
+          0,
+          3
+        ]
+      }
+    }
+  ],
+  "supported-platforms": {
+    "circles": [],
+    "squares": [
+      "macOS"
+    ]
+  }
+}

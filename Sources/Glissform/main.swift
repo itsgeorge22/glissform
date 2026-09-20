@@ -6,44 +6,6 @@ final class OverlayWindow: NSWindow {
     override var canBecomeMain: Bool { false }
 }
 
-private func makeGlissformAppIcon() -> NSImage {
-    let size = NSSize(width: 512, height: 512)
-    let image = NSImage(size: size)
-    image.lockFocus()
-
-    let background = NSBezierPath(
-        roundedRect: NSRect(x: 42, y: 42, width: 428, height: 428),
-        xRadius: 112,
-        yRadius: 112
-    )
-    background.addClip()
-    NSGradient(colors: [
-        NSColor(red: 0.24, green: 0.26, blue: 0.29, alpha: 1),
-        NSColor(red: 0.09, green: 0.10, blue: 0.12, alpha: 1),
-    ])?.draw(in: background, angle: -45)
-
-    NSColor.white.setStroke()
-    let rearScreen = NSBezierPath(
-        roundedRect: NSRect(x: 142, y: 188, width: 224, height: 150),
-        xRadius: 20,
-        yRadius: 20
-    )
-    rearScreen.lineWidth = 22
-    rearScreen.stroke()
-
-    let frontScreen = NSBezierPath(
-        roundedRect: NSRect(x: 188, y: 146, width: 224, height: 150),
-        xRadius: 20,
-        yRadius: 20
-    )
-    frontScreen.lineWidth = 22
-    frontScreen.stroke()
-
-    image.unlockFocus()
-    image.isTemplate = false
-    return image
-}
-
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
@@ -81,8 +43,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.applicationIconImage = makeGlissformAppIcon()
         NSApp.setActivationPolicy(.regular)
+        // Reset the Dock tile to the bundle icon after foreground activation.
+        // Passing nil keeps native appearance handling instead of pinning a bitmap.
+        NSApp.applicationIconImage = nil
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = IconlySymbol.laptop.menuImage()
         statusItem.button?.toolTip = "Glissform"

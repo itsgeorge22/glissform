@@ -4,7 +4,7 @@ Glissform’s shared settings interface supports a growing collection of animati
 
 ## Layout
 
-The page is a single column, 720 points wide, with 32-point content padding. Its window height is capped to available screen space; both pages scroll when necessary. The Infinite Screen page groups its preview and angle controls, pause-to-resume settings, and privacy footer. A permission card appears above the preview only when access is missing or briefly after a detected grant. Privacy & About shows the app name/version and separate privacy-information and access cards, with no introductory description or text below the cards.
+The page is a single column, 720 points wide, with 32-point content padding. Its window height follows the measured page content, including the 32-point bottom padding, and is capped to available screen space; both pages scroll when necessary. It resizes when navigating or showing/hiding the permission card. The Infinite Screen page groups its preview and angle controls, pause-to-resume settings, and privacy footer. A permission card appears above the preview only when access is missing or briefly after a detected grant. Privacy & About shows the app name/version and separate privacy-information and access cards, with no introductory description or text below the cards.
 
 | Spacing role | Points |
 | --- | ---: |
@@ -58,7 +58,7 @@ Angle arrows have independent 24 × 20-point targets and repeat while held. The 
 
 ## Interaction
 
-Custom buttons and arrows use the same hover and pressed fill strength (10% and 18%) and disabled opacity (45%). Filled buttons have a 6% resting surface; button outlines use 18% on hover and 30% on press. Switch feedback is applied to its track. Disabled controls ignore hover and cannot activate.
+Custom buttons and arrows use the same hover and pressed fill strength (10% and 18%) and disabled opacity (45%). Back and Preview motion use the same filled button style; Back keeps a 2-point icon-to-text gap. Filled buttons have a 6% resting surface; button outlines use 18% on hover and 30% on press. Switch feedback is applied to its track. Disabled controls ignore hover and cannot activate.
 
 Hover transitions use 120 ms; pressed feedback uses 80 ms; switch movement uses 160 ms. Reduce Motion removes these interpolations and uses the existing still illustration preview. Native keyboard traversal and button activation remain available; angle editing retains its accent outline. These settings styles do not alter the physical lid effect.
 
@@ -69,3 +69,7 @@ Use **Iconly Bold / Regular** for all interface icons. Preserve the original Bul
 The up arrow rotates for down and back navigation (the preserved Outline set uses a chevron). Play and stop use solid Bold circular shapes with cutouts. Permission states use Shield Done and Shield information; the pause tile uses Pause Circle. The menu bar uses mac laptop notebook. The original Glissform brand mark and explanatory animated laptop illustration remain distinct from the interface icon library.
 
 See [Iconly provenance](ICONLY.md) for source names and asset terms.
+
+## App icon
+
+The app's brand icon is a rounded blue glass pane with a sweeping wave in `Artwork/Glissform.icon`. Its foreground texture preserves the soft gradient, convex shading, bright rim and highlight; a centred, smaller inset and continuous corners keep it close to the approved reference. It expresses a surface responding to motion across Glissform's experiences. Default has a pearl-white/light-silver base; Dark has a graphite base. macOS derives clear and tinted styles from the same shaded artwork, preserving material detail instead of substituting a flat wave. The system supplies the outer mask, background material and selected tint. These system icon styles are separate from the window's light/dark appearance and the developer Iconly selector. See [artwork notes](../Artwork/README.md).

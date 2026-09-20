@@ -22,7 +22,19 @@ jobs:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Show toolchain
-        run: swift --version
+        run: |
+          # The native .icon asset requires a full Xcode 26+ installation.
+          for developer_dir in /Applications/Xcode*.app/Contents/Developer; do
+            version=$(DEVELOPER_DIR="$developer_dir" xcodebuild -version | awk '/^Xcode / { print $2 }')
+            if [[ "${version%%.*}" =~ ^[0-9]+$ ]] && (( ${version%%.*} >= 26 )); then
+              echo "DEVELOPER_DIR=$developer_dir" >> "$GITHUB_ENV"
+              DEVELOPER_DIR="$developer_dir" xcodebuild -version
+              DEVELOPER_DIR="$developer_dir" swift --version
+              exit 0
+            fi
+          done
+          echo "This runner needs Xcode 26 or later." >&2
+          exit 1
       - name: Build locally signed app
         run: bash scripts/build.sh
       - name: Check bundle version

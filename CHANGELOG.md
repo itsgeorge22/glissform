@@ -6,6 +6,22 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 No unreleased changes.
 
+## 0.1.0-alpha.5 — 2026-09-20
+
+Fifth public alpha: a new native glass-wave app icon with light, dark, clear and tinted appearances, corrected Dock icon display, and tighter window and Privacy screen layout. Source release; local builds remain ad-hoc signed and are not notarized.
+
+### Changed
+
+- Replaced the runtime-drawn app icon with a centred rounded blue glass wave, a pearl-white/light-silver Default base, and a graphite Dark base. A smaller foreground retains the selected artwork's rim, highlights and soft wave shading; native clear/tinted styles derive from that same artwork instead of a flat vector silhouette. macOS controls the icon appearance through System Settings. The build now requires Xcode 26 or later and packages both the native catalog and a legacy icon; older-macOS runtime appearance remains unverified.
+
+- Refresh the app bundle's modification date after development builds and reset AppKit's Dock icon to the bundled asset after foreground activation, addressing stale placeholder icons without overriding native appearance selection.
+
+- Reduced the Privacy header’s icon-to-text spacing from 16 to 8 points.
+
+- Matched Back to the filled Preview motion button style, retaining its tighter 2-point arrow-to-label spacing.
+
+- Settings window height follows the visible page content, keeping 32-point bottom padding after cards disappear or pages change. Content still scrolls when capped by available screen space.
+
 ## 0.1.0-alpha.4 — 2026-09-20
 
 Fourth public alpha: a refined native interface, clearer permission flow, unified Iconly icons, and simpler pause-to-resume controls. Glissform is positioned as a broader app for animations and quality-of-life improvements, with Infinite Screen as its first feature. No additional experience is introduced in this release. Source release; local builds remain ad-hoc signed and are not notarized.

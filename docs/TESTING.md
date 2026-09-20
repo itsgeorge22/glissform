@@ -61,6 +61,10 @@ On hardware, enable Resume desktop after a pause, set a 95° trigger, open above
 
 ## Settings and icon verification
 
+- Build with Xcode 26 or later and confirm the bundle includes `Assets.car`, `Glissform.icns`, and the compiler-generated icon keys in `Info.plist`.
+- Inspect the brand icon in Icon Composer and in the running app's Dock, Finder, and Privacy & About. Verify the blue wave in default/light and dark, and readable wave separation in clear light/dark and tinted appearances through System Settings → Appearance. Restore the user's original appearance after testing. Check Dock-sized and small Finder renderings for clipped edges or merged layers.
+- Check that all styles retain the rounded pane, glass rim, highlight and continuous wave shading; clear/tinted must not collapse into flat two-tone shapes. Rebuild in place and relaunch: the Dock tile should show the bundle icon, including after changing the system icon style. Finder alone is not sufficient evidence for the Dock.
+- Inspect the compiler's legacy `.icns`; earlier-macOS appearance still needs an actual supported-OS check. Native clear/tinted styles are only expected on macOS 26 or later.
 - Verify Light and Dark appearances, keyboard navigation, focus, disabled controls, and VoiceOver labels on both pages.
 - Confirm Bold is the default throughout, with flat 16%-opacity card icon containers and slightly darker icon colours in Light Mode.
 - Build with `--dev` to compare Bulk, Bold, Outline, and Custom with ⌥⌘1–4. Check live updates in settings, Privacy & About, and the menu bar; restart returns to Bold. A normal build hides Developer tools.

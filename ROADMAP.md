@@ -4,7 +4,7 @@ Glissform adds subtle animations and quality-of-life improvements to everyday Ma
 
 New experiences should feel native, have a clear purpose, stay lightweight, and respect privacy and normal system behaviour. Additional experiences are part of the product direction; their specific triggers, designs, and release dates are not announced here. This roadmap separates available work, near-term validation, and possibilities.
 
-## Current — 0.1.0-alpha.4
+## Current — 0.1.0-alpha.5
 
 The first feature, Infinite Screen, implements screenshot-based closing animation with full-angle hinge compensation, steadier adaptive smoothing, progressive full-image frost and shadow, awake reversal, native settings with a configurable starting angle and capture-free preview, optional desktop restoration after a fixed two-second still-lid pause, menu bar controls, and lifecycle cleanup. Synthetic checks cover projection, tracking, and interrupted gestures; repeatable physical acceptance remains an upcoming gate. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
 
@@ -16,6 +16,10 @@ The first feature, Infinite Screen, implements screenshot-based closing animatio
 - [ ] Continue improving existing features alongside new work; expansion is not dependent on making Infinite Screen the entire product.
 
 ## Next alpha iterations — shared foundations and Infinite Screen
+
+- [x] Integrate the centred, inset blue glass-wave icon with distinct light and dark bases plus native clear and tinted appearances. Preserve the same material shading in every style; verify native compilation, all six rendition exports, Finder style changes, and the running app's Privacy & About icon on macOS 27.
+- [x] Correct the Dock placeholder after resetting the native launch icon and refreshing development bundle registration; the owner confirmed the icon displays correctly.
+- [ ] Verify the compiler-generated legacy icon on an earlier supported macOS version.
 
 - [x] Unify interface iconography with locally bundled Iconly Bold / Regular vectors, retaining Bulk, Outline, and the previous Custom mix as alternatives with live switching in developer builds.
 
