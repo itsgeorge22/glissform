@@ -13,6 +13,8 @@ if [[ "${1:-}" == "--motion-only" ]]; then
 elif [ -x build/Glissform.app/Contents/MacOS/Glissform ]; then
     build/Glissform.app/Contents/MacOS/Glissform --render-test
     build/Glissform.app/Contents/MacOS/Glissform --lifecycle-test
+    swiftc -swift-version 5 -parse-as-library Sources/Glissform/OverlayWindow.swift Tests/OverlayChecks.swift -o build/tests/overlay-checks
+    build/tests/overlay-checks
 else
     echo "Build the app before running Metal checks: bash scripts/build.sh" >&2
     exit 1

@@ -4,6 +4,10 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+### Fixed
+
+- Infinite Screen's overlay can now appear over another app in a native full-screen Space even while Glissform's settings window is open. The overlay uses a non-activating panel that can join other apps' Spaces, preserving the foreground app, keyboard focus, and background Dock behavior.
+
 ### Changed
 
 - Closing the settings window now removes Glissform from the Dock while Infinite Screen and the menu bar keep running. Reopening Settings or opening the app again restores the window and Dock icon. No additional permission is required; Quit still stops the app completely.

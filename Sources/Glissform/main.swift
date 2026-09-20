@@ -1,11 +1,6 @@
 import AppKit
 import MetalKit
 
-final class OverlayWindow: NSWindow {
-    override var canBecomeKey: Bool { false }
-    override var canBecomeMain: Bool { false }
-}
-
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
@@ -199,15 +194,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         starting = true
         window?.close()
-        let overlay = OverlayWindow(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
-        overlay.isReleasedWhenClosed = false
-        overlay.isOpaque = false
-        overlay.backgroundColor = .clear
-        overlay.hasShadow = false
-        overlay.ignoresMouseEvents = true
-        overlay.level = .floating
-        overlay.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-        overlay.animationBehavior = .none
+        let overlay = OverlayWindow(contentRect: screen.frame)
         let view = MTKView(frame: NSRect(origin: .zero, size: screen.frame.size))
         guard let effect = EffectRenderer(view: view, framesPerSecond: screen.maximumFramesPerSecond) else {
             setStatus("Metal rendering unavailable")
@@ -499,11 +486,7 @@ extension AppDelegate {
         func makeGesture() throws -> (AppDelegate, SyntheticCapture) {
             let source = SyntheticCapture()
             let app = AppDelegate(capture: source)
-            let window = OverlayWindow(contentRect: NSRect(x: 16, y: 16, width: 64, height: 64),
-                                       styleMask: .borderless, backing: .buffered, defer: false)
-            window.isReleasedWhenClosed = false
-            window.alphaValue = 0
-            window.ignoresMouseEvents = true
+            let window = OverlayWindow(contentRect: NSRect(x: 16, y: 16, width: 64, height: 64))
             let view = MTKView(frame: NSRect(x: 0, y: 0, width: 64, height: 64))
             guard let renderer = EffectRenderer(view: view) else {
                 throw NSError(domain: "Glissform.LifecycleTest", code: 3)

@@ -24,6 +24,7 @@ Glissform brings subtle animations and quality-of-life improvements to everyday 
 - Saves the Infinite Screen toggle and starting angle. The default starting angle is 100°.
 - Optionally restores the live desktop after the lid pauses below the starting angle, so you can keep working at that angle. This is off by default and uses a fixed 2-second pause.
 - Covers the live Dock and menu bar during the effect so their captured images animate with the desktop. Mouse clicks cannot pass through the snapshot.
+- Displays the overlay in another app's full-screen Space with settings open or closed, without activating Glissform or moving keyboard focus from that app.
 - Appears in the Dock while its settings window is open, with standard About, Settings, Edit, and Quit commands. Closing the window removes Glissform from the Dock while Infinite Screen and menu bar access keep running. Reopening Settings restores the window and Dock icon. The menu bar uses a monochrome template derived from the actual Clear app icon; macOS supplies its foreground colour for the background and selection state.
 
 ## Current alpha requirements
@@ -86,7 +87,7 @@ build/Glissform.app/Contents/MacOS/Glissform --version
 build/Glissform.app/Contents/MacOS/Glissform --probe
 ```
 
-Tests cover motion, thresholds, reversals, tracking delay, boundary transitions, Metal rendering against synthetic pixels, and snapshot cancellation through the real gesture coordinator using synthetic captures. `--probe` reads the actual lid sensor. For a machine without Metal rendering support:
+Tests cover motion, thresholds, reversals, tracking delay, boundary transitions, Metal rendering against synthetic pixels, snapshot cancellation through the real gesture coordinator using synthetic captures, and overlay visibility without foreground activation. The overlay checks can also run while another app is full screen; see the testing notes. `--probe` reads the actual lid sensor. For a machine without Metal rendering support:
 
 ```sh
 bash scripts/test.sh --motion-only

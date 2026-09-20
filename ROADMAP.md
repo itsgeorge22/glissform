@@ -17,6 +17,8 @@ The first feature, Infinite Screen, implements screenshot-based closing animatio
 
 ## Next alpha iterations — shared foundations and Infinite Screen
 
+- [x] Allow Infinite Screen's overlay to join another app's full-screen Space with settings open or closed, without activating Glissform; verify visibility with a separate full-screen app and retain physical acceptance as a separate gate.
+
 - [x] Hide the Dock icon when settings close, keep Infinite Screen and menu bar access running, and restore the window and Dock icon when reopened without adding a permission requirement.
 
 - [x] Integrate the centred, inset blue glass-wave icon with distinct light and dark bases plus native clear and tinted appearances. Preserve the same material shading in every style; verify native compilation, all six rendition exports, Finder style changes, and the running app's Privacy & About icon on macOS 27.

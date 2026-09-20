@@ -20,6 +20,14 @@ The benchmark reports mean, 95th-percentile and maximum GPU command duration ove
 
 `bash scripts/test.sh --motion-only` explicitly omits Metal and AppKit lifecycle checks. GitHub Actions uses this mode; it does not verify physical lid behavior, permissions, or screen capture.
 
+### Full-screen overlay
+
+The full local suite also builds and runs `build/tests/overlay-checks`. It displays a small solid-colour panel through the production overlay class, checks active-Space membership and compositor visibility with both regular and accessory app activation, verifies that the foreground app stays unchanged, and checks dismissal. It takes no screenshots and requires no screen access. Running it on an ordinary desktop does not establish full-screen behavior.
+
+For the full-screen regression, run `sleep 5 && build/tests/overlay-checks`, then switch to another app in native full screen before the five-second delay ends. Leave that app active until both checks finish. A separate synthetic full-screen host reproduced the old failure in regular activation (the overlay was absent from the active Space and compositor); the updated panel passed both activation modes without changing the foreground app.
+
+For physical acceptance, repeat a close/reopen gesture over a full-screen app with Glissform settings open on another Space, then with settings closed. Check screenshot content, animation, reversal, pause restoration, sleep cleanup, and restored mouse access. Repeat with Split View and Space changes. The synthetic overlay checks verify window placement, not physical lid motion, screen-capture content, or protected video compatibility.
+
 ## Physical acceptance
 
 For a repeatable material review with original synthetic desktop artwork (text, widgets, window panels and Dock icons):
