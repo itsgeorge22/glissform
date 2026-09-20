@@ -4,7 +4,19 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+## 0.1.0-alpha.6 — 2026-09-20
+
+Sixth public alpha: consistent closing and post-sleep opening using the same screenshot, background operation when settings close, and support for overlays in other apps’ full-screen Spaces. The owner confirmed the cached opening works well on the development MacBook Air M5 15-inch; broader wake, unlock, display, and hardware acceptance remains ongoing. Source release; local builds remain ad-hoc signed and are not notarized.
+
+### Added
+
+- Experimental opening after lid-close sleep: retain the completed closing screenshot and its prepared texture in memory, reconnect immediately, and reuse the same image for remaining upward movement after unlock. No fresh wake capture or texture upload is needed. A three-second wake window rejects late, stale, reversed, or unavailable-desktop attempts; missing closing images skip without recapturing. Opening completion, cancellation, session/display changes, screen-access loss, setting changes, and quit release the image. Privacy & About explains the retention. No extra permission or sleep prevention is introduced; the owner confirmed the main opening behavior on the development Mac, while broader wake and unlock acceptance remains pending.
+
 ### Fixed
+
+- A heartbeat queued during sleep now gives the restarted sensor its normal one-second recovery window instead of immediately cancelling wake opening from an old pre-sleep timestamp. Actual sensor loss still clears pending and visible effects; the three-second wake deadline is unchanged.
+
+- Lock notifications around sleep keep the retained closing frame hidden and preserve the original wake deadline. A one-second grace period covers lock arriving just before near-closed sleep; ordinary locks and session switches still discard images. Sensor readings continue to evaluate remaining motion while locked without capturing or revealing pixels. Completed openings skip. Local timing logs distinguish retained-frame preparation, lock/session state, missing evidence, and timeouts. Diagnostic app runs start without a Dock entry and successful UI checks exit through AppKit.
 
 - Infinite Screen's overlay can now appear over another app in a native full-screen Space even while Glissform's settings window is open. The overlay uses a non-activating panel that can join other apps' Spaces, preserving the foreground app, keyboard focus, and background Dock behavior.
 

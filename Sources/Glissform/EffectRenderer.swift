@@ -23,6 +23,10 @@ final class EffectRenderer: NSObject, MTKViewDelegate {
     private var transitionGeneration = 0
     private var onReturnToFlat: (() -> Void)?
 
+    var hasPreparedSnapshot: Bool {
+        sourceBuffer != nil && sourceTexture != nil && filteredTexture != nil && !sourceNeedsFiltering
+    }
+
     func beginAnimation() {
         transitionGeneration += 1
         ending = false
@@ -119,15 +123,34 @@ final class EffectRenderer: NSObject, MTKViewDelegate {
         scheduleSettling()
     }
 
-    /// Submit a sharp identity frame while the overlay is still transparent.
+    /// Prepare the identity frame for closing, or the current fold for waking.
     /// The caller may reveal the window only after the GPU has finished it.
-    @MainActor func prepareSnapshot(pixelBuffer: CVPixelBuffer) async throws {
+    @MainActor func prepareSnapshot(pixelBuffer: CVPixelBuffer, opening: Bool = false) async throws {
         progress = 0
         update(pixelBuffer: pixelBuffer)
+        try await prepareFirstFrame(opening: opening)
+    }
+
+    /// Reuse the closing image and its mipmaps, without a capture or texture upload.
+    @MainActor func prepareRetainedSnapshot() async throws {
+        guard hasPreparedSnapshot else {
+            throw NSError(domain: "Glissform", code: 5, userInfo: [NSLocalizedDescriptionKey: "Closing screenshot unavailable"])
+        }
+        progress = 0
+        try await prepareFirstFrame(opening: true)
+    }
+
+    @MainActor private func prepareFirstFrame(opening: Bool) async throws {
+        let initialFold: Float = opening ? foldRadians : 0
+        if opening {
+            renderedFold = initialFold
+            smoothing.reset(to: initialFold)
+            handoff = HandoffTransition()
+        }
         guard sourceTexture != nil, let view,
               let drawable = view.currentDrawable,
               let descriptor = view.currentRenderPassDescriptor,
-              let command = encode(descriptor: descriptor, displayedFold: 0) else {
+              let command = encode(descriptor: descriptor, displayedFold: initialFold) else {
             throw NSError(domain: "Glissform", code: 4, userInfo: [NSLocalizedDescriptionKey: "Cannot prepare the first animation frame"])
         }
         command.present(drawable)
@@ -140,7 +163,9 @@ final class EffectRenderer: NSObject, MTKViewDelegate {
         }
     }
 
-    func clear() {
+    /// Stop drawing and invalidate callbacks, while keeping the single image ready.
+    func pauseSnapshot() {
+        progress = 0
         view?.isPaused = true
         lastDrawTime = nil
         smoothing.reset()
@@ -149,6 +174,10 @@ final class EffectRenderer: NSObject, MTKViewDelegate {
         ending = false
         transitionGeneration += 1
         onReturnToFlat = nil
+    }
+
+    func clear() {
+        pauseSnapshot()
         sourceTexture = nil
         sourceBuffer = nil
         filteredTexture = nil
@@ -282,6 +311,16 @@ final class EffectRenderer: NSObject, MTKViewDelegate {
             (1, 1, 85, "frost80"), (1.0125, 1, 85, "fullShadow")]
         var sharpBottomEdgeEnergy: Double?
         for (amount, frost, reference, label) in cases {
+            if label == "zeroAngle" {
+                let preparedTexture = renderer.filteredTexture
+                renderer.pauseSnapshot()
+                guard renderer.hasPreparedSnapshot, renderer.sourceBuffer === buffer,
+                      renderer.filteredTexture === preparedTexture, view.isPaused else {
+                    throw failure("Pausing must retain the exact source and prepared texture without drawing")
+                }
+                // The following zero-angle pixel comparison also checks that
+                // the retained image returns unchanged, without another upload.
+            }
             renderer.progress = amount
             renderer.blurScale = frost
             renderer.setLidAngle(label == "zeroAngle" ? reference : reference - Double(amount) * 80,
@@ -398,7 +437,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate {
             let target = label == "frost52" ? outputURL : outputURL.deletingPathExtension().appendingPathExtension("\(label).png")
             try png.write(to: target)
         }
-        print("PASS: stationary-plane GPU projection at 16°/40°/90°/120°, orientation, opacity, top shadow, bottom-edge blur, frost at 20°/40°/52°/80°")
+        print("PASS: stationary-plane GPU projection at 16°/40°/90°/120°, orientation, opacity, retained-frame identity, top shadow, bottom-edge blur, frost at 20°/40°/52°/80°")
         if benchmark {
             let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm,
                 width: width, height: height, mipmapped: false)

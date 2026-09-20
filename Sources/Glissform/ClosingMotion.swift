@@ -49,6 +49,15 @@ struct ClosingMotion {
         clearPauseTracking()
     }
 
+    /// Only the wake coordinator may arm below the threshold, after fresh
+    /// upward readings. Ordinary startup and setting changes remain unarmed.
+    mutating func beginOpening(angle: Double, time: Double) -> Float {
+        guard let startAngle, angle.isFinite, (0..<startAngle).contains(angle) else { return 0 }
+        reset()
+        armed = true
+        return update(angle: angle, time: time)
+    }
+
     mutating func update(angle: Double, time: Double = ProcessInfo.processInfo.systemUptime) -> Float {
         guard angle.isFinite, (0...180).contains(angle) else { clearPauseTracking(); return 0 }
         if let startAngle {

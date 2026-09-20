@@ -696,7 +696,7 @@ private struct AboutSettingsView: View {
         VStack(alignment: .leading, spacing: SettingsDesign.Spacing.cardInset) {
             Text("Your screen stays yours.").font(SettingsDesign.Typography.sectionTitle)
             privacyDetail("One gesture. One screenshot.", text: "Captured only when the effect begins. No continuous recording.", symbol: .copy)
-            privacyDetail("Here for a moment.", text: "Kept in memory, then released. Never saved or uploaded.", symbol: .memory)
+            privacyDetail("Only in memory.", text: "Reused after lid-close sleep, then released. Never saved or uploaded.", symbol: .memory)
             privacyDetail("Quiet by design.", text: "No audio capture, analytics, or network requests.", symbol: .lock)
         }
         .padding(SettingsDesign.Spacing.cardInset)

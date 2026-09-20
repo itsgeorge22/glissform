@@ -4,9 +4,9 @@ Glissform adds subtle animations and quality-of-life improvements to everyday Ma
 
 New experiences should feel native, have a clear purpose, stay lightweight, and respect privacy and normal system behaviour. Additional experiences are part of the product direction; their specific triggers, designs, and release dates are not announced here. This roadmap separates available work, near-term validation, and possibilities.
 
-## Current — 0.1.0-alpha.5
+## Current — 0.1.0-alpha.6
 
-The first feature, Infinite Screen, implements screenshot-based closing animation with full-angle hinge compensation, steadier adaptive smoothing, progressive full-image frost and shadow, awake reversal, native settings with a configurable starting angle and capture-free preview, optional desktop restoration after a fixed two-second still-lid pause, menu bar controls, and lifecycle cleanup. Synthetic checks cover projection, tracking, and interrupted gestures; repeatable physical acceptance remains an upcoming gate. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
+The first feature, Infinite Screen, implements screenshot-based closing animation with full-angle hinge compensation, steadier adaptive smoothing, progressive full-image frost and shadow, awake reversal, cached post-sleep opening, native settings with a configurable starting angle and capture-free preview, optional desktop restoration after a fixed two-second still-lid pause, menu bar controls, and lifecycle cleanup. Synthetic checks cover projection, tracking, and interrupted gestures; repeatable physical acceptance remains an upcoming gate. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
 
 ## Product development
 
@@ -16,6 +16,14 @@ The first feature, Infinite Screen, implements screenshot-based closing animatio
 - [ ] Continue improving existing features alongside new work; expansion is not dependent on making Infinite Screen the entire product.
 
 ## Next alpha iterations — shared foundations and Infinite Screen
+
+- [x] Prepare an initial unreleased wake-opening prototype with immediate reconnection, remaining-angle motion, bounded eligibility, local timing diagnostics, and synthetic cancellation checks.
+- [x] Correct loss of numeric wake eligibility when a lock/session notification follows sleep, and cover lock-before-wake, lock-after-wake, unlock with remaining motion, completed opening and timeout sequences in synthetic checks.
+- [x] Correct premature sensor-loss cancellation by a heartbeat delivered immediately after wake, preserving the bounded sensor-recovery and wake deadlines.
+- [x] Replace fresh wake capture with the completed closing image and prepared texture, retained in memory through lid-close sleep. Add hidden retention, lock ordering, skipping when no frame is available, cleanup checks, and updated privacy copy.
+- [x] Obtain owner confirmation that cached opening works well on the development Mac after the faded-window reports.
+- [ ] Measure remaining wake-to-visible delay and repeat appearance checks across lock states and opening speeds. The earlier fresh-capture trials exposed a blink and 283–356 ms preparation latency; cached pixels alone do not establish control of the first visible screen frame. See `docs/TESTING.md`.
+- [ ] Physically validate wake timing, quick/slow full-lid reopening, lock/unlock, fullscreen and external-display transitions on the target Mac. Verify the undocumented lock hints on supported macOS versions before describing wake opening as dependable.
 
 - [x] Allow Infinite Screen's overlay to join another app's full-screen Space with settings open or closed, without activating Glissform; verify visibility with a separate full-screen app and retain physical acceptance as a separate gate.
 
@@ -73,7 +81,7 @@ A release candidate is a complete proposed stable build. Publish 1.0.0 when thos
 
 ## Further possibilities — not committed
 
-- Wake/opening animation, only if macOS timing and permissions allow a dependable implementation.
+- Broader wake-opening support after the prototype passes timing, privacy, and physical acceptance gates; no first-frame or locked-wake guarantee.
 - Optional launch at login; a lightweight enable/pause control is already available in the working settings and menu.
 - Carefully bounded blur, shadow, and motion preferences or presets.
 - Accessibility options and behavior that respects reduced-motion preferences.

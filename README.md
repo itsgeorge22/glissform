@@ -4,15 +4,16 @@ Glissform brings subtle animations and quality-of-life improvements to everyday 
 
 **Infinite Screen is its first available feature:** your desktop appears to stay in place as you close your MacBook lid, with perspective, blur, and shadow responding to the movement. Glissform’s scope extends beyond this effect; additional experiences will be introduced as they are designed and validated.
 
-**Current version: 0.1.0-alpha.5.** This is an experimental public alpha, developed on a MacBook Air M5 15-inch. Wider hardware compatibility and physical performance are still being evaluated.
+**Current version: 0.1.0-alpha.6.** This is an experimental public alpha, developed on a MacBook Air M5 15-inch. Wider hardware compatibility and physical performance are still being evaluated.
 
 [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
 ## Available today — Infinite Screen
 
 - Takes one screenshot when closing crosses your chosen lid angle. No continuous screen recording or idle capture.
-- Animates that same image through closing, pauses, and reopening before sleep.
-- Starts at exactly zero stretch, blur, and shadow, then eases into the current angle.
+- Animates that same image through closing, pauses, and eligible reopening, including after lid-close sleep.
+- Includes experimental opening after lid-close sleep: it retains the completed closing screenshot and prepared texture in memory through sleep, then reuses them when the desktop is unlocked and opening movement remains. It takes no fresh wake screenshot. Missing closing images, completed openings, and late unlocks skip the effect; the owner confirmed the main opening behavior on the development Mac, with broader wake/unlock validation still pending.
+- Closing starts at exactly zero stretch, blur, and shadow, then eases into the current angle. Wake opening prepares the current fold directly and follows the remaining opening movement.
 - Compensates the full lid rotation around a fixed hinge, including closures that travel more than 90° from the starting angle.
 - Uses measured sensor cadence and critically damped smoothing to keep tracking speed steadier across whole-degree readings. Motion settles without overshooting reported angles and responds immediately to reversals.
 - Overlaps the 80 ms screenshot fade with a 100 ms geometric handoff, reducing entrance delay while keeping the first frame unchanged.
@@ -65,14 +66,17 @@ Open **Privacy & About** from the main page footer and use **Back** (⌘[) to re
 
 Closing the settings window with its close button or ⌘W keeps Glissform running in the background without a Dock icon. Reopen it through the menu bar's **Settings…** command or by opening the app again. **Quit Glissform** stops it completely. This background behavior requires no additional permission or access card and does not enable launch at login.
 
-Infinite Screen’s desktop screenshots stay in memory. The app does not save or transmit them, capture audio, or include networking or analytics. Privacy & About shows the Glissform name and version above the privacy information and screen-access cards. These cards explain the privacy boundaries and provide access status and management. The rendering test saves only synthetic test images under `build/render-test/`.
+Infinite Screen’s desktop screenshots stay in memory. One completed closing image and its prepared texture may remain through lid-close sleep for the following opening. The overlay stays hidden while asleep or locked; the image is released after the opening, a skipped wake attempt, or cancellation. Session switches, display changes, screen-access loss, disabling the effect, changing its starting angle, and quitting discard it. There is no capture fallback if a closing image is unavailable. The app does not save or transmit screenshots, capture audio, or include networking or analytics. Privacy & About explains this retention and provides access status and management through the existing screen-access card; no new permission is needed. The rendering test saves only synthetic test images under `build/render-test/`.
 
 For Infinite Screen, only the built-in display receives an overlay. The app does not change Dock/menu bar hiding preferences or take keyboard focus from your current application. Sleep, display changes, sensor loss, and quitting clear the overlay. The app does not prevent system sleep or alter lock-screen behavior.
 
 ## Known Infinite Screen alpha limitations
 
 - The lid sensor exposes an undocumented protocol and whole-degree readings. Smoothing improves the appearance but cannot recover motion the sensor never reported.
-- Reopening during an awake gesture reverses the animation. An opening animation after actual sleep is not implemented.
+- Reopening during an awake gesture reverses the animation. The experimental wake-opening effect requires a completed closing screenshot, a fresh near-closed reading before sleep, an available unlocked desktop, and upward movement still below the starting angle within three seconds of wake. Ordinary sleep/lock ordering keeps that image hidden in memory; a near-closed lock immediately before sleep has a one-second grace period. Session switches discard it. Fast opening, late unlock, unfinished closing capture, pause restoration before sleep, display changes, or missing sensor readings can skip the effect. It does not animate over the lock screen, replay a completed opening, or guarantee the first visible wake frame.
+- Wake desktop availability combines public display/session checks with undocumented macOS lock hints. Those hints need OS-version and physical unlock testing; the overlay retains normal login visibility restrictions and never requests drawing over the lock screen.
+- Physical trials of the earlier fresh-capture prototype showed a live-screen blink and incomplete-looking foreground windows after unlock. Retaining the closing image now removes that fresh-capture path and its wait, and the owner reported that the revised opening works well on the development Mac. Broader physical validation is still needed. macOS wake, unlock, sensor delivery, GPU presentation, and the 80 ms entrance fade still affect visible timing.
+- The cached image represents the desktop when closing began. Content that changes during sleep can differ when the live desktop returns; caching does not guarantee an invisible final handoff.
 - A screenshot freezes moving content. A perfectly invisible handoff is not guaranteed for video, changing windows, protected content, or OS capture indicators.
 - The projection assumes a fixed seated viewpoint; it is not head tracking or exact optical compensation.
 - Screen capture permission may need renewing after local signing or path changes.
@@ -87,7 +91,7 @@ build/Glissform.app/Contents/MacOS/Glissform --version
 build/Glissform.app/Contents/MacOS/Glissform --probe
 ```
 
-Tests cover motion, thresholds, reversals, tracking delay, boundary transitions, Metal rendering against synthetic pixels, snapshot cancellation through the real gesture coordinator using synthetic captures, and overlay visibility without foreground activation. The overlay checks can also run while another app is full screen; see the testing notes. `--probe` reads the actual lid sensor. For a machine without Metal rendering support:
+Tests cover motion, thresholds, reversals, tracking delay, boundary transitions, wake eligibility and deadlines, Metal rendering against synthetic pixels, snapshot cancellation through the real gesture coordinator using synthetic captures, and overlay visibility without foreground activation. The overlay checks can also run while another app is full screen; see the testing notes for wake diagnostics and physical acceptance. `--probe` reads the actual lid sensor. For a machine without Metal rendering support:
 
 ```sh
 bash scripts/test.sh --motion-only

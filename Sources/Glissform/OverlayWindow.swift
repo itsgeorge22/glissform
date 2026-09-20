@@ -11,6 +11,7 @@ final class OverlayWindow: NSPanel {
         backgroundColor = .clear
         hasShadow = false
         hidesOnDeactivate = false
+        canBecomeVisibleWithoutLogin = false
         isFloatingPanel = true
         ignoresMouseEvents = true
         level = .floating
