@@ -4,7 +4,11 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
-No unreleased changes.
+### Changed
+
+- Closing the settings window now removes Glissform from the Dock while Infinite Screen and the menu bar keep running. Reopening Settings or opening the app again restores the window and Dock icon. No additional permission is required; Quit still stops the app completely.
+
+- Replaced the laptop menu bar symbol with a monochrome template derived from the actual Clear app icon at 18 points in 1× and 2× resolutions. Its original wave and contours become opacity detail; macOS supplies the foreground colour. Developer icon switching leaves it unchanged. The build validates the encoded template opacity to catch invisible output.
 
 ## 0.1.0-alpha.5 — 2026-09-20
 

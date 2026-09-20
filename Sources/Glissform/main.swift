@@ -43,12 +43,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.regular)
-        // Reset the Dock tile to the bundle icon after foreground activation.
-        // Passing nil keeps native appearance handling instead of pinning a bitmap.
-        NSApp.applicationIconImage = nil
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.image = IconlySymbol.laptop.menuImage()
+        statusItem.button?.image = BrandIcon.menuBar
         statusItem.button?.toolTip = "Glissform"
         UserDefaults.standard.register(defaults: ["animationStartAngle": 100.0, "animationEnabled": true,
                                                   "resumeAfterPause": false])
@@ -131,6 +127,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         showSettings()
         return true
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
     }
 
     private func setStatus(_ text: String) {
@@ -438,7 +438,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func changeIconStyle(_ sender: NSMenuItem) {
         guard let value = sender.representedObject as? String, let style = IconlyStyle(rawValue: value) else { return }
         IconlyAppearance.shared.style = style
-        statusItem.button?.image = IconlySymbol.laptop.menuImage()
         for item in sender.menu?.items ?? [] {
             guard let value = item.representedObject as? String else { continue }
             item.state = value == style.rawValue ? .on : .off
@@ -544,6 +543,48 @@ extension AppDelegate {
                 if !app.hasSnapshot { return }
                 try await Task.sleep(nanoseconds: 10_000_000)
             }
+        }
+        // Closing settings must preserve both an in-flight capture and a visible
+        // gesture. Reopening must reuse the window and restore foreground access.
+        for visible in [false, true] {
+            let (app, source) = try makeGesture()
+            defer { app.shutdown(); app.window?.close() }
+            try await waitForCapture(source)
+            let captureTask = app.snapshotTask
+            if visible {
+                try await Task.sleep(nanoseconds: 50_000_000)
+                source.pending?.resume(returning: buffer)
+                source.pending = nil
+                await captureTask?.value
+                try await Task.sleep(nanoseconds: 100_000_000)
+            }
+            app.showSettings()
+            let settings = app.settingsWindowController!.window!
+            try check(settings.isVisible && NSApp.activationPolicy() == .regular,
+                      "Opening settings must show the window and Dock icon")
+            settings.performClose(nil)
+            try check(!settings.isVisible && NSApp.activationPolicy() == .accessory,
+                      "Closing settings must hide the window and Dock icon")
+            try check(!app.applicationShouldTerminateAfterLastWindowClosed(NSApp) && !app.quitting && app.ready,
+                      "Closing settings must leave the background coordinator running")
+            try check(app.snapshotRequested && app.hasSnapshot == visible && source.count == 1,
+                      "Closing settings must preserve the current gesture and its single capture")
+            if visible {
+                try check(app.window!.isVisible && app.window!.alphaValue > 0 && !app.window!.ignoresMouseEvents,
+                          "Closing settings must preserve the active overlay")
+            }
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await captureTask?.value
+            try check(app.hasSnapshot, "Pending capture must complete while settings are closed")
+            _ = app.applicationShouldHandleReopen(NSApp, hasVisibleWindows: true)
+            try check(app.settingsWindowController?.window === settings && settings.isVisible && NSApp.activationPolicy() == .regular,
+                      "Reopening with an overlay present must restore the same settings window and Dock icon")
+            settings.performClose(nil)
+            app.handleLidReading(100)
+            try await waitForCleanup(app)
+            try checkCleared(app)
+            print("PASS: settings close/reopen during \(visible ? "visible" : "pending") capture, background continuation and reversal cleanup")
         }
         // Resolve a capture *after* each interruption to prove stale work cannot reappear.
         // Also interrupt a revealed snapshot to verify overlay and GPU cleanup.

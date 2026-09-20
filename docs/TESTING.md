@@ -61,12 +61,16 @@ On hardware, enable Resume desktop after a pause, set a 95° trigger, open above
 
 ## Settings and icon verification
 
+- Close settings with the red close button and with ⌘W. Confirm the Dock icon disappears, the menu bar remains available, and Infinite Screen stays enabled. Reopen through menu bar Settings and by opening the app again; the same usable window and native Dock icon must return. Repeat the cycle and check that minimizing keeps the normal Dock entry. Quit from the menu bar while settings are closed and confirm the process exits.
+- Synthetic lifecycle checks close and reopen settings during pending and visible screenshots, verify the active gesture survives without another capture, and reverse it while in the background. Existing reversal, sleep, display-change, and quit cleanup checks also run with settings closed. These AppKit checks open settings briefly and use synthetic screenshot pixels; physical lid acceptance remains separate.
 - Build with Xcode 26 or later and confirm the bundle includes `Assets.car`, `Glissform.icns`, and the compiler-generated icon keys in `Info.plist`.
 - Inspect the brand icon in Icon Composer and in the running app's Dock, Finder, and Privacy & About. Verify the blue wave in default/light and dark, and readable wave separation in clear light/dark and tinted appearances through System Settings → Appearance. Restore the user's original appearance after testing. Check Dock-sized and small Finder renderings for clipped edges or merged layers.
 - Check that all styles retain the rounded pane, glass rim, highlight and continuous wave shading; clear/tinted must not collapse into flat two-tone shapes. Rebuild in place and relaunch: the Dock tile should show the bundle icon, including after changing the system icon style. Finder alone is not sufficient evidence for the Dock.
 - Inspect the compiler's legacy `.icns`; earlier-macOS appearance still needs an actual supported-OS check. Native clear/tinted styles are only expected on macOS 26 or later.
 - Verify Light and Dark appearances, keyboard navigation, focus, disabled controls, and VoiceOver labels on both pages.
 - Confirm Bold is the default throughout, with flat 16%-opacity card icon containers and slightly darker icon colours in Light Mode.
-- Build with `--dev` to compare Bulk, Bold, Outline, and Custom with ⌥⌘1–4. Check live updates in settings, Privacy & About, and the menu bar; restart returns to Bold. A normal build hides Developer tools.
+- Build with `--dev` to compare Bulk, Bold, Outline, and Custom with ⌥⌘1–4. Check live updates in settings and Privacy & About; the rounded-wave menu bar brand mark must stay unchanged. Restart returns to Bold. A normal build hides Developer tools.
 - Verify Privacy & About has the Glissform name/version and the two cards, with no old descriptive paragraph, alpha text, or footer text beneath them.
 - Confirm local icon resources load from the built app bundle without an account connection or network request.
+
+- Check the monochrome app-derived icon at native menu bar size on light/dark menu bars and while its menu is open. Confirm the generated 1×/2× template representations load from the asset catalog, preserve the wave detail, and use the system foreground colour. The build rejects templates whose encoded PNG lacks visible opacity; this catches transparent output but does not replace checking the live menu bar. Settings and Quit actions stay unchanged.

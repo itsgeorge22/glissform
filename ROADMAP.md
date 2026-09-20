@@ -17,8 +17,11 @@ The first feature, Infinite Screen, implements screenshot-based closing animatio
 
 ## Next alpha iterations — shared foundations and Infinite Screen
 
+- [x] Hide the Dock icon when settings close, keep Infinite Screen and menu bar access running, and restore the window and Dock icon when reopened without adding a permission requirement.
+
 - [x] Integrate the centred, inset blue glass-wave icon with distinct light and dark bases plus native clear and tinted appearances. Preserve the same material shading in every style; verify native compilation, all six rendition exports, Finder style changes, and the running app's Privacy & About icon on macOS 27.
 - [x] Correct the Dock placeholder after resetting the native launch icon and refreshing development bundle registration; the owner confirmed the icon displays correctly.
+- [x] Use a monochrome menu bar template derived from the actual Clear app icon, sharing the Icon Composer source and using the system foreground colour.
 - [ ] Verify the compiler-generated legacy icon on an earlier supported macOS version.
 
 - [x] Unify interface iconography with locally bundled Iconly Bold / Regular vectors, retaining Bulk, Outline, and the previous Custom mix as alternatives with live switching in developer builds.

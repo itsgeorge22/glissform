@@ -89,7 +89,7 @@ private final class SettingsWindow: NSWindow {
 }
 
 @MainActor
-final class SettingsWindowController: NSWindowController {
+final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     init(model: SettingsModel) {
         let contentHeight = min(SettingsDesign.Metrics.preferredHeight, (NSScreen.main?.visibleFrame.height ?? 900) - 48)
         let window = SettingsWindow(
@@ -119,15 +119,26 @@ final class SettingsWindowController: NSWindowController {
             return height
         })
         super.init(window: window)
+        window.delegate = self
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
     func present() {
+        NSApp.setActivationPolicy(.regular)
+        // Restore the bundled icon each time the app returns to the Dock.
+        // nil preserves macOS's native icon appearance selection.
+        NSApp.applicationIconImage = nil
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        // Only the settings window controls Dock presence. The overlay and
+        // menu bar keep running without changing capture or sensor state.
+        NSApp.setActivationPolicy(.accessory)
     }
 }
 

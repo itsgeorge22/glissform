@@ -33,7 +33,33 @@ mkdir -p build
 ICON_BUILD="$(mktemp -d "$PWD/build/icon-assets.XXXXXX")"
 trap 'rm -rf "$ICON_BUILD"' EXIT
 mkdir "$ICON_BUILD/Resources"
+ICON_COMPOSER="${DEVELOPER_DIR:-$(xcode-select -p)}/../Applications/Icon Composer.app/Contents/Executables/ictool"
+if [[ ! -x "$ICON_COMPOSER" ]]; then
+    echo "Icon Composer is required to export the app's Clear appearance for the menu bar." >&2
+    exit 1
+fi
+MENU_ASSET="$ICON_BUILD/MenuBar.xcassets/GlissformMenuBar.imageset"
+mkdir -p "$MENU_ASSET"
+for appearance in ClearDark; do
+    for scale in 1 2; do
+        "$ICON_COMPOSER" "$PWD/Artwork/Glissform.icon" \
+            --export-image --output-file "$MENU_ASSET/$appearance-$scale.png" \
+            --platform macOS --rendition "$appearance" --width 18 --height 18 --scale "$scale"
+    done
+done
+swift scripts/make-menu-template.swift "$MENU_ASSET/ClearDark-1.png" "$MENU_ASSET/ClearDark-2.png"
+cat > "$MENU_ASSET/Contents.json" <<'JSON'
+{
+  "images": [
+    {"filename":"ClearDark-1.png","idiom":"mac","scale":"1x"},
+    {"filename":"ClearDark-2.png","idiom":"mac","scale":"2x"}
+  ],
+  "properties": {"template-rendering-intent":"template"},
+  "info": {"author":"xcode","version":1}
+}
+JSON
 xcrun actool "$PWD/Artwork/Glissform.icon" \
+    "$ICON_BUILD/MenuBar.xcassets" \
     --compile "$ICON_BUILD/Resources" \
     --app-icon Glissform \
     --platform macosx \

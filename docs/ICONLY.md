@@ -13,13 +13,13 @@ Glissform's default interface set uses **Iconly Bold / Regular** throughout, sel
 | lock | Lock | Privacy footer and privacy detail |
 | copy | Copy 1 | Single-screenshot explanation |
 | memory | cpu processor | Temporary in-memory screenshot |
-| laptop | mac laptop notebook | Menu bar |
+| laptop | mac laptop notebook | Retained original artwork; replaced in the menu bar by Glissform’s brand mark |
 
 The vectors are in the `Bold`, `Bulk`, and `Outline` subdirectories of `Sources/Glissform/Resources/Iconly`. All three sets are retained without changing their asset bytes when switching styles. SVG wrapper metadata and colour declarations were normalised; original path coordinates, transforms, fill rules, and opacity were retained. Bold uses solid geometry with cutouts; Bulk keeps translucent secondary shapes. All sets inherit the surrounding foreground colour. Do not add strokes to these filled vectors.
 
 `IconlyAppearance.shared.style` is the observable session selection, initially `.bold`; `IconlyStyle.current` exposes it to AppKit. Each SwiftUI icon observes the selection without resetting view or animation state. Images are cached by style and symbol. All three source sets remain bundled unchanged. The preserved Custom mix resolves each symbol to a source style in `IconlySymbol.customStyle`; the current product default is Bold. Custom card icons use derived Bulk assets in `CustomCards/Light` and `CustomCards/Dark`. Path geometry is unchanged; the secondary layer is 56% in Light Mode and 43% in Dark Mode, with appearance-specific foreground colours. Only Custom permission and pause card tiles opt into these derived assets; Bold uses the original solid assets with the same appearance-specific card colours. Original Bulk, Bold, and Outline assets, About icons, and other consumers remain unchanged; tile fills stay at 16%. The preview retains its existing Play / Stop behavior and uses Bold for both states.
 
-Build with `bash scripts/build.sh --dev` to enable **Developer → Icon Style → Bulk / Bold / Outline / Custom**. Shortcuts are ⌥⌘1, ⌥⌘2, ⌥⌘3, and ⌥⌘4. Switching immediately updates every interface icon and the menu bar glyph. The choice is session-only; restart returns to Bold. A normal build writes `GlissformDeveloperTools=false` and omits the menu. There is no new production settings control or preference.
+Build with `bash scripts/build.sh --dev` to enable **Developer → Icon Style → Bulk / Bold / Outline / Custom**. Shortcuts are ⌥⌘1, ⌥⌘2, ⌥⌘3, and ⌥⌘4. Switching immediately updates every Iconly interface icon; the separate branded menu bar glyph stays unchanged. The choice is session-only; restart returns to Bold. A normal build writes `GlissformDeveloperTools=false` and omits the menu. There is no new production settings control or preference.
 
 Swift Package Manager includes the directory as a resource; `scripts/build.sh` copies the resource bundle into the app before signing. `IconlyIcon.swift` supplies cached native template images for SwiftUI and AppKit. All icons work offline. The synthetic material preview reuses this same library.
 
