@@ -6,17 +6,19 @@ Glissform’s current feature-specific checks cover Infinite Screen. Shared UI c
 
 Run `bash scripts/build.sh` followed by `bash scripts/test.sh`.
 
-Motion checks exercise thresholds, repeated closure, slow whole-degree readings, reversal, settling, zero-effect entrance, interrupted handoffs, low-lid startup, and reset behavior. Quantized 30 Hz sensor traces run on 60/120 Hz frame clocks at nine speeds from 2 to 90 degrees/second, including uneven report intervals and mixed one/two-degree reports. Both tracking error and frame-to-frame speed ripple are bounded; checking delay alone can reward visibly uneven movement. Full-angle checks cover starting angles from 20° to 130°.
+Motion checks exercise thresholds, repeated closure, slow whole-degree readings, reversal, settling, zero-effect entrance, interrupted handoffs, low-lid startup, and reset behavior. Quantized sensor traces run on 60/120 Hz frame clocks, including uneven report intervals and mixed one/two-degree reports. Acquisition-time checks separate sample history from render queries, cover batched delivery and future presentation queries, and verify bounded velocity-aware returns. Both tracking error and frame-to-frame speed ripple are bounded; checking delay alone can reward visibly uneven movement. Full-angle checks cover starting angles from 20° to 130°. Requested polling rates are not measurements of real sensor update frequency.
 
-Synthetic Metal checks compare projected pixels to independent CPU ray/plane intersections at 16°, 40°, 90° and 120° of physical rotation, and verify orientation, opacity, zero-angle identity and the final top shadow. Matching sharp/blurred frames at 40° verify that frost softens grid edges at the bottom of the image as well. Lifecycle checks use the real gesture coordinator and a synthetic capture source: a screenshot arriving after reversal, sleep, display change or shutdown must be rejected. An overlapping entrance, reclose during return, single-snapshot reuse and final desktop-access cleanup are also exercised. These checks briefly create a small synthetic Metal window; no desktop pixels are captured.
+Capture checks use synthetic dimensions, window identities and asynchronous metadata loaders. They cover scaled backing sizes, mismatched output rejection, overlay-only exclusion, the hidden-overlay application fallback, preservation of known settings windows, cache expiry, shared discovery, waiter cancellation and invalidation. They take no desktop screenshots. Physical capture composition and pixel matching still need the tests below.
 
-For a local GPU rendering measurement using synthetic pixels at 2880 × 1864:
+Synthetic Metal checks compare projected pixels to independent CPU ray/plane intersections at 16°, 40°, 90° and 120° of physical rotation, and verify orientation, opacity, zero-angle identity and the final top shadow. Matching sharp/blurred frames at 40° verify that frost softens grid edges at the bottom of the image as well. Projection expectations account for linear-light sampling and shading. Dedicated material probes verify black/white Gaussian averaging in linear light, continuity across small angle changes, an unchanged flat image, stable dither between frames, and lower tile-averaged dark-gradient rounding error than undithered output. Lifecycle checks use the real gesture coordinator and a synthetic capture source: a screenshot arriving after reversal, sleep, display change or shutdown must be rejected. The full-opacity closing entrance, reclose during return, single-snapshot reuse and final desktop-access cleanup are also exercised. These checks briefly create a small synthetic Metal window; no desktop pixels are captured.
+
+For a local GPU rendering measurement using synthetic pixels at the built-in display's current backing dimensions:
 
 ```sh
 build/Glissform.app/Contents/MacOS/Glissform --render-benchmark
 ```
 
-The benchmark reports mean, 95th-percentile and maximum GPU command duration over 120 closing/reopening frames after warmup. It excludes screenshot capture, the window compositor, sensor delivery and actual display frame pacing, so it cannot establish end-to-end smoothness or a guaranteed frame rate. Generated images stay under `build/`.
+The benchmark reports its actual width/height and mean, 95th-percentile and maximum GPU command duration over 120 closing/reopening frames after warmup. Scaled display modes can have backing dimensions larger than the panel's physical dimensions; keep the reported size with every result. `GLISSFORM_BENCHMARK_WIDTH` and `GLISSFORM_BENCHMARK_HEIGHT` permit explicit comparison sizes; without a built-in display it falls back to 2880 × 1864. The frame sweep excludes initial image preparation; a separate measurement reports the synthetic image copy, Gaussian pyramid and first identity frame. Both measurements exclude screenshot capture, the window compositor, sensor delivery and actual display frame pacing, so they cannot establish end-to-end smoothness or a guaranteed frame rate. Generated images stay under `build/`.
 
 `bash scripts/test.sh --motion-only` explicitly omits Metal and AppKit lifecycle checks. GitHub Actions uses this mode; it does not verify physical lid behavior, permissions, or screen capture.
 
@@ -30,9 +32,44 @@ For physical acceptance, repeat a close/reopen gesture over a full-screen app wi
 
 ## Physical acceptance
 
+### Unreleased capture and rendering changes
+
+Local validation on the development Mac passed: build, motion and capture checks, synthetic Metal rendering, lifecycle interruption and cleanup, and overlay placement under both activation policies. The rebuilt app opened its settings window with a live sensor reading and regular Dock activation. A metadata-only check confirmed a 3840 × 2486 backing size and safe exclusion of the hidden overlay without capturing desktop pixels.
+
+One synthetic 3840 × 2486 run measured image preparation at 4.01 ms GPU / 12.13 ms encode-and-wait, followed by 120 animation frames at 1.73 ms mean, 3.13 ms p95 and 5.63 ms maximum GPU duration. These are local samples, not end-to-end or power measurements.
+
+To repeat the live metadata check with an existing Screen Recording grant (it does not request permission or capture pixels):
+
+```sh
+build/Glissform.app/Contents/MacOS/Glissform --capture-metadata-test
+```
+
+The following physical comparisons remain required:
+
+- At the default and at least one scaled display mode, use sharp text and a high-contrast grid to compare live pixels, the initial flat screenshot, and the final flat return. Confirm capture and drawable dimensions match, with no unexpected downscaling, softening, brightness change or displaced edges. Repeat with Glissform settings visible, hidden and moved between Spaces; visible settings must not disappear from the captured desktop.
+- Compare slow and fast threshold crossings on a static desktop and moving content. Confirm the prepared closing frame starts flat and full opacity before geometry changes. Record capture delay and the first visible motion; removing the entrance dissolve does not eliminate screenshot age.
+- Compare ordinary reopening, reclose during return, and pause restoration at shallow and deep folds. The image must return to flat before its 50 ms fade, with restored mouse access at completion. Check for threshold braking, overshoot, geometric jumps and temporal ghosting. A changed post-sleep desktop must be evaluated separately from a static one.
+- Compare fine detail, diagonal edges, coloured shapes and smooth dark gradients through the full rotation range. Inspect the fixed dither at normal viewing distance and in flat areas. Verify linear-light frost does not introduce objectionable brightness changes, border halos or a visible level transition.
+- Exercise occlusion, display changes, permission loss, sleep, lock and quit during entrance, return and fade. Privacy/lifecycle cancellation must hide immediately. A stalled normal finish should restore desktop access through its cleanup watchdog; a delayed callback must not resurrect the overlay.
+- Measure distinct sensor readings, display presentation intervals, input age, capture/preparation time, CPU/GPU load, memory and power. Test idle operation and long pauses as well as active motion. A 60 Hz polling request and a one-frame presentation-latency request do not guarantee fresh sensor data or deadline delivery.
+
+For optional local numeric timing diagnostics, quit the existing app instance and launch the built executable with the diagnostic flag:
+
+```sh
+GLISSFORM_MOTION_DIAGNOSTICS=1 build/Glissform.app/Contents/MacOS/Glissform
+```
+
+In another terminal, stream the debug events while performing a trial:
+
+```sh
+log stream --level debug --style compact --predicate 'subsystem == "com.george.glissform.mvp" AND (category == "MotionTiming" OR category == "AnimationTiming")'
+```
+
+`MotionTiming` records numeric read counts, distinct readings and HID-read duration. `AnimationTiming` records capture metadata wait, pixel acquisition and preparation time, captured dimensions, and the first drawable presentation and long presentation gaps, with input age measured from host acquisition time. Distinct readings are angle changes, not proof of the hardware's internal sample cadence. Presented-frame intervals after an intentional idle pause include that pause; input age excludes unknown device-internal latency. These logs contain no screenshots, window titles or captured application names. Disable them by relaunching without the flag. Combine timing events with high-speed physical video when judging the live-to-frozen handoff; command completion and callback timestamps alone do not prove an invisible transition.
+
 ### Wake-opening prototype
 
-Automated checks cover recent near-closed eligibility, duplicate notifications, opening direction, completed openings, unavailable desktops, stale samples, deadlines, and explicit below-threshold arming. The Metal identity check pauses a prepared screenshot, verifies the original buffer and filtered texture survive, and compares its flat output with the original pixels. Synthetic lifecycle checks now use one capture across closing, sleep, and opening, then require a new capture for the next cycle. They assert hidden/paused retention; no fresh wake capture; rejection of late or failed closing captures; normal-lock cleanup; lock-before-sleep grace and repeated hints; lock before/after wake; completed/late unlocks; and cached-frame cleanup on session/display changes, access loss, disable/threshold changes, quit, sensor loss, and another sleep. Pending and visible opening interruptions must not resurrect an overlay. Cleanup checks explicitly pump synthetic rendering because MetalKit may suspend display callbacks while occluded/asleep. They do not establish physical compositor delivery, wake latency, or OS lock-detection correctness.
+Automated checks cover recent near-closed eligibility, duplicate notifications, opening direction, completed openings, unavailable desktops, stale samples, deadlines, and explicit below-threshold arming. The Metal identity check pauses a prepared screenshot, verifies the original buffer and filtered texture survive, and compares its flat output with the original pixels. Synthetic lifecycle checks now use one capture across closing, sleep, and opening, then require a new capture for the next cycle. They assert hidden/paused retention; no fresh wake capture; rejection of late or failed closing captures; normal-lock cleanup; lock-before-sleep grace and repeated hints; lock before/after wake; completed/late unlocks; and cached-frame cleanup on session/display changes, access loss, disable/threshold changes, quit, sensor loss, and another sleep. Pending and visible opening interruptions must not resurrect an overlay. Cleanup checks explicitly pump synthetic rendering because display callbacks may stop while occluded/asleep. They do not establish physical compositor delivery, wake latency, or OS lock-detection correctness.
 
 On the target Mac, keep normal lock and sleep settings. With a static foreground window, close fully, wait for sleep, then reopen slowly and quickly. Verify the closing and opening show the same window and the logs say `retainedFrame=true` and `cached frame prepared; reveal requested`, with no fresh wake capture. Repeat with a password prompt, settings open/closed, fullscreen, long sleep, and display changes. The overlay must remain hidden until unlocked and only animate remaining upward movement within the original three-second deadline. A completed opening, missing closing screenshot, or late unlock must skip with no replay. Check normal sleep, restored mouse access, cache release after completion/cancellation, and a fresh screenshot on the next closing gesture. Content that changes during sleep may differ at the final handoff. After trying the cached-frame revision, the owner reported “Now it works great” on the development MacBook Air M5 15-inch. This confirms the reported everyday opening experience, not the full speed/lock/display matrix or measured latency. Those broader checks remain pending.
 

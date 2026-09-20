@@ -86,6 +86,85 @@ import Foundation
                 print(String(format: "PASS: %.0f°/s at %.0f Hz, tracking error %.1f ms, relative speed ripple %.3f", speed, fps, meanDelay * 1000, ripple))
             }
         }
+        // Source timing must remain independent of the display clock and its
+        // phase. Poll at both rates, including sub-degree repeated readings.
+        for pollRate in [30.0, 60.0] {
+            for fps in [60.0, 120.0] {
+                for phaseFraction in [0.0, 0.17, 0.43, 0.79] {
+                    for speed in [2.0, 5.0, 30.0, 60.0, 90.0] {
+                        var tracking = MotionSmoothing()
+                        tracking.reset(at: 0)
+                        var sample = 0
+                        var latest: Float = 0
+                        var error = 0.0
+                        var count = 0
+                        for frame in 1...Int(3 * fps) {
+                            let time = Double(frame) / fps
+                            while (Double(sample) + phaseFraction) / pollRate <= time + 0.0000001 {
+                                let acquiredAt = (Double(sample) + phaseFraction) / pollRate
+                                latest = Float((acquiredAt * speed).rounded() * .pi / 180)
+                                tracking.ingest(target: latest, at: acquiredAt)
+                                sample += 1
+                            }
+                            let rendered = tracking.step(at: time)
+                            precondition(rendered >= 0 && rendered <= latest + 0.000001,
+                                         "Presentation queries must not predict unreported motion")
+                            if time > 1 {
+                                error += abs(Double(rendered) * 180 / .pi - time * speed) / speed
+                                count += 1
+                            }
+                        }
+                        precondition(error / Double(count) < (speed <= 5 ? 0.270 : 0.140),
+                                     "Acquisition-timed tracking must remain bounded across clock phases")
+                    }
+                }
+            }
+        }
+        print("PASS: acquisition-timed 30/60 Hz inputs across independent 60/120 Hz display phases")
+
+        // Render ahead frequently on one copy and only after delayed delivery on
+        // the other. Once the same observations have arrived, both must describe
+        // the same motion; callback frequency cannot alter cadence or momentum.
+        var immediate = MotionSmoothing()
+        var delayed = MotionSmoothing()
+        immediate.reset(at: 0)
+        delayed.reset(at: 0)
+        var pending: [(Float, Double)] = []
+        for sample in 1...180 {
+            let acquiredAt = Double(sample) / 60
+            let angle = sample <= 60 ? Double(sample) * 0.4
+                : sample <= 100 ? 24 : max(0, 24 - Double(sample - 100) * 0.3)
+            let target = Float(angle.rounded() * .pi / 180)
+            immediate.ingest(target: target, at: acquiredAt)
+            _ = immediate.step(at: acquiredAt + 0.014)
+            pending.append((target, acquiredAt))
+            if sample.isMultiple(of: 5) {
+                for (value, time) in pending { delayed.ingest(target: value, at: time) }
+                pending.removeAll()
+                let time = acquiredAt + 0.014
+                precondition(abs(immediate.step(at: time) - delayed.step(at: time)) < 0.000001,
+                             "Delayed delivery must not rewrite source cadence")
+                precondition(abs(immediate.velocity - delayed.velocity) < 0.000001,
+                             "Rendering ahead must not change sample-anchored velocity")
+            }
+        }
+        let beforeStale = immediate
+        immediate.ingest(target: 1, at: 0.1)
+        immediate.ingest(target: .nan, at: 4)
+        var unchanged = beforeStale
+        precondition(immediate.step(at: 3.1) == unchanged.step(at: 3.1), "Reject stale and invalid input")
+        let beforeBackward = immediate.value
+        precondition(immediate.step(at: 2.0) == beforeBackward, "Reject backward presentation time")
+        precondition(immediate.step(at: 5) == 0 && immediate.velocity == 0,
+                     "A stopped source must settle without perpetual extrapolation")
+        var timestampedReverse = MotionSmoothing()
+        timestampedReverse.ingest(target: 0.5, at: 0)
+        let beforeTimestampedReverse = timestampedReverse.step(at: 0.1)
+        timestampedReverse.ingest(target: 0.1, at: 0.1)
+        precondition(timestampedReverse.step(at: 0.116) < beforeTimestampedReverse,
+                     "Timestamped reversal must respond on the next display")
+        print("PASS: delayed delivery, future presentation queries, stops, reversals and stale timestamps")
+
         // Full physical rotation, including reference angles above 90 degrees.
         for reference in [20.0, 85, 100, 130] {
             var previousFold: Float = -1
@@ -115,6 +194,47 @@ import Foundation
                      "Even a late first display frame must start at exactly zero effect")
         precondition(handoff.step(toward: 1, elapsed: 0.010) < 0.01)
         print("PASS: exact zero first frame, gentle entry and exit, interrupted entrance, reclose continuity")
+        // Ordinary return inherits its feasible onscreen speed. A prepared
+        // frame needs no extra one-frame hold before movement begins.
+        var movingReturn = HandoffTransition()
+        movingReturn.begin(from: 0.4, velocity: -1.5, duration: 0.180, holdFirstFrame: false)
+        let tinyStep = movingReturn.step(toward: 0, elapsed: 0.00001)
+        precondition(abs(Double(tinyStep - 0.4) / 0.00001 + 1.5) < 0.005,
+                     "Return must inherit a feasible starting velocity")
+        var lastReturn: Float = tinyStep
+        for _ in 0..<180 {
+            let next = movingReturn.step(toward: 0, elapsed: 0.001)
+            precondition(next >= 0 && next <= lastReturn, "Return must not overshoot or move backwards")
+            lastReturn = next
+        }
+        precondition(lastReturn == 0 && movingReturn.velocity == 0 && !movingReturn.active,
+                     "Return ends flat and at rest")
+        for startingVelocity in [-100.0, 100.0] {
+            var bounded = HandoffTransition()
+            bounded.begin(from: 0.4, velocity: startingVelocity, duration: 0.200, holdFirstFrame: false)
+            var previous: Float = 0.4
+            for _ in 0..<21 {
+                let value = bounded.step(toward: 0, elapsed: 0.010)
+                precondition(value >= 0 && value <= previous,
+                             "Impossible boundary velocities must be bounded without overshoot")
+                previous = value
+            }
+        }
+        var movingEntrance = HandoffTransition()
+        movingEntrance.begin(from: 0, duration: 0.100, holdFirstFrame: false)
+        for frame in 1...100 {
+            let t = Double(frame) * 0.001
+            _ = movingEntrance.step(toward: Float(0.3 + 0.4 * t), velocity: 0.4, elapsed: 0.001)
+        }
+        precondition(!movingEntrance.active && abs(movingEntrance.velocity - 0.4) < 0.000001,
+                     "Entrance must join the moving target with its velocity")
+        var deepReturn = HandoffTransition()
+        deepReturn.begin(from: 1, duration: 0.240, holdFirstFrame: false)
+        _ = deepReturn.step(toward: 0, elapsed: 0.100)
+        precondition(deepReturn.active, "Deep pause restoration can use a longer bounded return")
+        precondition(deepReturn.step(toward: 0, elapsed: 0.140) == 0 && !deepReturn.active)
+        print("PASS: boundary velocity, prepared-frame movement, bounded returns and moving-target join")
+
         // Pause-to-resume uses a monotonic sample clock, not time since capture.
         func pausingMotion(duration: Double = 2, enabled: Bool = true) -> ClosingMotion {
             var state = ClosingMotion()

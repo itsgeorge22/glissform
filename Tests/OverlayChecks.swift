@@ -47,7 +47,12 @@ struct OverlayChecks {
             window.ignoresMouseEvents = false
             window.alphaValue = 1
             window.orderFrontRegardless()
-            try await Task.sleep(nanoseconds: 300_000_000)
+            // Space membership/occlusion updates arrive asynchronously after
+            // an activation-policy change, especially after another UI test exits.
+            for _ in 0..<100 {
+                if window.isOnActiveSpace && isOnScreen(window) && window.occlusionState.contains(.visible) { break }
+                try await Task.sleep(nanoseconds: 20_000_000)
+            }
             try check(window.isOnActiveSpace && isOnScreen(window) && window.occlusionState.contains(.visible),
                       "Overlay must join the visible Space with activation policy \(policy.rawValue)")
             try check(!window.isKeyWindow && !window.isMainWindow &&

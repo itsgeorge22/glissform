@@ -19,7 +19,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var observers: [NSObjectProtocol] = []
     private var lockObservers: [NSObjectProtocol] = []
     private var heartbeat: Timer?
-    private var revealTimer: Timer?
+    private var cleanupTimer: Timer?
+    private var captureWarmupTask: Task<Void, Never>?
+    private var captureWarmupGeneration = 0
     private var lastReading = Date.distantPast
     private var sensorRestartedAt = Date.distantPast
     private var lastLidAngle: Double?
@@ -40,9 +42,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     private var displayLayout: [DisplayGeometry] = []
     private let wakeLog = Logger(subsystem: "com.george.glissform.mvp", category: "WakeOpening")
+    private let animationLog = Logger(subsystem: "com.george.glissform.mvp", category: "AnimationTiming")
+    private let timingEnabled = ProcessInfo.processInfo.environment["GLISSFORM_MOTION_DIAGNOSTICS"] == "1"
     private var hasSnapshot = false
     private var finishingGesture = false
-    private var entrancePending = false
     private var snapshotTask: Task<Void, Never>?
     private var snapshotRequested = false
     private var snapshotToken = 0
@@ -55,10 +58,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var starting = false
     private var permissionRequested = false
 
-    init(capture: DesktopScreenshotSource = DesktopCapture(),
+    init(capture: DesktopScreenshotSource? = nil,
          desktopAvailable: @escaping (CGDirectDisplayID) -> Bool = DesktopAvailability.allowsCapture,
          screenAccessAllowed: @escaping () -> Bool = CGPreflightScreenCaptureAccess) {
-        self.capture = capture
+        self.capture = capture ?? DesktopCapture()
         self.desktopAvailable = desktopAvailable
         self.screenAccessAllowed = screenAccessAllowed
         super.init()
@@ -154,7 +157,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.settingsModel.refreshPermission()
             self.checkSensorHealth()
             if !self.ready, !self.starting, Date() >= self.retryAfter { self.connect() }
+            else { self.warmCaptureMetadata() }
             }
+        }
+        for name in [NSWindow.willCloseNotification, NSWindow.didBecomeKeyNotification] {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] event in
+                MainActor.assumeIsolated {
+                    guard let self, let changed = event.object as? NSWindow,
+                          changed === self.settingsWindowController?.window else { return }
+                    self.invalidateCaptureMetadata()
+                }
+            })
         }
         startSensor()
         connect()
@@ -180,8 +193,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func startSensor() {
         sensorRestartedAt = Date()
         motion.reset()
-        sensor.start(onReading: { [weak self] angle in
-            self?.handleLidReading(angle)
+        sensor.start(onReading: { [weak self] angle, acquiredAt in
+            self?.handleLidReading(angle, time: acquiredAt)
         }, onStatus: { [weak self] status in
             guard let self else { return }
             self.settingsModel.updateSensorStatus(status)
@@ -248,16 +261,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard ready else { return }
         let progress = beganOpening ? currentProgress : motion.update(angle: angle, time: time)
         currentProgress = progress
-        renderer?.setLidAngle(angle, referenceAngle: motion.activationAngle)
+        sensor.setActivePolling(motion.active || wakeOpening.pending)
+        renderer?.setLidAngle(angle, referenceAngle: motion.activationAngle, sampleTime: time)
         guard motion.active else {
-            finishGesture()
+            finishGesture(restoringPause: motion.desktopResumed)
             setStatus(motion.desktopResumed ? "Desktop restored" : "Ready")
             return
         }
         if finishingGesture {
             finishingGesture = false
-            entrancePending = false
-            renderer?.beginAnimation()
+            cleanupTimer?.invalidate()
+            cleanupTimer = nil
             revealOverlay()
         }
         if !snapshotRequested { prepareGestureSnapshot() }
@@ -288,6 +302,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if matchesConnection(screen) {
             // Reuse the hidden overlay, pipeline and any retained closing image.
             ready = true
+            warmCaptureMetadata()
             return
         }
         cancelWake("display configuration changed")
@@ -313,6 +328,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ready = true
         starting = false
         motion.reset()
+        warmCaptureMetadata()
         setStatus("Ready · Close the lid to animate")
     }
 
@@ -339,6 +355,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func handleDisplayChange() {
         guard !quitting else { return }
+        invalidateCaptureMetadata()
         if let screen = builtInScreen(), matchesConnection(screen) {
             if !sleeping, wakeOpening.pending { connect() }
             return
@@ -352,6 +369,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @discardableResult private func checkScreenAccess() -> Bool {
         guard screenAccessAllowed() else {
+            invalidateCaptureMetadata()
             cancelWake("screen access revoked")
             endGesture()
             ready = false
@@ -372,6 +390,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setStatus(openingGesture ? "Preparing opening…" : "Taking screenshot…")
         snapshotTask = Task { [weak self] in
             guard let self, let renderer = self.renderer else { return }
+            let started = ProcessInfo.processInfo.systemUptime
             do {
                 guard !Task.isCancelled, token == snapshotToken else { return }
                 if openingGesture {
@@ -379,7 +398,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     retainedClosingSnapshot = false
                     try await renderer.prepareRetainedSnapshot()
                 } else {
+                    guard let window, let view = window.contentView as? MTKView else { discardCapture(); return }
+                    try await capture.prepare(displayID: displayID,
+                                              excludingWindowID: CGWindowID(window.windowNumber),
+                                              expectedPixelSize: view.drawableSize)
+                    guard !Task.isCancelled, token == snapshotToken, captureMayPresent() else { return }
+                    let captureStarted = ProcessInfo.processInfo.systemUptime
                     let buffer = try await capture.screenshot(displayID: displayID)
+                    if timingEnabled {
+                        animationLog.debug("capture: metadataWaitMs=\((captureStarted - started) * 1000), pixelsMs=\((ProcessInfo.processInfo.systemUptime - captureStarted) * 1000), width=\(CVPixelBufferGetWidth(buffer)), height=\(CVPixelBufferGetHeight(buffer))")
+                    }
                     guard !Task.isCancelled, token == snapshotToken, motion.active,
                           ready, !sleeping, !quitting else { return }
                     guard captureMayPresent() else { discardCapture(); return }
@@ -389,16 +417,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                       ready, !sleeping, !quitting else { return }
                 guard captureMayPresent() else { discardCapture(); return }
                 hasSnapshot = true
+                if timingEnabled {
+                    animationLog.debug("prepared: opening=\(self.openingGesture), totalMs=\((ProcessInfo.processInfo.systemUptime - started) * 1000)")
+                }
                 // Raise only after capture: the snapshot retains the normal Dock
                 // and menu bar, while their live counterparts stay underneath.
                 window?.level = NSWindow.Level(rawValue: NSWindow.Level.popUpMenu.rawValue + 1)
                 window?.ignoresMouseEvents = false
                 window?.orderFrontRegardless()
                 setStatus(openingGesture ? "Animating · Opening" : "Animating · Reopen to reverse")
-                // Reveal the prepared identity frame, then blend geometry and
-                // opacity together so two handoffs do not accumulate latency.
-                entrancePending = !openingGesture
-                if openingGesture {
+                // Closing replaces matching flat pixels without a double-image
+                // dissolve. Wake fades the retained fold on the render timeline.
+                    if openingGesture {
                     logWake("cached frame prepared; reveal requested")
                     clearWakeTracking()
                 }
@@ -413,66 +443,68 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func revealOverlay(hiding: Bool = false) {
-        revealTimer?.invalidate()
-        let initialAlpha = window?.alphaValue ?? 0
-        let targetAlpha: Double = hiding ? 0 : 1
-        let started = ProcessInfo.processInfo.systemUptime
-        let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] timer in
-            MainActor.assumeIsolated {
-                guard let self, self.hasSnapshot, !self.sleeping, !self.quitting else {
-                    timer.invalidate()
-                    return
-                }
-                let amount = min(1, (ProcessInfo.processInfo.systemUptime - started) / 0.08)
-                let blend = amount * amount * (3 - 2 * amount)
-                self.window?.alphaValue = initialAlpha + (targetAlpha - initialAlpha) * blend
-                if !hiding, self.entrancePending, !self.finishingGesture {
-                    self.entrancePending = false
-                    self.renderer?.beginAnimation()
-                    self.showProgress()
-                }
-                if amount == 1 {
-                    timer.invalidate()
-                    self.revealTimer = nil
-                    if hiding, self.finishingGesture { self.endGesture() }
-                }
-            }
+    private func invalidateCaptureMetadata() {
+        captureWarmupGeneration += 1
+        captureWarmupTask?.cancel()
+        captureWarmupTask = nil
+        capture.invalidate()
+    }
+
+    private func warmCaptureMetadata() {
+        guard ready, settingsModel.animationEnabled, !sleeping, !quitting, canUseDesktop(), !snapshotRequested,
+              captureWarmupTask == nil, let displayID, let window,
+              let view = window.contentView as? MTKView else { return }
+        let id = CGWindowID(window.windowNumber)
+        let size = view.drawableSize
+        let generation = captureWarmupGeneration
+        captureWarmupTask = Task { [weak self] in
+            guard let self else { return }
+            defer { if self.captureWarmupGeneration == generation { self.captureWarmupTask = nil } }
+            try? await self.capture.prepare(displayID: displayID, excludingWindowID: id, expectedPixelSize: size)
         }
-        revealTimer = timer
-        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func revealOverlay() {
+        window?.alphaValue = 1
+        renderer?.beginAnimation(opening: openingGesture)
     }
 
     private func showProgress() {
-        renderer?.progress = hasSnapshot && !entrancePending ? currentProgress : 0
+        renderer?.progress = hasSnapshot ? currentProgress : 0
         // Once revealed, sensor updates must not overwrite the entrance fade.
         if !hasSnapshot { window?.alphaValue = 0 }
     }
 
-    private func finishGesture() {
+    private func finishGesture(restoringPause: Bool = false) {
         guard hasSnapshot else { endGesture(); return }
         guard !finishingGesture else { return }
         finishingGesture = true
-        if entrancePending {
-            entrancePending = false
-            revealOverlay(hiding: true)
-            return
-        }
-        // Keep the snapshot and controls covered until geometry reaches flat.
-        renderer?.finishAnimation { [weak self] in
+        renderer?.finishAnimation(restoringPause: restoringPause) { [weak self] in
             guard let self, self.finishingGesture else { return }
-            self.revealOverlay(hiding: true)
+            self.endGesture()
         }
+        // Display callbacks can stop when occluded. Never leave a snapshot
+        // blocking input indefinitely while waiting for a final frame.
+        cleanupTimer?.invalidate()
+        let token = snapshotToken
+        let timer = Timer(timeInterval: 0.8, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.finishingGesture, self.snapshotToken == token else { return }
+                self.endGesture()
+            }
+        }
+        cleanupTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
     }
 
     private func endGesture(retainingSnapshot: Bool = false) {
         if openingGesture && wakeOpening.pending { clearWakeTracking() }
         openingGesture = false
         finishingGesture = false
-        entrancePending = false
-        revealTimer?.invalidate()
-        revealTimer = nil
+        cleanupTimer?.invalidate()
+        cleanupTimer = nil
         currentProgress = 0
+        sensor.setActivePolling(false)
         window?.alphaValue = 0
         window?.ignoresMouseEvents = true
         window?.level = .floating
@@ -502,6 +534,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func suspend() {
         guard !sleeping else { return }
+        invalidateCaptureMetadata()
         let retain = screenAccessAllowed() && (canRetainClosingSnapshot
             || (retainedClosingSnapshot && sleepPreparationTimer != nil && recentClosedLid))
         clearWakeTracking()
@@ -602,6 +635,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func blockDesktop() {
+        invalidateCaptureMetadata()
         // Lock may precede actual sleep. Keep a completed near-closed frame for
         // one second to bridge that ordering; an ordinary lock clears it.
         if !sleeping, !retainedClosingSnapshot, canRetainClosingSnapshot {
@@ -637,6 +671,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         sessionInactive = inactive
         wakeLog.notice("session changed: inactive=\(inactive), sleeping=\(self.sleeping), awaitingWake=\(self.wakeOpening.awaitingWake), pending=\(self.wakeOpening.pending)")
         if inactive {
+            invalidateCaptureMetadata()
             cancelWake("session inactive")
             endGesture()
             motion.reset()
@@ -733,11 +768,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func showSettings() {
+        invalidateCaptureMetadata()
         if settingsWindowController == nil {
             settingsWindowController = SettingsWindowController(model: settingsModel)
         }
         settingsModel.refreshPermission()
         settingsWindowController?.present()
+        warmCaptureMetadata()
     }
 
     @objc private func openPermissions() {
@@ -751,6 +788,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func shutdown() {
         quitting = true
+        invalidateCaptureMetadata()
         cancelWake("quit")
         heartbeat?.invalidate()
         sensor.stop()
@@ -766,6 +804,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 extension AppDelegate {
+    /// Uses existing permission to validate live metadata only, never pixels.
+    static func captureMetadataSelfTest() async throws {
+        guard CGPreflightScreenCaptureAccess() else {
+            throw NSError(domain: "Glissform.CaptureTest", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "Existing screen access is required; no permission prompt was requested"])
+        }
+        guard let screen = NSScreen.screens.first(where: {
+            let id = ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
+            return id.map { CGDisplayIsBuiltin($0) != 0 } ?? false
+        }), let id = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value else {
+            throw CapturePreparationError.displayUnavailable
+        }
+        let window = OverlayWindow(contentRect: screen.frame)
+        let view = MTKView(frame: NSRect(origin: .zero, size: screen.frame.size))
+        window.contentView = view
+        window.orderFrontRegardless()
+        let capture = DesktopCapture()
+        defer { capture.invalidate(); window.close() }
+        try await capture.prepare(displayID: id, excludingWindowID: CGWindowID(window.windowNumber),
+                                  expectedPixelSize: view.drawableSize)
+        print("PASS: live capture metadata matches \(Int(view.drawableSize.width))x\(Int(view.drawableSize.height)) backing pixels and safely excludes the hidden overlay; no screenshot taken")
+    }
+
     /// Real gesture/cancellation paths with synthetic pixels and no capture permission.
     static func lifecycleSelfTest() async throws {
         let savedSettings = ["animationStartAngle", "animationEnabled"].map {
@@ -824,10 +885,10 @@ extension AppDelegate {
         }
         func checkCleared(_ app: AppDelegate) throws {
             try check(!app.hasSnapshot && !app.snapshotRequested && app.snapshotTask == nil,
-                      "Snapshot state must be cleared (alpha \(app.window?.alphaValue ?? -1), finishing \(app.finishingGesture), entrance \(app.entrancePending), paused \((app.window?.contentView as? MTKView)?.isPaused ?? true), visible \(app.window?.isVisible ?? false), occlusion \(app.window?.occlusionState.rawValue ?? 0), progress \(app.renderer?.progress ?? -1))")
+                      "Snapshot state must be cleared (alpha \(app.window?.alphaValue ?? -1), finishing \(app.finishingGesture), paused \((app.window?.contentView as? MTKView)?.isPaused ?? true), visible \(app.window?.isVisible ?? false), occlusion \(app.window?.occlusionState.rawValue ?? 0), progress \(app.renderer?.progress ?? -1))")
             try check(app.window?.alphaValue == 0 && app.window?.ignoresMouseEvents == true,
                       "Interrupted gesture must restore desktop access")
-            try check(!app.entrancePending && !app.finishingGesture && app.revealTimer == nil,
+            try check(!app.finishingGesture && app.cleanupTimer == nil && app.renderer?.isRendering == false,
                       "Interrupted transitions must not remain pending")
             try check(!app.retainedClosingSnapshot && app.renderer?.hasPreparedSnapshot == false
                       && app.sleepPreparationTimer == nil, "Cleared gestures must release cached pixels and pre-sleep timers")
@@ -845,7 +906,7 @@ extension AppDelegate {
             // checks coordinator/GPU cleanup, not compositor frame delivery.
             for _ in 0..<100 {
                 if !app.hasSnapshot { return }
-                if let view = app.window?.contentView as? MTKView, !view.isPaused {
+                if let view = app.window?.contentView as? MTKView, app.renderer?.isRendering == true {
                     app.renderer?.draw(in: view)
                 }
                 try await Task.sleep(nanoseconds: 10_000_000)
@@ -992,7 +1053,7 @@ extension AppDelegate {
             try check(!app.hasSnapshot && !app.snapshotRequested && app.snapshotTask == nil,
                       "Retained pixels must not remain an active gesture")
             try check(app.window?.alphaValue == 0 && app.window?.ignoresMouseEvents == true
-                      && app.renderer?.progress == 0 && (app.window?.contentView as? MTKView)?.isPaused == true,
+                      && app.renderer?.progress == 0 && app.renderer?.isRendering == false,
                       "Retained pixels must remain hidden, paused and nonblocking")
         }
         func makeSleepingWake(lockBeforeSleep: Bool = false,
@@ -1173,7 +1234,7 @@ extension AppDelegate {
                 let task = app.snapshotTask
                 if visible {
                     await task?.value
-                    try check(app.hasSnapshot && !app.entrancePending && !app.wakeOpening.pending,
+                    try check(app.hasSnapshot && !app.wakeOpening.pending,
                               "Cached wake must prepare folded pixels without a closing entrance")
                     try await Task.sleep(nanoseconds: 100_000_000)
                     try check(app.window!.alphaValue == 1, "Cached wake must fully reveal")
@@ -1195,6 +1256,23 @@ extension AppDelegate {
                           "Interrupted cached wake must leave no pixels, retry or late reveal")
                 print("PASS: \(visible ? "visible" : "pending") cached wake cleanup on \(interruption)")
             }
+        }
+        do {
+            let (wake, source) = try await makeWake()
+            defer { wake.shutdown(); wake.window?.close() }
+            await wake.snapshotTask?.value
+            try await Task.sleep(nanoseconds: 100_000_000)
+            wake.handleLidReading(100)
+            try await Task.sleep(nanoseconds: 30_000_000)
+            wake.handleLidReading(60)
+            try await Task.sleep(nanoseconds: 250_000_000)
+            try check(wake.hasSnapshot && !wake.finishingGesture && source.count == 1
+                      && wake.renderer?.opacity == 1,
+                      "Reclosing during cached wake return must restore the same image and cancel cleanup")
+            wake.handleLidReading(100)
+            try await waitForCleanup(wake)
+            try checkCleared(wake)
+            print("PASS: cached-wake return can reverse without recapture or stale cleanup")
         }
         do {
             let (app, source) = try await makeWake()
@@ -1224,9 +1302,13 @@ extension AppDelegate {
         source.pending = nil
         await app.snapshotTask?.value
         try check(app.hasSnapshot, "Synthetic screenshot must reach the real renderer")
+        let initialFrames = app.renderer?.renderedFrameCount ?? 0
+        try await Task.sleep(nanoseconds: 100_000_000)
+        try check((app.renderer?.renderedFrameCount ?? 0) > initialFrames + 1,
+                  "The production display link must advance visible frames without manual pumping")
         try await Task.sleep(nanoseconds: 45_000_000)
-        try check(!app.entrancePending && app.window!.alphaValue > 0,
-                  "Geometry must begin during the visibility fade")
+        try check(app.window!.alphaValue == 1,
+                  "Closing must replace the prepared identity frame at full window opacity")
         app.handleLidReading(100)
         try await Task.sleep(nanoseconds: 40_000_000)
         app.handleLidReading(80)
@@ -1236,13 +1318,27 @@ extension AppDelegate {
         app.handleLidReading(100)
         try await waitForCleanup(app)
         try checkCleared(app)
-        print("PASS: overlapping entrance, interrupted return, one-snapshot reclose, flat-frame cleanup")
+        print("PASS: identity entrance, interrupted return, one-snapshot reclose, aligned fade cleanup")
+
+        let (stalled, stalledSource) = try makeGesture()
+        defer { stalled.shutdown(); stalled.window?.close() }
+        try await waitForCapture(stalledSource)
+        try await Task.sleep(nanoseconds: 50_000_000)
+        stalledSource.pending?.resume(returning: buffer)
+        stalledSource.pending = nil
+        await stalled.snapshotTask?.value
+        stalled.handleLidReading(100)
+        stalled.renderer?.progress = 0 // Simulate suspended display callbacks.
+        try await Task.sleep(nanoseconds: 900_000_000)
+        try checkCleared(stalled)
+        print("PASS: missing display callbacks cannot leave the desktop blocked")
     }
 }
 
 // Diagnostics should not register as foreground app launches. UI lifecycle
 // checks temporarily exercise regular activation, then terminate via AppKit.
-if CommandLine.arguments.contains(where: { ["--lifecycle-test", "--render-test", "--render-benchmark", "--material-preview"].contains($0) }) {
+if CommandLine.arguments.contains(where: { ["--lifecycle-test", "--render-test", "--render-benchmark", "--material-preview", "--capture-metadata-test"].contains($0) }) {
+    setbuf(stdout, nil)
     MainActor.assumeIsolated {
         _ = NSApplication.shared
         NSApp.setActivationPolicy(.accessory)
@@ -1254,6 +1350,17 @@ if CommandLine.arguments.contains("--version") {
     print("Glissform \(Bundle.main.object(forInfoDictionaryKey: "GlissformVersion") as? String ?? "Development")")
 } else if CommandLine.arguments.contains("--probe") {
     print(LidSensor.probe())
+} else if CommandLine.arguments.contains("--capture-metadata-test") {
+    Task { @MainActor in
+        do {
+            try await AppDelegate.captureMetadataSelfTest()
+            NSApp.terminate(nil)
+        } catch {
+            fputs("Capture metadata test failed: \(error)\n", stderr)
+            exit(1)
+        }
+    }
+    NSApplication.shared.run()
 } else if CommandLine.arguments.contains("--lifecycle-test") {
     _ = NSApplication.shared
     Task { @MainActor in

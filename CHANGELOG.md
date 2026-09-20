@@ -4,6 +4,18 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+### Changed
+
+- Prepare capture metadata before a gesture without taking idle screenshots. Capture dimensions now follow ScreenCaptureKit's point-to-pixel scale and must match the overlay's backing dimensions. Exclude the animation overlay while preserving known Glissform settings windows, including when the hidden overlay is absent from capture metadata.
+- Replace the closing entrance dissolve with a prepared, full-opacity flat frame and a 100 ms geometric handoff. Use one display-driven timeline for motion and opacity, a short cached-opening fade, and a velocity-aware return followed by a 50 ms fade to the live desktop. Deeper pause restorations have a longer, bounded return; a cleanup watchdog restores desktop access if display callbacks stop.
+- Timestamp lid readings at acquisition, separate sensor cadence from rendering, and request 60 Hz polling during active gestures while retaining 30 Hz idle polling. Actual sensor updates remain hardware-dependent; smoothing does not invent angles beyond the latest reported reading.
+- Prepare a Gaussian blur pyramid once per screenshot, use linear-light filtering and shading, and add fixed spatial dithering to the shadow gradient. The unchanged flat frame, progressive frost, and full-angle projection are retained.
+- Add capture-metadata and motion-timing regression coverage, opt-in numeric sensor/presentation diagnostics, and a synthetic GPU benchmark that defaults to the built-in display's current backing dimensions.
+
+### Validation and limitations
+
+- The build, automated motion/capture/Metal/lifecycle/overlay checks, live capture-metadata check, and running-app launch passed locally. Repeatable physical acceptance of closing, reopening, pause restoration, wake/unlock, scaled display modes, and performance remains required. Higher polling and display-linked rendering are not guarantees of a higher sensor update rate or invisible screenshot handoff.
+
 ## 0.1.0-alpha.6 — 2026-09-20
 
 Sixth public alpha: consistent closing and post-sleep opening using the same screenshot, background operation when settings close, and support for overlays in other apps’ full-screen Spaces. The owner confirmed the cached opening works well on the development MacBook Air M5 15-inch; broader wake, unlock, display, and hardware acceptance remains ongoing. Source release; local builds remain ad-hoc signed and are not notarized.
