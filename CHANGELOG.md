@@ -6,6 +6,8 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ### Changed
 
+- Add a top-bezel contact shadow driven by the first few displayed degrees of closure, with a dark upper edge and soft falloff that spreads downward. Preserve the lighter lower image and unchanged flat frame. This follow-up is not regression-tested; physical review is left to the owner.
+
 - Prepare capture metadata before a gesture without taking idle screenshots. Capture dimensions now follow ScreenCaptureKit's point-to-pixel scale and must match the overlay's backing dimensions. Exclude the animation overlay while preserving known Glissform settings windows, including when the hidden overlay is absent from capture metadata.
 - Replace the closing entrance dissolve with a prepared, full-opacity flat frame and a 100 ms geometric handoff. Use one display-driven timeline for motion and opacity, a short cached-opening fade, and a velocity-aware return followed by a 50 ms fade to the live desktop. Deeper pause restorations have a longer, bounded return; a cleanup watchdog restores desktop access if display callbacks stop.
 - Timestamp lid readings at acquisition, separate sensor cadence from rendering, and request 60 Hz polling during active gestures while retaining 30 Hz idle polling. Actual sensor updates remain hardware-dependent; smoothing does not invent angles beyond the latest reported reading.
@@ -14,7 +16,7 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ### Validation and limitations
 
-- The build, automated motion/capture/Metal/lifecycle/overlay checks, live capture-metadata check, and running-app launch passed locally. Repeatable physical acceptance of closing, reopening, pause restoration, wake/unlock, scaled display modes, and performance remains required. Higher polling and display-linked rendering are not guarantees of a higher sensor update rate or invisible screenshot handoff.
+- Before the latest upper-shadow tuning, the build, automated motion/capture/Metal/lifecycle/overlay checks, live capture-metadata check, and running-app launch passed locally. Repeatable physical acceptance of closing, reopening, pause restoration, wake/unlock, scaled display modes, and performance remains required. Higher polling and display-linked rendering are not guarantees of a higher sensor update rate or invisible screenshot handoff.
 
 ## 0.1.0-alpha.6 — 2026-09-20
 

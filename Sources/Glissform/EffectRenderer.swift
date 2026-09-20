@@ -576,7 +576,11 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
                         let visibleProgress = rawProgress * rawProgress * (3 - 2 * rawProgress)
                         let darkness = pow(visibleProgress, 2.2)
                             * (1 - smoothstep(0.05, 1, 1 - heightFromHinge))
-                        expected *= 1 - darkness
+                        let degrees = Double(amount) * 80
+                        let contactStrength = 0.88 * (1 - exp(-degrees / 3))
+                        let contactDepth = 0.035 + 0.20 * (1 - exp(-degrees / 22))
+                        let contactShadow = contactStrength * exp(-pow((1 - heightFromHinge) / contactDepth, 1.6))
+                        expected *= (1 - darkness) * (1 - contactShadow)
                         expected = 255 * (expected <= 0.0031308 ? expected * 12.92 : 1.055 * pow(expected, 1 / 2.4) - 0.055)
                         guard abs(Double(rendered[(y * width + x) * 4 + channel]) - expected) < 2 else {
                             throw failure("Stationary-image projection mismatch at \(label), \(x),\(y), channel \(channel)")
@@ -763,7 +767,10 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
                 let uv = (Double(y) + 0.5) / Double(height)
                 let t = min(1, max(0, (uv - 0.05) / 0.95))
                 let darkness = pow(progress, 2.2) * (1 - t * t * (3 - 2 * t))
-                let linear = source * (1 - darkness)
+                let contactStrength = 0.88 * (1 - exp(-50.0 / 3))
+                let contactDepth = 0.035 + 0.20 * (1 - exp(-50.0 / 22))
+                let contactShadow = contactStrength * exp(-pow(uv / contactDepth, 1.6))
+                let linear = source * (1 - darkness) * (1 - contactShadow)
                 ideal += 255 * (linear <= 0.0031308 ? linear * 12.92 : 1.055 * pow(linear, 1 / 2.4) - 0.055) / 8
                 for x in (width / 2 - 32)..<(width / 2 + 32) {
                     plain += Double(quantized[(y * width + x) * 4]) / 512
@@ -993,14 +1000,17 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
                 color += desktop.sample(sampling, uv + offset, level(lod)).rgb * weights[x] * weights[y];
             }
         }
-        // The top recedes into shadow; the hinge stays lit. Use the displayed
-        // angle so shadow, projection and frost share the same soft stop.
-        // Build throughout the whole animation. The gradient extends from
-        // transparent at the bottom to a black plateau across the top 5%.
-        // Keep blurred colors luminous until the deep shadow builds near closure.
-        float darkness = pow(uniforms.x, 2.2f)
-                         * (1.0f - smoothstep(0.05f, 1.0f, in.uv.y));
-        color *= 1.0f - darkness;
+        // Broad closure shading stays gentle; a separate contact shadow is
+        // anchored to the physical top bezel, independent of projected image UVs.
+        // Drive its onset with actual displayed degrees, not eased full-gesture
+        // progress, so the first few degrees already reveal the frame's depth.
+        float broadShadow = pow(uniforms.x, 2.2f)
+                          * (1.0f - smoothstep(0.05f, 1.0f, in.uv.y));
+        float degrees = theta * 57.2957795f;
+        float contactStrength = 0.88f * (1.0f - exp(-degrees / 3.0f));
+        float contactDepth = 0.035f + 0.20f * (1.0f - exp(-degrees / 22.0f));
+        float contactShadow = contactStrength * exp(-pow(in.uv.y / contactDepth, 1.6f));
+        color *= (1.0f - broadShadow) * (1.0f - contactShadow);
         // A fixed 8x8 ordered threshold spreads the final 8-bit rounding over
         // neighboring pixels. Scale in linear light by the sRGB transfer slope:
         // the perturbation stays below half an encoded code value. Static screen

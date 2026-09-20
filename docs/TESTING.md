@@ -34,6 +34,8 @@ For physical acceptance, repeat a close/reopen gesture over a full-screen app wi
 
 ### Unreleased capture and rendering changes
 
+The latest top-bezel contact-shadow tuning has not been regression-tested, at the owner’s request. The results below precede that adjustment.
+
 Local validation on the development Mac passed: build, motion and capture checks, synthetic Metal rendering, lifecycle interruption and cleanup, and overlay placement under both activation policies. The rebuilt app opened its settings window with a live sensor reading and regular Dock activation. A metadata-only check confirmed a 3840 × 2486 backing size and safe exclusion of the hidden overlay without capturing desktop pixels.
 
 One synthetic 3840 × 2486 run measured image preparation at 4.01 ms GPU / 12.13 ms encode-and-wait, followed by 120 animation frames at 1.73 ms mean, 3.13 ms p95 and 5.63 ms maximum GPU duration. These are local samples, not end-to-end or power measurements.

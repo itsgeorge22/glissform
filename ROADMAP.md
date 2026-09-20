@@ -21,7 +21,7 @@ The first feature, Infinite Screen, implements screenshot-based closing animatio
 - [x] Implement acquisition-timed smoothing, higher active polling, display-linked motion and opacity, a prepared flat closing entrance, velocity-aware returns, and bounded cleanup when display callbacks stop.
 - [x] Implement a reusable Gaussian blur pyramid, linear-light material rendering, and fixed shadow-gradient dithering; add numeric timing diagnostics and a display-sized synthetic GPU benchmark.
 - [x] Complete local build, motion/capture/Metal/lifecycle/overlay regression checks, capture-metadata validation, and settings-window launch for these unreleased changes.
-- [ ] Compare entrance, awake and cached-wake exit, deep-fold pause restoration, and material quality on the target Mac. Measure real sensor changes, presentation intervals, memory, and power before claiming an improvement in physical smoothness.
+- [ ] Compare entrance, awake and cached-wake exit, deep-fold pause restoration, and material quality on the target Mac, including the untested top-bezel contact shadow. Measure real sensor changes, presentation intervals, memory, and power before claiming an improvement in physical smoothness.
 
 - [x] Prepare an initial unreleased wake-opening prototype with immediate reconnection, remaining-angle motion, bounded eligibility, local timing diagnostics, and synthetic cancellation checks.
 - [x] Correct loss of numeric wake eligibility when a lock/session notification follows sleep, and cover lock-before-wake, lock-after-wake, unlock with remaining motion, completed opening and timeout sequences in synthetic checks.
