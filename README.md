@@ -76,6 +76,7 @@ For Infinite Screen, only the built-in display receives an overlay. The app does
 
 ## Known Infinite Screen alpha limitations
 
+- Known issue reported by the owner on 2026-09-21: switching Spaces while a full-screen app is open breaks the animation. The exact failure and cause still need investigation; full-screen overlay placement checks do not cover this transition.
 - The lid sensor exposes an undocumented protocol and whole-degree readings. Smoothing improves the appearance but cannot recover motion the sensor never reported.
 - Reopening during an awake gesture reverses the animation. The experimental wake-opening effect requires a completed closing screenshot, a fresh near-closed reading before sleep, an available unlocked desktop, and upward movement still below the starting angle within three seconds of wake. Ordinary sleep/lock ordering keeps that image hidden in memory; a near-closed lock immediately before sleep has a one-second grace period. Session switches discard it. Fast opening, late unlock, unfinished closing capture, pause restoration before sleep, display changes, or missing sensor readings can skip the effect. It does not animate over the lock screen, replay a completed opening, or guarantee the first visible wake frame.
 - Wake desktop availability combines public display/session checks with undocumented macOS lock hints. Those hints need OS-version and physical unlock testing; the overlay retains normal login visibility restrictions and never requests drawing over the lock screen.

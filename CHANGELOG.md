@@ -16,6 +16,8 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ### Validation and limitations
 
+- On 2026-09-21, the owner confirmed smoothness, speed, abrupt lid stops, reversals, and opening after sleep without locking on the development Mac. The owner also reported that switching Spaces while a full-screen app is open breaks the animation; this remains unresolved. This confirmation does not cover locked wake or replace automated regression checks.
+
 - Before the latest upper-shadow tuning, the build, automated motion/capture/Metal/lifecycle/overlay checks, live capture-metadata check, and running-app launch passed locally. Repeatable physical acceptance of closing, reopening, pause restoration, wake/unlock, scaled display modes, and performance remains required. Higher polling and display-linked rendering are not guarantees of a higher sensor update rate or invisible screenshot handoff.
 
 ## 0.1.0-alpha.6 — 2026-09-20

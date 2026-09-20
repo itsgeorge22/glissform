@@ -2,11 +2,17 @@
 
 Glissform adds subtle animations and quality-of-life improvements to everyday Mac interactions. The product is intended to grow into a cohesive collection of useful visual experiences for familiar gestures and system changes. Infinite Screen is the first available feature, not the boundary of the app.
 
-New experiences should feel native, have a clear purpose, stay lightweight, and respect privacy and normal system behaviour. Additional experiences are part of the product direction; their specific triggers, designs, and release dates are not announced here. This roadmap separates available work, near-term validation, and possibilities.
+New experiences should feel native, have a clear purpose, stay lightweight, and respect privacy and normal system behaviour. This roadmap separates available work, near-term fixes, and feature ideas without committed release dates.
+
+Glissform is a small passion project. The owner's intended price is $1.90, with occasional improvements and new features after launch. Keep release preparation proportional to that scope; broad hardware certification, formal performance studies, and a fixed tester cohort are not prerequisites.
 
 ## Current — 0.1.0-alpha.6
 
-The first feature, Infinite Screen, implements screenshot-based closing animation with full-angle hinge compensation, steadier adaptive smoothing, progressive full-image frost and shadow, awake reversal, cached post-sleep opening, native settings with a configurable starting angle and capture-free preview, optional desktop restoration after a fixed two-second still-lid pause, menu bar controls, and lifecycle cleanup. Synthetic checks cover projection, tracking, and interrupted gestures; repeatable physical acceptance remains an upcoming gate. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
+The first feature, Infinite Screen, implements screenshot-based closing animation with full-angle hinge compensation, steadier adaptive smoothing, progressive full-image frost and shadow, awake reversal, cached post-sleep opening, native settings with a configurable starting angle and capture-free preview, optional desktop restoration after a fixed two-second still-lid pause, menu bar controls, and lifecycle cleanup. On 2026-09-21, the owner confirmed correct smoothness, speed, abrupt lid stops, reversals, and opening after sleep without locking on the development Mac. Locked wake is outside that confirmation. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
+
+## Current priority — known bug
+
+- [ ] Fix animation breaking when switching Spaces while a full-screen app is open (owner report, 2026-09-21). Record the precise reproduction and symptom before diagnosing the cause. Verify the fix by repeating the Space switch with a full-screen app open; existing static full-screen overlay checks do not establish that this transition works.
 
 ## Product development
 
@@ -64,20 +70,18 @@ The first feature, Infinite Screen, implements screenshot-based closing animatio
 
 ## Beta gate — 0.1.0-beta.1
 
-Move to beta when the feature set selected for that beta is settled and:
+Keep this a practical release check for a small passion project:
 
-- Each included experience behaves consistently across its documented supported configurations; Infinite Screen includes closing and reversal checks.
-- Failures in the resources each feature uses reliably leave or restore normal desktop interaction, including capture and sensor failures in Infinite Screen.
-- Performance and power measurements meet recorded acceptance targets.
-- Installation and permission instructions work for testers without developer assistance.
-- Known limitations and supported hardware are documented accurately.
-- There are no known blockers to broader voluntary testing.
+- Fix the known full-screen Space-switching bug and confirm everyday animation still works on the development Mac.
+- Run the existing build and regression checks on the intended release build.
+- Check that normal desktop access returns when the effect stops or the app quits, and that sleep and the lock screen behave normally.
+- Provide a usable installation and permission flow, with honest tested-hardware and known-limitation notes.
 
-Stabilize the selected beta feature set through bug fixes, compatibility evidence, onboarding, and distribution work. Additional experiences can be explored separately without destabilizing the beta.
+The broader investigations below and above are follow-up work, not a requirement to complete every roadmap item before beta. Additional features are not required for launch; improve the app incrementally after release.
 
 ## Release candidate and stable — 1.0.0-rc.1 → 1.0.0
 
-- [ ] Complete broader testing with no unresolved release-blocking failures.
+- [ ] Confirm everyday use on the documented tested configuration, with no known release-blocking failures.
 - [ ] Establish Developer ID signing, notarization, and a reproducible distribution process.
 - [ ] Verify installation, upgrade, and removal on supported macOS versions.
 - [ ] Confirm normal desktop access is restored after errors and interruptions.
@@ -87,6 +91,8 @@ A release candidate is a complete proposed stable build. Publish 1.0.0 when thos
 
 ## Further possibilities — not committed
 
+- Charging feedback: when the charger is plugged in, show a ripple spreading from the bottom-left corner with a green haze. Visual reference: the proximity-sharing animation when the tops of two iPhones are brought together to share contacts (NameDrop/AirDrop). Idea only; not implemented.
+- Touch ID feedback: a similar ripple spreading from the bottom-right corner with a red haze. Idea only; the exact Touch ID event and feasibility still need to be determined. Not implemented.
 - Broader wake-opening support after the prototype passes timing, privacy, and physical acceptance gates; no first-frame or locked-wake guarantee.
 - Optional launch at login; a lightweight enable/pause control is already available in the working settings and menu.
 - Carefully bounded blur, shadow, and motion preferences or presets.
