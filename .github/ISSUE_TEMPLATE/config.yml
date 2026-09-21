@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: App guide
+    url: https://github.com/itsgeorge22/glissform/blob/main/docs/APP_GUIDE.md
+    about: Read about current features, permissions, and limitations.
+  - name: Roadmap and known priorities
+    url: https://github.com/itsgeorge22/glissform/blob/main/ROADMAP.md
+    about: Check planned work before suggesting a feature.

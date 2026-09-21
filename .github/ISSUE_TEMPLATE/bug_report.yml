@@ -1,0 +1,73 @@
+---
+name: Bug report
+description: Report a problem with Glissform.
+title: "[Bug] "
+body:
+- type: markdown
+  attributes:
+    value: 'Thanks for helping improve Glissform. Search existing issues first. Reports
+      and attachments are public: omit serial numbers, credentials, and private desktop
+      content.'
+- type: input
+  id: app-version
+  attributes:
+    label: Glissform version
+    description: Find it in Privacy & About. For a source build, include the commit
+      if known.
+  validations:
+    required: true
+- type: input
+  id: mac-model
+  attributes:
+    label: Mac model and chip
+    description: Find these in About This Mac. Do not include your serial number.
+    placeholder: MacBook Air, M5, 15-inch
+  validations:
+    required: true
+- type: input
+  id: macos-version
+  attributes:
+    label: macOS version
+    description: Include the full version and whether it is a beta.
+  validations:
+    required: true
+- type: dropdown
+  id: area
+  attributes:
+    label: Affected area
+    options:
+    - Infinite Screen
+    - Settings or preview
+    - Installation or permissions
+    - Other / unsure
+  validations:
+    required: true
+- type: textarea
+  id: problem
+  attributes:
+    label: What happened?
+    description: Describe the actual result and what you expected instead.
+  validations:
+    required: true
+- type: textarea
+  id: steps
+  attributes:
+    label: Steps to reproduce
+    description: Include whether it happens every time or occasionally.
+    placeholder: |-
+      1. Open…
+      2. …
+  validations:
+    required: true
+- type: textarea
+  id: context
+  attributes:
+    label: Gesture and display context
+    description: 'If relevant: starting angle, pause setting, sleep/lock, full-screen
+      apps, Space switching, and external displays.'
+- type: textarea
+  id: attachments
+  attributes:
+    label: Additional details
+    description: Optional screenshots, recordings, or relevant log excerpts. Remove
+      private content before sharing.

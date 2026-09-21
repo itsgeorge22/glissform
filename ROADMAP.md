@@ -62,7 +62,8 @@ The first feature, Infinite Screen, implements screenshot-based closing animatio
 - [ ] Measure capture latency, frame pacing, CPU/GPU load, memory use, and idle/battery impact.
 - [ ] Strengthen recovery from denied/revoked permissions, unavailable screenshots, sensor disconnects, and display changes.
 - [ ] Test full-screen applications, Dock/menu behavior, external displays, multiple Spaces, sleep/wake, and quitting during transitions.
-- [ ] Build a compatibility table from additional MacBook testing.
+- [x] Prepare structured GitHub submissions for bugs, suggestions, and community compatibility reports, with tested-hardware information and an explicit pre-download status on the project page.
+- [ ] Build a compatibility table from owner and community reports, distinguishing reported results from maintainer verification.
 - [x] Refine the native interface with compact navigation, adaptive neutral surfaces, a distinctive perspective illustration, and a clearer control hierarchy.
 - [x] Add a capture-free, in-window gesture preview with a still alternative for Reduce Motion and contextual first-gesture guidance.
 - [x] Introduce and simplify native settings with a dedicated live-angle display, precise trigger controls, and screen-access status, and an About page with prominent privacy information.
@@ -84,6 +85,7 @@ The broader investigations below and above are follow-up work, not a requirement
 
 - [ ] Confirm everyday use on the documented tested configuration, with no known release-blocking failures.
 - [ ] Establish Developer ID signing, notarization, and a reproducible distribution process.
+- [ ] Prepare and publish a `.dmg` on GitHub, then add public download links and installation instructions.
 - [ ] Verify installation, upgrade, and removal on supported macOS versions.
 - [ ] Confirm normal desktop access is restored after errors and interruptions.
 - [ ] Finalize privacy documentation, support instructions, and release notes.

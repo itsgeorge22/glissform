@@ -26,6 +26,10 @@ For every project task, review README.md, CHANGELOG.md, and ROADMAP.md alongside
 - scripts/build.sh derives the numeric bundle short version and full GlissformVersion from VERSION.
 - Increment the public version only for an intended release. Keep unreleased work in the changelog until then.
 - Tags are v<VERSION>. Never move an existing public release tag.
+- An authorized version release includes a GitHub Release page for its exact tag, with version-specific notes based on the corresponding changelog entry. Mark alpha, beta, and release-candidate versions as prereleases. A pushed tag alone is not a completed GitHub Release; if the user requests tags only, report that distinction explicitly.
+- Before reporting a release complete, verify its published GitHub page, tag and target commit, notes, prerelease status, and any intended downloadable assets. Report missing steps or blockers rather than claiming completion.
+- Missing release pages may be added later to existing tags without moving those tags or changing their code. Publish backfilled pages only when authorized, describe only that version's changes, and clearly identify source-only releases without implying an app installer is available.
+- Public app download links and installation instructions belong on GitHub only once the intended `.dmg` is ready and published. Source tags and release notes do not establish app-download availability.
 - Do not publish future commits, tags, or releases without authorization for that publication task.
 
 ## Verification

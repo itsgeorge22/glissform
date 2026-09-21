@@ -1,0 +1,70 @@
+---
+name: Compatibility report
+description: Tell us how Glissform works on your Mac, including successful results.
+title: "[Compatibility] "
+body:
+- type: markdown
+  attributes:
+    value: 'Thanks for helping improve Glissform. Search existing issues first. Reports
+      and attachments are public: omit serial numbers, credentials, and private desktop
+      content.'
+- type: input
+  id: app-version
+  attributes:
+    label: Glissform version
+    description: Find it in Privacy & About. For a source build, include the commit
+      if known.
+  validations:
+    required: true
+- type: input
+  id: mac-model
+  attributes:
+    label: Mac model and chip
+    description: Find these in About This Mac. Do not include your serial number.
+    placeholder: MacBook Air, M5, 15-inch
+  validations:
+    required: true
+- type: input
+  id: macos-version
+  attributes:
+    label: macOS version
+    description: Include the full version and whether it is a beta.
+  validations:
+    required: true
+- type: dropdown
+  id: result
+  attributes:
+    label: Overall result
+    options:
+    - Works in the situations I tried
+    - Works with limitations
+    - Does not work
+    - Unable to launch or finish setup
+  validations:
+    required: true
+- type: dropdown
+  id: sensor
+  attributes:
+    label: Does the live lid angle update?
+    options:
+    - 'Yes'
+    - 'No'
+    - Not tested / unable to check
+  validations:
+    required: true
+- type: textarea
+  id: checks
+  attributes:
+    label: What did you try?
+    description: 'For example: closing/reopening, pauses, sleep, locked wake, full-screen
+      apps, Space switching, or external displays. Only list what you actually checked.'
+  validations:
+    required: true
+- type: textarea
+  id: notes
+  attributes:
+    label: Results and limitations
+    description: Describe failures or confirm what worked. Link an existing bug report
+      if relevant.
+  validations:
+    required: true

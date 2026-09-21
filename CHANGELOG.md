@@ -4,6 +4,10 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+### Added
+
+- A concise GitHub project overview, detailed app guide, and structured forms for bug reports, feature suggestions, and community compatibility reports. Clarify that public app downloads and installation guidance will follow publication of a `.dmg` on GitHub.
+
 ### Changed
 
 - Add a top-bezel contact shadow driven by the first few displayed degrees of closure, with a dark upper edge and soft falloff that spreads downward. Preserve the lighter lower image and unchanged flat frame. The owner manually tested and approved its appearance on the development Mac on 2026-09-21; the local build and full regression suite also passed.

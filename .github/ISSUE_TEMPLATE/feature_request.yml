@@ -1,0 +1,30 @@
+---
+name: Feature suggestion
+description: Suggest an improvement or a new experience.
+title: "[Idea] "
+body:
+- type: markdown
+  attributes:
+    value: 'Thanks for helping improve Glissform. Search existing issues first. Reports
+      and attachments are public: omit serial numbers, credentials, and private desktop
+      content.'
+- type: textarea
+  id: problem
+  attributes:
+    label: What would this help you do?
+    description: Describe the situation or problem.
+  validations:
+    required: true
+- type: textarea
+  id: idea
+  attributes:
+    label: Your suggestion
+    description: Explain how you would like it to work.
+  validations:
+    required: true
+- type: textarea
+  id: alternatives
+  attributes:
+    label: Alternatives or references
+    description: Optional. Link related issues or roadmap items. Suggestions are not
+      release commitments.

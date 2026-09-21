@@ -4,6 +4,8 @@ Glissform is an early-alpha macOS app for subtle animations and quality-of-life 
 
 ## Report an issue
 
+Use the [submission chooser](https://github.com/itsgeorge22/glissform/issues/new/choose) for a bug report, feature suggestion, or compatibility report. Successful compatibility reports are welcome too. Search existing issues before submitting a duplicate; add your configuration and reproduction details to an existing report when appropriate.
+
 Include the affected feature, Mac model, macOS version, Glissform version, steps to reproduce, and expected versus actual behaviour. For Infinite Screen, include the chosen start angle, external displays, full-screen apps, and whether the Mac slept. Remove private desktop content from any media you choose to share.
 
 ## Propose a change
