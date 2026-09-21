@@ -4,9 +4,9 @@ Glissform brings subtle animations and quality-of-life improvements to everyday 
 
 **Infinite Screen is its first available feature:** your desktop appears to stay in place as you close your MacBook lid, with perspective, blur, and shadow responding to the movement. Glissform’s scope extends beyond this effect; additional experiences will be introduced as they are designed and validated.
 
-**Development version: 0.1.0-alpha.6. The app is not yet available for public download.** A `.dmg` and installation instructions will be published on GitHub when ready. Development testing uses a MacBook Air M5 15-inch; wider compatibility is still being evaluated.
+**Development version: 0.1.0-alpha.7. The app is not yet available for public download.** A `.dmg` and installation instructions will be published on GitHub when ready. Development testing uses a MacBook Air M5 15-inch; wider compatibility is still being evaluated.
 
-The working tree includes unreleased capture, motion, and material improvements described below. They do not change the public version; repeatable physical acceptance is still pending.
+This source release includes the capture, motion, material, and Space-change improvements described below. Repeatable physical acceptance remains pending where noted.
 
 [Changelog](../CHANGELOG.md) · [Roadmap](../ROADMAP.md) · [Contributing](../CONTRIBUTING.md)
 

@@ -6,7 +6,7 @@ New experiences should feel native, have a clear purpose, stay lightweight, and 
 
 Glissform is a small passion project. The owner's intended price is $1.90, with occasional improvements and new features after launch. Keep release preparation proportional to that scope; broad hardware certification, formal performance studies, and a fixed tester cohort are not prerequisites.
 
-## Current — 0.1.0-alpha.6
+## Current — 0.1.0-alpha.7
 
 The first feature, Infinite Screen, implements screenshot-based closing animation with full-angle hinge compensation, steadier adaptive smoothing, progressive full-image frost and shadow, awake reversal, cached post-sleep opening, native settings with a configurable starting angle and capture-free preview, optional desktop restoration after a fixed two-second still-lid pause, menu bar controls, and lifecycle cleanup. On 2026-09-21, the owner confirmed correct smoothness, speed, abrupt lid stops, reversals, and opening after sleep without locking on the development Mac. Locked wake is outside that confirmation. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
 

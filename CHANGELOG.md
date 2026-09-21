@@ -4,6 +4,10 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+## 0.1.0-alpha.7 — 2026-09-21
+
+Seventh public alpha: smoother display-linked motion and screenshot handoffs, refined frost and contact shadow, safer Space switching, stronger capture validation, and expanded public project guidance. Space changes now keep a visible snapshot in its source Space and cancel the gesture after the transition; physical confirmation of the full-screen transition remains pending. Source release; local builds remain ad-hoc signed and are not notarized.
+
 ### Fixed
 
 - Keep a visible Infinite Screen snapshot in the Space where its gesture began so macOS does not duplicate the same frozen image on both sides of a Space-switch animation. Clear it when the active Space changes, release mouse input, discard its capture metadata, and require the lid to reopen above **Begin at** before a fresh animation can start in the new Space.
