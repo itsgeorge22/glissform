@@ -6,7 +6,7 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ### Changed
 
-- Add a top-bezel contact shadow driven by the first few displayed degrees of closure, with a dark upper edge and soft falloff that spreads downward. Preserve the lighter lower image and unchanged flat frame. This follow-up is not regression-tested; physical review is left to the owner.
+- Add a top-bezel contact shadow driven by the first few displayed degrees of closure, with a dark upper edge and soft falloff that spreads downward. Preserve the lighter lower image and unchanged flat frame. The owner manually tested and approved its appearance on the development Mac on 2026-09-21; the local build and full regression suite also passed.
 
 - Prepare capture metadata before a gesture without taking idle screenshots. Capture dimensions now follow ScreenCaptureKit's point-to-pixel scale and must match the overlay's backing dimensions. Exclude the animation overlay while preserving known Glissform settings windows, including when the hidden overlay is absent from capture metadata.
 - Replace the closing entrance dissolve with a prepared, full-opacity flat frame and a 100 ms geometric handoff. Use one display-driven timeline for motion and opacity, a short cached-opening fade, and a velocity-aware return followed by a 50 ms fade to the live desktop. Deeper pause restorations have a longer, bounded return; a cleanup watchdog restores desktop access if display callbacks stop.
@@ -18,7 +18,7 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 - On 2026-09-21, the owner confirmed smoothness, speed, abrupt lid stops, reversals, and opening after sleep without locking on the development Mac. The owner also reported that switching Spaces while a full-screen app is open breaks the animation; this remains unresolved. This confirmation does not cover locked wake or replace automated regression checks.
 
-- Before the latest upper-shadow tuning, the build, automated motion/capture/Metal/lifecycle/overlay checks, live capture-metadata check, and running-app launch passed locally. Repeatable physical acceptance of closing, reopening, pause restoration, wake/unlock, scaled display modes, and performance remains required. Higher polling and display-linked rendering are not guarantees of a higher sensor update rate or invisible screenshot handoff.
+- After the latest upper-shadow tuning, the build and full automated motion/wake/capture/Metal/lifecycle/overlay checks passed locally on 2026-09-21. The live capture-metadata check and running-app launch passed before that tuning. Repeatable physical acceptance of closing, reopening, pause restoration, wake/unlock, scaled display modes, and performance remains required. Higher polling and display-linked rendering are not guarantees of a higher sensor update rate or invisible screenshot handoff.
 
 ## 0.1.0-alpha.6 — 2026-09-20
 

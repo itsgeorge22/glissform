@@ -34,7 +34,7 @@ For physical acceptance, repeat a close/reopen gesture over a full-screen app wi
 
 ### Unreleased capture and rendering changes
 
-The latest top-bezel contact-shadow tuning has not been regression-tested, at the owner’s request. The results below precede that adjustment.
+On 2026-09-21, the owner manually tested the latest top-bezel contact shadow on the development Mac and approved its appearance. After that tuning, `bash scripts/build.sh` and the full `bash scripts/test.sh` suite passed locally, covering motion, wake eligibility, capture metadata, Metal rendering, lifecycle cancellation/cleanup, and overlay placement. This does not verify the known full-screen Space-switching bug. The launch, live metadata, and benchmark results below precede that adjustment.
 
 Local validation on the development Mac passed: build, motion and capture checks, synthetic Metal rendering, lifecycle interruption and cleanup, and overlay placement under both activation policies. The rebuilt app opened its settings window with a live sensor reading and regular Dock activation. A metadata-only check confirmed a 3840 × 2486 backing size and safe exclusion of the hidden overlay without capturing desktop pixels.
 
