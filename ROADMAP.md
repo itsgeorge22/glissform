@@ -12,7 +12,7 @@ The first feature, Infinite Screen, implements screenshot-based closing animatio
 
 ## Current priority — known bug
 
-- [ ] Fix animation breaking when switching Spaces while a full-screen app is open (owner report, 2026-09-21). Record the precise reproduction and symptom before diagnosing the cause. Verify the fix by repeating the Space switch with a full-screen app open; existing static full-screen overlay checks do not establish that this transition works.
+- [ ] Resolve [#1: Infinite Screen breaks when switching Spaces with a full-screen app open](https://github.com/itsgeorge22/glissform/issues/1). Reproduction, investigation, and verification are tracked in the issue.
 
 ## Product development
 

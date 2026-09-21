@@ -37,16 +37,9 @@ The lid sensor uses an undocumented protocol. If you try Glissform on another co
 
 One screenshot is taken per gesture and kept in memory. A completed closing image may remain through lid-close sleep for the following opening; it stays hidden while locked or asleep and is released after completion or cancellation. There is no continuous recording, audio capture, screenshot saving, networking, or analytics. Normal system sleep remains enabled.
 
-## Known limitations
-
-- Switching Spaces while a full-screen app is open can break the animation. This is the current fix priority.
-- Opening after sleep is experimental. Fast opening, late unlock, or an unavailable closing image can skip the effect; it never animates over the lock screen.
-- Moving or protected content and changes during sleep can make the screenshot handoff visible.
-- Other MacBook models, older macOS versions, and external-display configurations need more real-world feedback.
-
-See the [full limitations](docs/APP_GUIDE.md#known-infinite-screen-alpha-limitations) and [open issues](https://github.com/itsgeorge22/glissform/issues).
-
 ## Feedback and support
+
+Track bugs and their resolution in [GitHub Issues](https://github.com/itsgeorge22/glissform/issues). For detailed feature behaviour, see the [app guide](docs/APP_GUIDE.md).
 
 A GitHub account is required to submit a report. Check existing issues first; if yours is already reported, add useful details there.
 

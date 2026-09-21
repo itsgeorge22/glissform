@@ -14,6 +14,8 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ### Changed
 
+- Move active bug tracking to GitHub Issues and remove the README bug/limitations list, keeping a direct issue-tracker link in Feedback and support.
+
 - Add a top-bezel contact shadow driven by the first few displayed degrees of closure, with a dark upper edge and soft falloff that spreads downward. Preserve the lighter lower image and unchanged flat frame. The owner manually tested and approved its appearance on the development Mac on 2026-09-21; the local build and full regression suite also passed.
 
 - Prepare capture metadata before a gesture without taking idle screenshots. Capture dimensions now follow ScreenCaptureKit's point-to-pixel scale and must match the overlay's backing dimensions. Exclude the animation overlay while preserving known Glissform settings windows, including when the hidden overlay is absent from capture metadata.
