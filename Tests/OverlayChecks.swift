@@ -58,6 +58,12 @@ struct OverlayChecks {
             try check(!window.isKeyWindow && !window.isMainWindow &&
                       frontmost == NSWorkspace.shared.frontmostApplication?.processIdentifier,
                       "Overlay must leave foreground and focus unchanged (before \(frontmost ?? -1), after \(NSWorkspace.shared.frontmostApplication?.processIdentifier ?? -1), self \(ProcessInfo.processInfo.processIdentifier), key \(window.isKeyWindow), main \(window.isMainWindow))")
+            window.pinToCurrentSpace()
+            try check(!window.collectionBehavior.contains(.canJoinAllSpaces),
+                      "Visible snapshot behavior must not duplicate into another Space")
+            window.parkAcrossSpaces()
+            try check(window.collectionBehavior.contains(.canJoinAllSpaces),
+                      "Hidden overlay behavior must remain ready across Spaces")
             window.orderOut(nil)
             try await Task.sleep(nanoseconds: 100_000_000)
             try check(!isOnScreen(window), "Dismissed overlay must leave the screen")

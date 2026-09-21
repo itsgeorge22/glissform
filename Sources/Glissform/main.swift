@@ -133,6 +133,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             })
         }
+        observers.append(center.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification,
+                                            object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.handleActiveSpaceChange() }
+        })
         // These system notifications are undocumented. Never use them to draw
         // over loginwindow; the overlay explicitly retains normal login visibility.
         for (name, locked) in [("com.apple.screenIsLocked", true), ("com.apple.screenIsUnlocked", false)] {
@@ -422,6 +426,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 // Raise only after capture: the snapshot retains the normal Dock
                 // and menu bar, while their live counterparts stay underneath.
+                window?.pinToCurrentSpace()
                 window?.level = NSWindow.Level(rawValue: NSWindow.Level.popUpMenu.rawValue + 1)
                 window?.ignoresMouseEvents = false
                 window?.orderFrontRegardless()
@@ -508,6 +513,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window?.alphaValue = 0
         window?.ignoresMouseEvents = true
         window?.level = .floating
+        window?.parkAcrossSpaces()
         renderer?.progress = 0
         sleepPreparationTimer?.invalidate()
         sleepPreparationTimer = nil
@@ -675,6 +681,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             cancelWake("session inactive")
             endGesture()
             motion.reset()
+        }
+    }
+
+    private func handleActiveSpaceChange() {
+        guard !quitting else { return }
+        invalidateCaptureMetadata()
+        cancelWake("active Space changed")
+        endGesture()
+        motion.reset()
+        if settingsModel.animationEnabled, ready, !sleeping {
+            setStatus("Ready · Open above \(Int(settingsModel.startAngle))° to rearm")
+            // Let AppKit finish the Space transition before discovering capture
+            // metadata for the newly active desktop.
+            DispatchQueue.main.async { [weak self] in self?.warmCaptureMetadata() }
         }
     }
 
@@ -953,6 +973,46 @@ extension AppDelegate {
             try await waitForCleanup(app)
             try checkCleared(app)
             print("PASS: settings close/reopen during \(visible ? "visible" : "pending") capture, background continuation and reversal cleanup")
+        }
+        // A Space change must discard both pending and visible snapshots and
+        // require a fresh opening above the configured threshold before recapture.
+        for visible in [false, true] {
+            let (app, source) = try makeGesture()
+            defer { app.shutdown(); app.window?.close() }
+            try await waitForCapture(source)
+            let oldTask = app.snapshotTask
+            if visible {
+                source.pending?.resume(returning: buffer)
+                source.pending = nil
+                await oldTask?.value
+                try await Task.sleep(nanoseconds: 100_000_000)
+                try check(app.hasSnapshot && app.window?.alphaValue == 1,
+                          "Synthetic snapshot must be visible before the Space change")
+                try check(app.window?.collectionBehavior.contains(.canJoinAllSpaces) == false,
+                          "A visible snapshot must stay in its source Space")
+            }
+            app.handleActiveSpaceChange()
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await oldTask?.value
+            try checkCleared(app)
+            try check(app.window?.collectionBehavior.contains(.canJoinAllSpaces) == true,
+                      "A hidden overlay must park across Spaces for the next gesture")
+            app.handleLidReading(70)
+            try check(source.count == 1 && !app.motion.active,
+                      "Movement below Begin at must remain disarmed after a Space change")
+            app.handleLidReading(101)
+            app.handleLidReading(80)
+            try await waitForCapture(source)
+            try check(source.count == 2 && app.motion.active,
+                      "Opening above Begin at must rearm a fresh capture after a Space change")
+            let freshTask = app.snapshotTask
+            app.handleActiveSpaceChange()
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await freshTask?.value
+            try checkCleared(app)
+            print("PASS: Space change cancels \(visible ? "visible" : "pending") animation and requires opening above Begin at")
         }
         // Resolve a capture *after* each interruption to prove stale work cannot reappear.
         // Also interrupt a revealed snapshot to verify overlay and GPU cleanup.

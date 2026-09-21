@@ -6,6 +6,8 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ### Fixed
 
+- Keep a visible Infinite Screen snapshot in the Space where its gesture began so macOS does not duplicate the same frozen image on both sides of a Space-switch animation. Clear it when the active Space changes, release mouse input, discard its capture metadata, and require the lid to reopen above **Begin at** before a fresh animation can start in the new Space.
+
 - Repair the CI icon build configuration: use a macOS 26 runner and its maintained default Xcode, support both Xcode 26 and 27 Icon Composer export commands, and update checkout to Node.js 24. Run motion, wake, and synthetic capture checks before app packaging so icon errors no longer skip those checks.
 
 ### Added
@@ -26,7 +28,7 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ### Validation and limitations
 
-- On 2026-09-21, the owner confirmed smoothness, speed, abrupt lid stops, reversals, and opening after sleep without locking on the development Mac. The owner also reported that switching Spaces while a full-screen app is open breaks the animation; this remains unresolved. This confirmation does not cover locked wake or replace automated regression checks.
+- On 2026-09-21, the owner confirmed smoothness, speed, abrupt lid stops, reversals, and opening after sleep without locking on the development Mac. Space changes now deliberately cancel the current animation instead of carrying an old screenshot into another Space; the exact full-screen transition still needs physical confirmation. This confirmation does not cover locked wake or replace automated regression checks.
 
 - After the latest upper-shadow tuning, the build and full automated motion/wake/capture/Metal/lifecycle/overlay checks passed locally on 2026-09-21. The live capture-metadata check and running-app launch passed before that tuning. Repeatable physical acceptance of closing, reopening, pause restoration, wake/unlock, scaled display modes, and performance remains required. Higher polling and display-linked rendering are not guarantees of a higher sensor update rate or invisible screenshot handoff.
 

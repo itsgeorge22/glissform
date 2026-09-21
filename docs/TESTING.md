@@ -118,6 +118,7 @@ Record the app version, Mac model, macOS version, display arrangement, start ang
 - Let the Mac sleep, wake and unlock, then close again.
 - Exercise permission denial/revocation, display changes, and unavailable capture/sensor paths where practical.
 - Check external displays, multiple Spaces, full-screen apps, Dock/menu coverage, and restoration of mouse access.
+- While an animation is pending and while it is visible, switch between a normal Space and another app's native full-screen Space. Confirm the frozen effect remains only on its source side instead of appearing on both sides of the switch animation, then clears, mouse access returns, movement below **Begin at** does not restart it, and reopening above **Begin at** permits one fresh screenshot and animation in the new Space. Repeat with settings open and closed.
 - Reopen and quit. Confirm no overlay remains.
 
 Measure capture delay, frame timing, CPU/GPU use, memory, and power before making performance claims. Hardware tests are not complete merely because synthetic tests pass.
