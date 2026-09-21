@@ -4,6 +4,10 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+### Fixed
+
+- Repair the CI icon build configuration: use a macOS 26 runner and its maintained default Xcode, support both Xcode 26 and 27 Icon Composer export commands, and update checkout to Node.js 24. Run motion, wake, and synthetic capture checks before app packaging so icon errors no longer skip those checks.
+
 ### Added
 
 - A concise GitHub project overview, detailed app guide, and structured forms for bug reports, feature suggestions, and community compatibility reports. Clarify that public app downloads and installation guidance will follow publication of a `.dmg` on GitHub.

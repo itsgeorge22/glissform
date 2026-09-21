@@ -16,25 +16,19 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-15
+    # Native Icon Composer compilation needs the newer host asset runtime.
+    runs-on: macos-26
     timeout-minutes: 15
     steps:
       - name: Check out source
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5 (Node.js 24)
       - name: Show toolchain
         run: |
-          # The native .icon asset requires a full Xcode 26+ installation.
-          for developer_dir in /Applications/Xcode*.app/Contents/Developer; do
-            version=$(DEVELOPER_DIR="$developer_dir" xcodebuild -version | awk '/^Xcode / { print $2 }')
-            if [[ "${version%%.*}" =~ ^[0-9]+$ ]] && (( ${version%%.*} >= 26 )); then
-              echo "DEVELOPER_DIR=$developer_dir" >> "$GITHUB_ENV"
-              DEVELOPER_DIR="$developer_dir" xcodebuild -version
-              DEVELOPER_DIR="$developer_dir" swift --version
-              exit 0
-            fi
-          done
-          echo "This runner needs Xcode 26 or later." >&2
-          exit 1
+          # Use the image's maintained default, not the first (oldest) Xcode.
+          xcodebuild -version
+          swift --version
+      - name: Run motion checks (no physical sensor or GPU required)
+        run: bash scripts/test.sh --motion-only
       - name: Build locally signed app
         run: bash scripts/build.sh
       - name: Check bundle version
@@ -42,5 +36,3 @@ jobs:
           expected="Glissform $(cat VERSION)"
           actual="$(build/Glissform.app/Contents/MacOS/Glissform --version)"
           test "$actual" = "$expected"
-      - name: Run motion checks (no physical sensor or GPU required)
-        run: bash scripts/test.sh --motion-only

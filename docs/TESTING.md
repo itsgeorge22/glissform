@@ -22,6 +22,8 @@ The benchmark reports its actual width/height and mean, 95th-percentile and maxi
 
 `bash scripts/test.sh --motion-only` explicitly omits Metal and AppKit lifecycle checks. GitHub Actions uses this mode; it does not verify physical lid behavior, permissions, or screen capture.
 
+CI uses the macOS 26 runner's maintained default Xcode. Motion, wake, and synthetic capture checks run before app packaging; the build then validates native/legacy icon resources, menu-bar template opacity, signing, and bundle version. Verify the GitHub run for the exact pushed commit before reporting CI success; a passing local Xcode 27 build does not establish compatibility with the runner's toolchain. Main-branch pushes, release tags, pull requests, and manual runs remain covered.
+
 ### Full-screen overlay
 
 The full local suite also builds and runs `build/tests/overlay-checks`. It displays a small solid-colour panel through the production overlay class, checks active-Space membership and compositor visibility with both regular and accessory app activation, verifies that the foreground app stays unchanged, and checks dismissal. It takes no screenshots and requires no screen access. Running it on an ordinary desktop does not establish full-screen behavior.

@@ -40,11 +40,27 @@ if [[ ! -x "$ICON_COMPOSER" ]]; then
 fi
 MENU_ASSET="$ICON_BUILD/MenuBar.xcassets/GlissformMenuBar.imageset"
 mkdir -p "$MENU_ASSET"
+# Xcode 26 uses positional --export-preview arguments; Xcode 27 renamed
+# the command and switched to named arguments. Detect the actual capability.
+ICON_HELP="$("$ICON_COMPOSER" --help 2>&1 || true)"
+if [[ "$ICON_HELP" == *"--export-image"* ]]; then
+    ICON_EXPORT_MODE=image
+elif [[ "$ICON_HELP" == *"--export-preview"* ]]; then
+    ICON_EXPORT_MODE=preview
+else
+    echo "Unsupported Icon Composer export interface in Xcode $XCODE_VERSION." >&2
+    exit 1
+fi
 for appearance in ClearDark; do
     for scale in 1 2; do
-        "$ICON_COMPOSER" "$PWD/Artwork/Glissform.icon" \
-            --export-image --output-file "$MENU_ASSET/$appearance-$scale.png" \
-            --platform macOS --rendition "$appearance" --width 18 --height 18 --scale "$scale"
+        if [[ "$ICON_EXPORT_MODE" == image ]]; then
+            "$ICON_COMPOSER" "$PWD/Artwork/Glissform.icon" \
+                --export-image --output-file "$MENU_ASSET/$appearance-$scale.png" \
+                --platform macOS --rendition "$appearance" --width 18 --height 18 --scale "$scale"
+        else
+            "$ICON_COMPOSER" "$PWD/Artwork/Glissform.icon" \
+                --export-preview macOS "$appearance" 18 18 "$scale" "$MENU_ASSET/$appearance-$scale.png"
+        fi
     done
 done
 swift scripts/make-menu-template.swift "$MENU_ASSET/ClearDark-1.png" "$MENU_ASSET/ClearDark-2.png"
