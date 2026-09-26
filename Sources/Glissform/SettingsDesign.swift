@@ -46,6 +46,7 @@ enum SettingsDesign {
         static let switchOff = Color(nsColor: .tertiaryLabelColor)
         static let feature = Color(red: 78 / 255, green: 103 / 255, blue: 216 / 255)
         static let success = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
+        static let sound = Color(red: 69 / 255, green: 203 / 255, blue: 234 / 255)
         static let attention = Color(red: 1, green: 159 / 255, blue: 10 / 255)
         static let iconTileOpacity = 0.16
 
@@ -54,9 +55,11 @@ enum SettingsDesign {
             switch (color, scheme) {
             case (.feature, .light): hex = 0x435CCD
             case (.success, .light): hex = 0x2AB84D
+            case (.sound, .light): hex = 0x0784AA
             case (.attention, .light): hex = 0xE08C09
             case (.feature, _): hex = 0x667CE7
             case (.success, _): hex = 0x30D158
+            case (.sound, _): hex = 0x61D8F4
             case (.attention, _): hex = 0xFF9F0A
             }
             return Color(red: Double((hex >> 16) & 255) / 255,
@@ -65,12 +68,13 @@ enum SettingsDesign {
         }
 
         enum CardIconColor {
-            case feature, success, attention
+            case feature, success, sound, attention
 
             var tile: Color {
                 switch self {
                 case .feature: return Palette.feature
                 case .success: return Palette.success
+                case .sound: return Palette.sound
                 case .attention: return Palette.attention
                 }
             }

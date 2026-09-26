@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let capture: DesktopScreenshotSource
     private let desktopAvailable: (CGDirectDisplayID) -> Bool
     private let screenAccessAllowed: () -> Bool
+    private let playPauseRestorationSound: @MainActor () -> Void
     private let settingsModel = SettingsModel()
     private var settingsWindowController: SettingsWindowController?
     private var window: OverlayWindow?
@@ -60,10 +61,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     init(capture: DesktopScreenshotSource? = nil,
          desktopAvailable: @escaping (CGDirectDisplayID) -> Bool = DesktopAvailability.allowsCapture,
-         screenAccessAllowed: @escaping () -> Bool = CGPreflightScreenCaptureAccess) {
+         screenAccessAllowed: @escaping () -> Bool = CGPreflightScreenCaptureAccess,
+         playPauseRestorationSound: @escaping @MainActor () -> Void = { PauseRestorationSound.shared.play() }) {
         self.capture = capture ?? DesktopCapture()
         self.desktopAvailable = desktopAvailable
         self.screenAccessAllowed = screenAccessAllowed
+        self.playPauseRestorationSound = playPauseRestorationSound
         super.init()
     }
 
@@ -73,7 +76,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.button?.toolTip = "Glissform"
         UserDefaults.standard.register(defaults: ["animationStartAngle": 100.0, "animationEnabled": true,
                                                   "resumeAfterPause": false,
-                                                  "automaticStartAngleEnabled": false])
+                                                  "automaticStartAngleEnabled": false,
+                                                  "pauseRestorationSoundEnabled": true])
         let storedAngle = UserDefaults.standard.double(forKey: "animationStartAngle")
         let startAngle = storedAngle.isFinite ? min(130, max(20, storedAngle)).rounded() : 100
         let animationEnabled = UserDefaults.standard.bool(forKey: "animationEnabled")
@@ -101,7 +105,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             startAngle: startAngle,
             screenCaptureAllowed: CGPreflightScreenCaptureAccess(),
             resumeAfterPause: motion.resumeAfterPause,
-            automaticStartAngle: motion.automaticStartAngle
+            automaticStartAngle: motion.automaticStartAngle,
+            pauseRestorationSoundEnabled: UserDefaults.standard.bool(forKey: "pauseRestorationSoundEnabled")
         )
         settingsModel.onAnimationEnabledChange = { [weak self] enabled in
             self?.applyAnimationEnabled(enabled)
@@ -116,6 +121,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             self.motion.resumeAfterPause = enabled
             UserDefaults.standard.set(enabled, forKey: "resumeAfterPause")
+        }
+        settingsModel.onPauseRestorationSoundChange = { enabled in
+            UserDefaults.standard.set(enabled, forKey: "pauseRestorationSoundEnabled")
         }
         settingsModel.onOpenPermissions = { [weak self] in self?.openPermissions() }
 
@@ -236,7 +244,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         lastReading = Date()
         lastLidAngle = angle
         lastLidTime = time
-        settingsModel.updateAngle(angle)
+        settingsModel.updateAngle(angle, time: time)
         guard settingsModel.animationEnabled else {
             finishGesture()
             motion.reset()
@@ -278,7 +286,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             renderer?.setLidAngle(angle, referenceAngle: motion.activationAngle, sampleTime: time)
         }
         guard motion.active else {
-            finishGesture(restoringPause: motion.desktopResumed)
+            finishGesture(restoringPause: motion.desktopResumed, playSound: true)
             setStatus(motion.desktopResumed ? "Desktop restored" : "Ready")
             return
         }
@@ -490,18 +498,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !hasSnapshot { window?.alphaValue = 0 }
     }
 
-    private func finishGesture(restoringPause: Bool = false) {
+    private func finishGesture(restoringPause: Bool = false, playSound: Bool = false) {
         guard hasSnapshot else { endGesture(); return }
         guard !finishingGesture else { return }
         finishingGesture = true
+        let token = snapshotToken
         renderer?.finishAnimation(restoringPause: restoringPause) { [weak self] in
-            guard let self, self.finishingGesture else { return }
+            guard let self, self.finishingGesture, self.snapshotToken == token else { return }
             self.endGesture()
+        }
+        if playSound && settingsModel.pauseRestorationSoundEnabled
+            && !sleeping && !quitting
+            && !screenLocked && !sessionInactive {
+            playPauseRestorationSound()
         }
         // Display callbacks can stop when occluded. Never leave a snapshot
         // blocking input indefinitely while waiting for a final frame.
         cleanupTimer?.invalidate()
-        let token = snapshotToken
         let timer = Timer(timeInterval: 0.8, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, self.finishingGesture, self.snapshotToken == token else { return }
@@ -909,9 +922,12 @@ extension AppDelegate {
         CVPixelBufferUnlockBaseAddress(buffer, [])
 
         func makeGesture(screenAccessAllowed: @escaping () -> Bool = { true },
-                         startGesture: Bool = true) throws -> (AppDelegate, SyntheticCapture) {
+                         startGesture: Bool = true,
+                         onPauseRestored: @escaping @MainActor () -> Void = {}) throws -> (AppDelegate, SyntheticCapture) {
             let source = SyntheticCapture()
-            let app = AppDelegate(capture: source, desktopAvailable: { _ in true }, screenAccessAllowed: screenAccessAllowed)
+            let app = AppDelegate(capture: source, desktopAvailable: { _ in true },
+                                  screenAccessAllowed: screenAccessAllowed,
+                                  playPauseRestorationSound: onPauseRestored)
             let window = OverlayWindow(contentRect: NSRect(x: 16, y: 16, width: 64, height: 64))
             let view = MTKView(frame: NSRect(x: 0, y: 0, width: 64, height: 64))
             guard let renderer = EffectRenderer(view: view) else {
@@ -1103,10 +1119,54 @@ extension AppDelegate {
                 print("PASS: \(visible ? "visible snapshot cleanup" : "delayed snapshot cancellation") on \(interruption)")
             }
         }
+        for visible in [false, true] {
+            var soundCount = 0
+            let (app, source) = try makeGesture(onPauseRestored: { soundCount += 1 })
+            defer { app.shutdown(); app.window?.close() }
+            try await waitForCapture(source)
+            let task = app.snapshotTask
+            if visible {
+                try await Task.sleep(nanoseconds: 50_000_000)
+                source.pending?.resume(returning: buffer)
+                source.pending = nil
+                await task?.value
+                try await Task.sleep(nanoseconds: 45_000_000)
+                try check(app.hasSnapshot && app.window!.alphaValue > 0,
+                          "Manual return test needs a visible snapshot")
+            }
+            app.handleLidReading(100)
+            try check(soundCount == (visible ? 1 : 0),
+                      "Manual return must click once only when its snapshot is visible")
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await task?.value
+            if visible { try await waitForCleanup(app) }
+            try checkCleared(app)
+            try check(soundCount == (visible ? 1 : 0),
+                      "Manual return cleanup must not replay the click")
+            print("PASS: \(visible ? "visible" : "pending") manual return sound")
+        }
+        do {
+            var soundCount = 0
+            let (app, source) = try makeGesture(onPauseRestored: { soundCount += 1 })
+            defer { app.shutdown(); app.window?.close() }
+            try await waitForCapture(source)
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await app.snapshotTask?.value
+            app.settingsModel.setPauseRestorationSoundEnabled(false)
+            app.handleLidReading(100)
+            try check(app.finishingGesture && soundCount == 0,
+                      "Muted manual return must still animate without a click")
+            try await waitForCleanup(app)
+            try checkCleared(app)
+            print("PASS: return sound toggle mutes manual snap without changing the return")
+        }
         // Expire the still-lid timer through the real coordinator with fresh
         // synthetic timestamps, including captures that have not completed yet.
         for visible in [false, true] {
-            let (app, source) = try makeGesture()
+            var soundCount = 0
+            let (app, source) = try makeGesture(onPauseRestored: { soundCount += 1 })
             defer { app.shutdown(); app.window?.close() }
             try await waitForCapture(source)
             let pendingTask = app.snapshotTask
@@ -1122,11 +1182,15 @@ extension AppDelegate {
             for frame in 0...10 { app.handleLidReading(80, time: 100 + Double(frame) * 0.05) }
             try check(app.motion.desktopResumed && !app.motion.active, "Still lid must latch desktop restoration")
             if visible { try check(app.finishingGesture, "Visible restoration must return to flat before release") }
+            try check(soundCount == (visible ? 1 : 0),
+                      "Click must play once when a visible pause return begins")
             source.pending?.resume(returning: buffer)
             source.pending = nil
             await pendingTask?.value
             if visible { try await waitForCleanup(app) }
             try checkCleared(app)
+            try check(soundCount == (visible ? 1 : 0),
+                      "Pause cleanup must not play the click again")
             app.handleLidReading(70, time: 101)
             app.handleLidReading(100, time: 101.1)
             app.handleLidReading(80, time: 101.2)
@@ -1144,8 +1208,29 @@ extension AppDelegate {
             try checkCleared(app)
             print("PASS: pause restoration with \(visible ? "visible" : "pending") snapshot, below-threshold suppression, fresh rearm and sleep cleanup")
         }
+        do {
+            var soundCount = 0
+            let (app, source) = try makeGesture(onPauseRestored: { soundCount += 1 })
+            defer { app.shutdown(); app.window?.close() }
+            try await waitForCapture(source)
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await app.snapshotTask?.value
+            try await Task.sleep(nanoseconds: 100_000_000)
+            app.settingsModel.setPauseRestorationSoundEnabled(false)
+            app.motion.resumeAfterPause = true
+            app.motion.pauseDuration = 0.5
+            for frame in 0...10 { app.handleLidReading(80, time: 100 + Double(frame) * 0.05) }
+            try check(app.finishingGesture && soundCount == 0,
+                      "Muted pause restoration must still animate without a click")
+            try await waitForCleanup(app)
+            try checkCleared(app)
+            try check(soundCount == 0, "Muted pause restoration must remain silent after cleanup")
+            print("PASS: pause restoration sound toggle mutes the click without changing the return")
+        }
         for interruption in ["sleep", "display change", "quit"] {
-            let (app, source) = try makeGesture()
+            var soundCount = 0
+            let (app, source) = try makeGesture(onPauseRestored: { soundCount += 1 })
             defer { app.shutdown(); app.window?.close() }
             try await waitForCapture(source)
             try await Task.sleep(nanoseconds: 50_000_000)
@@ -1156,6 +1241,7 @@ extension AppDelegate {
             app.motion.resumeAfterPause = true
             app.motion.pauseDuration = 0.5
             for frame in 0...10 { app.handleLidReading(80, time: 100 + Double(frame) * 0.05) }
+            try check(soundCount == 1, "Visible pause return must click at its start")
             switch interruption {
             case "sleep": app.suspend()
             case "display change": app.restart(startHardware: false)
@@ -1163,6 +1249,7 @@ extension AppDelegate {
             }
             try await Task.sleep(nanoseconds: 180_000_000)
             try checkCleared(app)
+            try check(soundCount == 1, "Interrupted pause return must not click again")
             print("PASS: pause return interrupted by \(interruption)")
         }
 

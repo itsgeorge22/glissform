@@ -1,6 +1,6 @@
 # Iconly assets
 
-Glissform's default interface set uses **Iconly Bold / Regular** throughout, selected from the project owner's signed-in [Iconly library](https://web.iconly.pro/) on 2026-09-20. Outline / Regular, Bulk / Regular, and the previous Custom mix remain available alongside it.
+Glissform's default Iconly interface set uses **Iconly Bold / Regular**, selected from the project owner's signed-in [Iconly library](https://web.iconly.pro/) on 2026-09-20. Outline / Regular, Bulk / Regular, and the previous Custom mix remain available alongside it. The sound toggle uses the owner's separate volume-on and volume-off SVGs.
 
 | Asset | Bold / Bulk name (Outline name if different) | Use |
 | --- | --- | --- |

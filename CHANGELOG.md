@@ -4,6 +4,14 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+### Added
+
+- Play a short click when a visible reopening or pause restoration starts snapping the desktop back, with a saved on/off switch in its own card below **Resume desktop after a pause**. Its cyan light-blue tile uses the supplied volume-on and volume-off SVGs to reflect the switch state. Sound starts on, and switching it off leaves the animation unchanged. The sound is [“Videogame Menu BUTTON CLICK” by Christopherderp](https://freesound.org/people/Christopherderp/sounds/342200/), used under CC0. Returns without a visible screenshot remain silent.
+
+### Changed
+
+- Stabilize only the Settings lid-angle number and illustration: a one-degree change appears after 250 ms of continuous readings, while a change of two degrees or more appears immediately. Animation, automatic angle selection, and **Use current angle** continue to use raw sensor readings.
+
 ## 0.1.0-alpha.8 — 2026-09-26
 
 Eighth public alpha: automatic starting-angle selection, clearer settings states, distinct feature colours, and a smoother pause restoration. Source release; local builds remain ad-hoc signed and are not notarized.

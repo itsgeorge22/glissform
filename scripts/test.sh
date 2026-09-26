@@ -6,7 +6,7 @@ if [[ "${1:-}" != "" && "${1:-}" != "--motion-only" ]]; then
     exit 1
 fi
 mkdir -p build/tests
-swiftc -swift-version 5 Sources/Glissform/ClosingMotion.swift Sources/Glissform/MotionSmoothing.swift Sources/Glissform/ScreenProjection.swift Tests/MotionChecks.swift -o build/tests/motion-checks
+swiftc -swift-version 5 Sources/Glissform/ClosingMotion.swift Sources/Glissform/MotionSmoothing.swift Sources/Glissform/LidAnglePresentation.swift Sources/Glissform/ScreenProjection.swift Tests/MotionChecks.swift -o build/tests/motion-checks
 build/tests/motion-checks
 swiftc -swift-version 5 Sources/Glissform/ClosingMotion.swift Sources/Glissform/WakeOpening.swift Tests/WakeOpeningChecks.swift -o build/tests/wake-opening-checks
 build/tests/wake-opening-checks

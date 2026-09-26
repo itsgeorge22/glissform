@@ -2,6 +2,34 @@ import Foundation
 
 @main struct MotionChecks {
     static func main() {
+        var displayedLid = LidAnglePresentation()
+        precondition(displayedLid.ingest(100, at: 0) == 100)
+        for (reading, time) in [(101.0, 0.05), (100.0, 0.12), (101.0, 0.20), (100.0, 0.28)] {
+            precondition(displayedLid.ingest(reading, at: time) == 100,
+                         "A one-degree boundary fluctuation must not flicker in Settings")
+        }
+        precondition(displayedLid.ingest(101, at: 0.35) == 100)
+        precondition(displayedLid.ingest(101, at: 0.45) == 100)
+        precondition(displayedLid.ingest(101, at: 0.61) == 101,
+                     "A sustained one-degree change must appear after 250 ms")
+        precondition(displayedLid.ingest(102, at: 0.70) == 101)
+        precondition(displayedLid.ingest(102, at: 0.85) == 101)
+        precondition(displayedLid.ingest(102, at: 0.96) == 102,
+                     "Slow movement must advance through consecutive one-degree readings")
+        precondition(displayedLid.ingest(104, at: 1.0) == 104,
+                     "A two-degree movement must appear immediately")
+        var gappedDisplay = LidAnglePresentation()
+        precondition(gappedDisplay.ingest(100, at: 0) == 100)
+        precondition(gappedDisplay.ingest(101, at: 0.1) == 100)
+        precondition(gappedDisplay.ingest(101, at: 0.5) == 100,
+                     "A gap in sensor samples must restart the display wait")
+        precondition(gappedDisplay.ingest(101, at: 0.65) == 100)
+        precondition(gappedDisplay.ingest(101, at: 0.76) == 101)
+        displayedLid.reset()
+        precondition(displayedLid.angle == nil && displayedLid.ingest(95, at: 4) == 95,
+                     "A new sensor connection must show its first reading immediately")
+        print("PASS: Settings-only lid angle display resists one-degree flicker and follows larger motion")
+
         var smooth = MotionSmoothing()
         var last: Float = 0
         for _ in 0..<6 {

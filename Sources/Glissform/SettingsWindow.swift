@@ -11,6 +11,8 @@ final class SettingsModel: ObservableObject {
     @Published private(set) var learnedStartAngle: Double?
     var effectiveStartAngle: Double { automaticStartAngle ? (learnedStartAngle ?? startAngle) : startAngle }
     @Published private(set) var currentAngle: Double?
+    @Published private(set) var displayedLidAngle: Double?
+    private var lidAnglePresentation = LidAnglePresentation()
     @Published private(set) var sensorStatus = "Connecting…"
     @Published private(set) var screenCaptureAllowed = false
     @Published private(set) var runtimeStatus = "Starting…"
@@ -20,16 +22,20 @@ final class SettingsModel: ObservableObject {
     var onAutomaticStartAngleChange: ((Bool) -> Void)?
     @Published private(set) var resumeAfterPause = false
     var onResumeAfterPauseChange: ((Bool) -> Void)?
+    @Published private(set) var pauseRestorationSoundEnabled = true
+    var onPauseRestorationSoundChange: ((Bool) -> Void)?
 
     var onOpenPermissions: (() -> Void)?
 
     func configure(animationEnabled: Bool, startAngle: Double, screenCaptureAllowed: Bool,
-                   resumeAfterPause: Bool = false, automaticStartAngle: Bool = false) {
+                   resumeAfterPause: Bool = false, automaticStartAngle: Bool = false,
+                   pauseRestorationSoundEnabled: Bool = true) {
         self.animationEnabled = animationEnabled
         self.startAngle = startAngle
         self.screenCaptureAllowed = screenCaptureAllowed
         self.resumeAfterPause = resumeAfterPause
         self.automaticStartAngle = automaticStartAngle
+        self.pauseRestorationSoundEnabled = pauseRestorationSoundEnabled
     }
 
     func setAutomaticStartAngle(_ enabled: Bool) {
@@ -49,6 +55,12 @@ final class SettingsModel: ObservableObject {
         onResumeAfterPauseChange?(enabled)
     }
 
+    func setPauseRestorationSoundEnabled(_ enabled: Bool) {
+        guard pauseRestorationSoundEnabled != enabled else { return }
+        pauseRestorationSoundEnabled = enabled
+        onPauseRestorationSoundChange?(enabled)
+    }
+
     func setAnimationEnabled(_ enabled: Bool) {
         guard animationEnabled != enabled else { return }
         animationEnabled = enabled
@@ -63,10 +75,12 @@ final class SettingsModel: ObservableObject {
         onStartAngleChange?(normalized)
     }
 
-    func updateAngle(_ angle: Double) {
+    func updateAngle(_ angle: Double, time: Double = ProcessInfo.processInfo.systemUptime) {
         guard angle.isFinite, (0...180).contains(angle) else { return }
         if sensorStatus != "Connected" { sensorStatus = "Connected" }
         if currentAngle != angle { currentAngle = angle }
+        let shown = lidAnglePresentation.ingest(angle, at: time)
+        if displayedLidAngle != shown { displayedLidAngle = shown }
     }
 
     func updateSensorStatus(_ status: String) {
@@ -75,6 +89,8 @@ final class SettingsModel: ObservableObject {
         } else {
             sensorStatus = "Sensor unavailable"
             currentAngle = nil
+            lidAnglePresentation.reset()
+            displayedLidAngle = nil
         }
     }
 
@@ -237,7 +253,7 @@ private struct AnimationSettingsView: View {
     }
     private var displayedAngle: Double {
         if preview.isStill { return 42 }
-        return preview.isPlaying ? preview.angle : (model.currentAngle ?? 110)
+        return preview.isPlaying ? preview.angle : (model.displayedLidAngle ?? 110)
     }
     private var isIllustrating: Bool { preview.isPlaying || preview.isStill }
     private var canUseCurrentAngle: Bool {
@@ -284,6 +300,11 @@ private struct AnimationSettingsView: View {
                     .padding(.bottom, SettingsDesign.Spacing.cards)
 
                 pauseControls
+                    .padding(.vertical, SettingsDesign.Spacing.cardInset)
+                    .modifier(SettingsCardSurface())
+                    .padding(.bottom, SettingsDesign.Spacing.cards)
+
+                soundControls
                     .padding(.vertical, SettingsDesign.Spacing.cardInset)
                     .modifier(SettingsCardSurface())
 
@@ -387,10 +408,10 @@ private struct AnimationSettingsView: View {
                     Text("Current lid angle")
                         .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
                         .accessibilityHidden(true)
-                    Text(model.currentAngle.map { "\(Int($0))°" } ?? "—")
+                    Text(model.displayedLidAngle.map { "\(Int($0))°" } ?? "—")
                         .font(SettingsDesign.Typography.liveValue)
                         .accessibilityLabel("Current lid angle")
-                        .accessibilityValue(model.currentAngle.map { "\(Int($0)) degrees" } ?? "Unavailable")
+                        .accessibilityValue(model.displayedLidAngle.map { "\(Int($0)) degrees" } ?? "Unavailable")
                 }
                 Spacer()
                 Button {
@@ -449,6 +470,28 @@ private struct AnimationSettingsView: View {
             ))
             .labelsHidden().toggleStyle(AppleSwitchStyle())
             .accessibilityLabel("Resume desktop after a pause")
+        }
+        .padding(.horizontal, SettingsDesign.Spacing.cardInset)
+    }
+
+    private var soundControls: some View {
+        HStack(spacing: SettingsDesign.Spacing.cards) {
+            SoundFeatureIcon(enabled: model.pauseRestorationSoundEnabled)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
+                Text("Play sound when desktop returns").font(SettingsDesign.Typography.controlTitle)
+                Text("Hear a click when the desktop snaps back after you reopen or pause the lid.")
+                    .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Toggle("Play sound when desktop returns", isOn: Binding(
+                get: { model.pauseRestorationSoundEnabled },
+                set: { model.setPauseRestorationSoundEnabled($0) }
+            ))
+            .labelsHidden().toggleStyle(AppleSwitchStyle())
+            .accessibilityLabel("Play sound when desktop returns")
+            .accessibilityHint("Plays a click when reopening or pausing the lid returns the desktop.")
         }
         .padding(.horizontal, SettingsDesign.Spacing.cardInset)
     }
@@ -688,6 +731,32 @@ private struct PauseFeatureIcon: View {
     var body: some View {
         CardIconTile(color: .success) {
             IconlyIcon(.pause, size: 24, isCardIcon: true)
+        }
+    }
+}
+
+private struct SoundFeatureIcon: View {
+    let enabled: Bool
+
+    private static func load(_ name: String) -> NSImage {
+        guard let url = Bundle.module.url(forResource: name, withExtension: "svg", subdirectory: "SoundIcons"),
+              let image = NSImage(contentsOf: url), image.isValid else {
+            preconditionFailure("Missing or invalid sound icon: \(name)")
+        }
+        image.isTemplate = true
+        return image
+    }
+
+    private static let volumeHigh = load("volumeHigh")
+    private static let volumeClose = load("volumeClose")
+
+    var body: some View {
+        CardIconTile(color: .sound) {
+            Image(nsImage: enabled ? Self.volumeHigh : Self.volumeClose)
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 24, height: 24)
         }
     }
 }

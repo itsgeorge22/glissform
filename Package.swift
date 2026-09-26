@@ -6,6 +6,10 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [.executable(name: "Glissform", targets: ["Glissform"])],
     targets: [
-        .executableTarget(name: "Glissform", resources: [.copy("Resources/Iconly")])
+        .executableTarget(name: "Glissform", resources: [
+            .copy("Resources/Iconly"),
+            .copy("Resources/SoundIcons"),
+            .copy("Resources/PauseRestored.wav")
+        ])
     ]
 )
