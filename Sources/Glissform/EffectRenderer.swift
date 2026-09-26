@@ -1,5 +1,7 @@
 import AppKit
 import CoreVideo
+import CoreImage
+import CoreImage.CIFilterBuiltins
 import MetalKit
 import QuartzCore
 import OSLog
@@ -13,10 +15,19 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
     private let commandQueue: MTLCommandQueue
     private let pipeline: MTLRenderPipelineState
     private let gaussianPyramid: MPSImageGaussianPyramid
+    private let blurContext: CIContext
+    private let blurColorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+    private final class ProjectionSlot {
+        let texture: MTLTexture
+        var inUse = false
+        init(texture: MTLTexture) { self.texture = texture }
+    }
     private var textureCache: CVMetalTextureCache?
     private var sourceTexture: CVMetalTexture?
     private var sourceBuffer: CVPixelBuffer?
     private var filteredTexture: MTLTexture?
+    private var projectionSlots: [ProjectionSlot] = []
+    private var screenBlurMask: CIImage?
     private var sourceNeedsFiltering = true
     private var foldRadians: Float = 0
     private var fullClosureRadians: Float = 1
@@ -157,6 +168,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         }
         self.device = device
         self.commandQueue = queue
+        self.blurContext = CIContext(mtlDevice: device)
         self.gaussianPyramid = MPSImageGaussianPyramid(device: device)
         // The shader applies one continuous soft image boundary. Clamping the
         // pyramid itself avoids baking separate dark borders into every mip.
@@ -169,7 +181,9 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         view.device = device
         view.colorPixelFormat = .bgra8Unorm_srgb
         view.colorspace = CGColorSpace(name: CGColorSpace.sRGB)
-        view.framebufferOnly = true
+        // The screen-space finishing blur writes through Core Image into the
+        // drawable after Metal has rendered the projected screenshot.
+        view.framebufferOnly = false
         view.isPaused = true
         view.preferredFramesPerSecond = max(60, framesPerSecond)
         // CAMetalDisplayLink owns production draws; MetalKit remains paused.
@@ -292,6 +306,8 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         sourceTexture = nil
         sourceBuffer = nil
         filteredTexture = nil
+        projectionSlots.removeAll()
+        screenBlurMask = nil
         syntheticTarget = nil
         sourceNeedsFiltering = true
         if let textureCache { CVMetalTextureCacheFlush(textureCache, 0) }
@@ -440,13 +456,71 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             }
             sampledTexture = filteredTexture ?? texture
         }
-        guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor) else { return nil }
+        let visibleAngle = displayedFold ?? foldRadians
+        let fraction = min(1, max(0, visibleAngle / max(0.001, fullClosureRadians)))
+        let visibleProgress = fraction * fraction * (3 - 2 * fraction)
+        let frostAmount = (1 - exp(-3 * visibleProgress)) / (1 - exp(-3))
+        let target = descriptor.colorAttachments[0].texture
+        // A modest even Gaussian avoids the radius bands seen with a strong
+        // masked variable blur. Its blend strength still follows the height.
+        let screenBlurRadius = min(Float(target?.height ?? 0) * 0.008, 24) * frostAmount
+        var blurSlot: ProjectionSlot?
+        var blurImage: CIImage?
+        if sampledTexture != nil, visibleAngle > 0, opacity > 0, blurScale > 0,
+           screenBlurRadius >= 0.5, let target, target.usage.contains(.shaderWrite),
+           let slot = acquireProjectionSlot(width: target.width, height: target.height),
+           let mask = screenBlurMask,
+           let textureImage = CIImage(mtlTexture: slot.texture, options: [.colorSpace: blurColorSpace]) {
+            let bounds = CGRect(x: 0, y: 0, width: target.width, height: target.height)
+            // Core Image and the Metal drawable use opposite vertical origins.
+            // Orient the projection before blurring so the image and mask agree.
+            let projected = textureImage.transformed(by: CGAffineTransform(
+                translationX: 0, y: CGFloat(target.height)).scaledBy(x: 1, y: -1))
+                .cropped(to: bounds)
+            let filter = CIFilter.gaussianBlur()
+            filter.inputImage = projected.clampedToExtent()
+            filter.radius = screenBlurRadius
+            if let softened = filter.outputImage {
+                // Keep the existing coverage and side fade. Otherwise the blur
+                // carries bright pixels into transparent space as narrow seams.
+                let alpha = projected.applyingFilter("CIColorMatrix", parameters: [
+                    "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+                    "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+                    "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+                    "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+                    "inputBiasVector": CIVector(x: 0, y: 0, z: 0, w: 1)
+                ])
+                let safeInterior = alpha.applyingFilter("CIMorphologyMinimum", parameters: [
+                    kCIInputRadiusKey: min(ceil(screenBlurRadius * 3), 36)
+                ]).cropped(to: bounds)
+                let verticallyMixed = softened.cropped(to: bounds).applyingFilter("CIBlendWithMask", parameters: [
+                    kCIInputBackgroundImageKey: projected,
+                    kCIInputMaskImageKey: mask
+                ])
+                blurImage = verticallyMixed.applyingFilter("CIBlendWithMask", parameters: [
+                    kCIInputBackgroundImageKey: projected,
+                    kCIInputMaskImageKey: safeInterior
+                ]).cropped(to: bounds)
+            }
+            if blurImage != nil { blurSlot = slot }
+            else { slot.inUse = false }
+        }
+        let renderDescriptor: MTLRenderPassDescriptor
+        if let blurSlot {
+            let offscreen = MTLRenderPassDescriptor()
+            offscreen.colorAttachments[0].texture = blurSlot.texture
+            offscreen.colorAttachments[0].loadAction = .clear
+            offscreen.colorAttachments[0].clearColor = descriptor.colorAttachments[0].clearColor
+            offscreen.colorAttachments[0].storeAction = .store
+            renderDescriptor = offscreen
+        } else { renderDescriptor = descriptor }
+        guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderDescriptor) else {
+            blurSlot?.inUse = false
+            return nil
+        }
         if let texture = sampledTexture {
             encoder.setRenderPipelineState(pipeline)
             encoder.setFragmentTexture(texture, index: 0)
-            let visibleAngle = displayedFold ?? foldRadians
-            let fraction = min(1, max(0, visibleAngle / max(0.001, fullClosureRadians)))
-            let visibleProgress = fraction * fraction * (3 - 2 * fraction)
             var uniforms = SIMD4<Float>(visibleProgress, Float(texture.width), Float(texture.height), visibleAngle)
             encoder.setFragmentBytes(&uniforms, length: MemoryLayout<SIMD4<Float>>.stride, index: 0)
             var frost = blurScale
@@ -460,11 +534,49 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         }
         encoder.endEncoding()
+        if let blurSlot, let blurImage, let target {
+            blurContext.render(blurImage, to: target, commandBuffer: commandBuffer,
+                               bounds: CGRect(x: 0, y: 0, width: target.width, height: target.height),
+                               colorSpace: blurColorSpace)
+            commandBuffer.addCompletedHandler { [blurSlot] _ in
+                DispatchQueue.main.async { blurSlot.inUse = false }
+            }
+        }
         commandBuffer.addCompletedHandler { _ in
             withExtendedLifetime(retainedTexture) {}
             withExtendedLifetime(retainedBuffer) {}
         }
         return commandBuffer
+    }
+
+    private func acquireProjectionSlot(width: Int, height: Int) -> ProjectionSlot? {
+        if projectionSlots.first?.texture.width != width || projectionSlots.first?.texture.height != height {
+            projectionSlots.removeAll()
+            screenBlurMask = nil
+        }
+        if screenBlurMask == nil {
+            let gradient = CIFilter.smoothLinearGradient()
+            gradient.point0 = CGPoint(x: 0, y: 0)
+            gradient.point1 = CGPoint(x: 0, y: height)
+            gradient.color0 = CIColor(red: 0.65, green: 0.65, blue: 0.65)
+            gradient.color1 = CIColor(red: 1, green: 1, blue: 1)
+            screenBlurMask = gradient.outputImage?.cropped(to: CGRect(x: 0, y: 0, width: width, height: height))
+        }
+        if let slot = projectionSlots.first(where: { !$0.inUse }) {
+            slot.inUse = true
+            return slot
+        }
+        // Keep GPU work bounded if the display is already behind.
+        guard projectionSlots.count < 3 else { return nil }
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm_srgb,
+            width: width, height: height, mipmapped: false)
+        descriptor.storageMode = .private
+        descriptor.usage = [.renderTarget, .shaderRead]
+        guard let texture = device.makeTexture(descriptor: descriptor) else { return nil }
+        let slot = ProjectionSlot(texture: texture)
+        slot.inUse = true
+        projectionSlots.append(slot)
+        return slot
     }
 
     /// Renders synthetic pixels only; does not request permission or read the user's screen.
