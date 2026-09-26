@@ -2,6 +2,7 @@ import Foundation
 
 @main struct MotionChecks {
     static func main() {
+        setbuf(stdout, nil)
         var displayedLid = LidAnglePresentation()
         precondition(displayedLid.ingest(100, at: 0) == 100)
         for (reading, time) in [(101.0, 0.05), (100.0, 0.12), (101.0, 0.20), (100.0, 0.28)] {
@@ -82,8 +83,8 @@ import Foundation
         print("PASS: slow whole-degree staircase, gentle boundaries, immediate reversal, finite settling")
         // Replay quantized 30 Hz input on independent 60/120 Hz frame clocks.
         // Measure against the continuous physical motion, not the filter target.
-        let rippleLimits: [Double: Double] = [2: 0.62, 5: 0.28, 7: 0.33, 12: 0.24,
-                                             20: 0.14, 30: 0.04, 45: 0.15, 60: 0.09, 90: 0.14]
+        let rippleLimits: [Double: Double] = [2: 0.49, 5: 0.20, 7: 0.22, 12: 0.24,
+                                             20: 0.14, 30: 0.04, 45: 0.10, 60: 0.07, 90: 0.07]
         for speed in rippleLimits.keys.sorted() {
             for fps in [60.0, 120.0] {
                 var tracking = MotionSmoothing()
@@ -193,6 +194,76 @@ import Foundation
                      "Timestamped reversal must respond on the next display")
         print("PASS: delayed delivery, future presentation queries, stops, reversals and stale timestamps")
 
+        var chatter = MotionSmoothing()
+        chatter.reset(at: 0)
+        chatter.ingest(target: 10 * degree, at: 0)
+        _ = chatter.step(at: 1)
+        for frame in 1...60 {
+            let time = 1 + Double(frame) / 60
+            chatter.ingest(target: (frame.isMultiple(of: 2) ? 10 : 9) * degree, at: time)
+            precondition(abs(chatter.step(at: time) - 10 * degree) < 0.00001,
+                         "Alternating one-degree chatter must not kick the desktop backwards")
+        }
+        for frame in 1...12 {
+            let time = 2 + Double(frame) / 60
+            chatter.ingest(target: 9 * degree, at: time)
+            _ = chatter.step(at: time)
+        }
+        precondition(chatter.value < 9.2 * degree,
+                     "A sustained one-degree reversal must pass the chatter gate promptly")
+        precondition(chatter.step(at: 3) == 9 * degree,
+                     "Chatter protection must not discard a real one-degree adjustment")
+
+        var reversing = MotionSmoothing()
+        reversing.reset(at: 0)
+        for frame in 1...60 {
+            let time = Double(frame) / 60
+            reversing.ingest(target: Float((time * 30).rounded()) * degree, at: time)
+            _ = reversing.step(at: time)
+        }
+        let turningPoint = reversing.value
+        let incomingSpeed = reversing.velocity
+        reversing.ingest(target: 25 * degree, at: 1)
+        precondition(reversing.step(at: 1) == turningPoint
+                     && abs(reversing.velocity - incomingSpeed) < 0.000001,
+                     "A real reversal must keep position and velocity continuous")
+        _ = reversing.step(at: 1.080)
+        precondition(reversing.velocity < 0 && reversing.value < turningPoint,
+                     "Preserved momentum must brake into a real reversal within 80 ms")
+        print("PASS: one-degree chatter rejection, sustained fine adjustment and continuous reversal")
+
+        for fold in [0.1, 0.5, 2.0, 30.0, 100.0] {
+            for speed in [0.0, -2.0, -30.0, -90.0] {
+                var flat = ProgrammaticReturn()
+                let origin = Float(fold) * degree
+                let radiansPerSecond = speed * .pi / 180
+                flat.begin(from: origin, velocity: radiansPerSecond)
+                precondition(flat.step(elapsed: 0) == origin && flat.velocity == radiansPerSecond,
+                             "Disabling must preserve the displayed position and speed")
+                var previous = origin
+                for _ in 0..<66 {
+                    let value = flat.step(elapsed: 0.010)
+                    precondition(value >= 0 && value <= previous,
+                                 "The flat return must brake without overshooting or bouncing")
+                    previous = value
+                }
+                precondition(previous == 0 && flat.velocity == 0 && !flat.active,
+                             "Even deep returns must finish before the cleanup watchdog")
+            }
+        }
+        var gentleReturn = ProgrammaticReturn()
+        gentleReturn.begin(from: degree, velocity: -2 * .pi / 180)
+        precondition(gentleReturn.step(elapsed: 0.060) > degree * 0.7,
+                     "A slow programmatic stop must not be forced flat in four display frames")
+        var return60 = ProgrammaticReturn(), return120 = ProgrammaticReturn()
+        return60.begin(from: 3 * degree, velocity: -0.3)
+        return120 = return60
+        for _ in 0..<12 { _ = return60.step(elapsed: 1.0 / 60) }
+        for _ in 0..<24 { _ = return120.step(elapsed: 1.0 / 120) }
+        precondition(abs(return60.step(elapsed: 0) - return120.step(elapsed: 0)) < 0.000001,
+                     "Return timing must not depend on display refresh rate")
+        print("PASS: velocity-continuous programmatic stops and bounded cleanup")
+
         // Full physical rotation, including reference angles above 90 degrees.
         for reference in [20.0, 85, 100, 130] {
             var previousFold: Float = -1
@@ -271,14 +342,32 @@ import Foundation
             precondition(value >= 0 && value <= previousPauseValue,
                          "Pause restoration must settle without reversing or bouncing")
             if frame == 20 {
-                precondition(value < 0.45 && value > 0.25,
-                             "Pause restoration should move decisively before its soft landing")
+                precondition(abs(value - 0.5) < 0.00001,
+                             "Pause restoration must use balanced motion instead of an early surge")
             }
             previousPauseValue = value
         }
         precondition(previousPauseValue == 0 && pauseReturn.velocity == 0 && !pauseReturn.active,
                      "Pause restoration must finish exactly flat and at rest")
         print("PASS: eased pause restoration, monotonic return and exact flat finish")
+
+        for fold in [1.0, 15.0, 60.0, 120.0] {
+            let origin = Float(fold) * degree
+            let duration = HandoffTransition.pauseRestorationDuration(for: origin)
+            var restored = HandoffTransition()
+            restored.begin(from: origin, duration: duration, holdFirstFrame: false, curve: .pauseRestoration)
+            var peakSpeed = 0.0
+            for _ in 0..<650 {
+                _ = restored.step(toward: 0, elapsed: 0.001)
+                peakSpeed = max(peakSpeed, abs(restored.velocity))
+            }
+            let previousDuration = min(0.480, 0.260 + Double(origin) * 0.16)
+            precondition(peakSpeed < 1.875 * Double(origin) / previousDuration,
+                         "Pause restoration must reduce peak speed at shallow and deep folds")
+            precondition(!restored.active && restored.velocity == 0 && duration + 0.050 < 0.8,
+                         "Pause return and fade must finish before the watchdog")
+        }
+        print("PASS: lower pause-return peak speed across shallow and deep folds")
 
         // Pause-to-resume uses a monotonic sample clock, not time since capture.
         func pausingMotion(duration: Double = 2, enabled: Bool = true) -> ClosingMotion {

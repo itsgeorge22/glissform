@@ -1,6 +1,6 @@
 import Foundation
 
-/// Reconstructs whole-degree readings without predicting unreported lid motion.
+/// Reconstructs whole-degree readings without extrapolating sensor motion.
 /// Sensor samples advance an analytic trajectory; display queries never change
 /// its cadence or history, even when rendering runs ahead to a presentation time.
 struct MotionSmoothing {
@@ -15,6 +15,8 @@ struct MotionSmoothing {
     private var timeConstant = 0.020
     private var degreeInterval = 1.0 / 30
     private var hasCadence = false
+    private var intervals: [Double] = []
+    private var pendingReversal: (target: Float, since: Double)?
     private var compatibilityTime: Double = 0
     private var lastPresentationTime: Double?
 
@@ -30,6 +32,8 @@ struct MotionSmoothing {
         timeConstant = 0.020
         degreeInterval = 1.0 / 30
         hasCadence = false
+        intervals.removeAll(keepingCapacity: true)
+        pendingReversal = nil
         compatibilityTime = sampleTime ?? 0
         lastPresentationTime = nil
     }
@@ -38,6 +42,7 @@ struct MotionSmoothing {
         guard nextTarget.isFinite, time.isFinite,
               sampleTime.map({ time >= $0 }) ?? true else { return }
         if let sampleTime {
+            if time - sampleTime > 0.100 { pendingReversal = nil }
             let state = response(from: sampleValue, velocity: sampleVelocity,
                                  elapsed: time - sampleTime)
             sampleValue = state.value
@@ -45,10 +50,23 @@ struct MotionSmoothing {
         }
         sampleTime = time
         let change = nextTarget - target
-        guard change != 0 else { return }
+        guard change != 0 else {
+            pendingReversal = nil
+            return
+        }
         let nextDirection: Float = change > 0 ? 1 : -1
         let reversing = direction != 0 && nextDirection != direction
-        if reversing { sampleVelocity = 0 }
+        // A single backwards degree can be boundary chatter. Confirm it over
+        // 50 ms, or immediately when movement spans more than one degree.
+        // This gate affects only presentation, never gesture/sleep decisions.
+        if reversing && abs(change) < Float(1.1 * .pi / 180) {
+            if pendingReversal?.target != nextTarget {
+                pendingReversal = (nextTarget, time)
+                return
+            }
+            if time - (pendingReversal?.since ?? time) < 0.050 { return }
+        }
+        pendingReversal = nil
         let degrees = max(1, Double(abs(change)) * 180 / .pi)
         let interval = min(0.5, max(0.000001, time - (targetChangeTime ?? (time - 1.0 / 30))) / degrees)
         // Degree cadence belongs to the acquisition clock, not to queue delivery
@@ -56,22 +74,37 @@ struct MotionSmoothing {
         if direction == 0 || reversing {
             degreeInterval = interval
             hasCadence = false
+            intervals.removeAll(keepingCapacity: true)
         } else if !hasCadence {
             degreeInterval = interval
             hasCadence = true
+            intervals = [interval]
         } else {
-            degreeInterval = degreeInterval * 0.85 + interval * 0.15
+            intervals.append(interval)
+            if intervals.count > 4 { intervals.removeFirst() }
+            degreeInterval = intervals.reduce(0, +) / Double(intervals.count)
         }
         let movingResponse = 0.035 * pow(min(1, degreeInterval * 30), 0.7)
-        timeConstant = reversing || abs(change) > 0.1 ? 0.0125
-            : min(0.100, max(movingResponse, degreeInterval * 0.35))
+        let desiredResponse = min(0.118, max(0.024, movingResponse, degreeInterval * 0.43))
+        if direction == 0 {
+            timeConstant = abs(change) > 0.1 ? 0.0125 : 0.035
+        } else if reversing {
+            // Brake the existing momentum instead of deleting it. A real
+            // reversal remains responsive without the old 12.5 ms kick.
+            timeConstant = min(timeConstant, 0.045)
+        } else {
+            let elapsed = max(0, time - (targetChangeTime ?? time))
+            timeConstant += (desiredResponse - timeConstant) * (1 - exp(-elapsed / 0.12))
+        }
+        timeConstant = DampedMotion.timeConstant(timeConstant, from: Double(sampleValue),
+                                                velocity: sampleVelocity, to: Double(nextTarget))
         direction = nextDirection
         target = nextTarget
         targetChangeTime = time
     }
 
-    /// Evaluates only the known target's settling trajectory. A future display
-    /// timestamp never extrapolates the lid beyond the latest reported angle.
+    /// Evaluates the accepted target's settling trajectory. Future display
+    /// queries never extrapolate a new sensor target or change its history.
     mutating func step(at time: Double) -> Float {
         guard time.isFinite, let sampleTime, time >= sampleTime,
               lastPresentationTime.map({ time >= $0 }) ?? true else { return value }
@@ -93,17 +126,71 @@ struct MotionSmoothing {
     private func response(from origin: Float, velocity initialVelocity: Double,
                           elapsed: Double) -> (value: Float, velocity: Double) {
         guard elapsed > 0 else { return (origin, initialVelocity) }
-        let decay = exp(-elapsed / timeConstant)
-        let error = Double(origin) - Double(target)
-        let coefficient = initialVelocity + error / timeConstant
-        let next = Double(target) + (error + coefficient * elapsed) * decay
-        let nextVelocity = (initialVelocity - coefficient * elapsed / timeConstant) * decay
-        // Bound sudden stops and finish exactly so rendering can pause at rest.
-        if (Double(target) - Double(origin)) * (Double(target) - next) <= 0
-            || (abs(Double(target) - next) < 0.00005 && abs(nextVelocity) < 0.003) {
-            return (target, 0)
+        let state = DampedMotion.response(from: Double(origin), velocity: initialVelocity,
+                                          to: Double(target), timeConstant: timeConstant, elapsed: elapsed)
+        return (Float(state.value), state.velocity)
+    }
+}
+
+/// Exact critically damped motion used for lid tracking and programmatic stops.
+/// Keep incoming velocity; choose damping that will brake before the destination
+/// instead of clipping a moving trajectory when it crosses the target.
+enum DampedMotion {
+    static func timeConstant(_ proposed: Double, from origin: Double,
+                             velocity: Double, to target: Double) -> Double {
+        let error = origin - target
+        if error * velocity < 0 { return min(proposed, abs(error / velocity)) }
+        return proposed
+    }
+
+    static func response(from origin: Double, velocity: Double, to target: Double,
+                         timeConstant: Double, elapsed: Double) -> (value: Double, velocity: Double) {
+        guard elapsed > 0 else { return (origin, velocity) }
+        let tau = max(0.000001, timeConstant)
+        let decay = exp(-elapsed / tau)
+        let coefficient = velocity + (origin - target) / tau
+        let value = target + (origin - target + coefficient * elapsed) * decay
+        let speed = (velocity - coefficient * elapsed / tau) * decay
+        if abs(target - value) < 0.00005 && abs(speed) < 0.003 { return (target, 0) }
+        return (value, speed)
+    }
+}
+
+/// Return the desktop when the effect is disabled during a gesture. Manual
+/// reopening never uses this trajectory: it stays on MotionSmoothing through zero.
+struct ProgrammaticReturn {
+    private var origin = 0.0
+    private var initialVelocity = 0.0
+    private var timeConstant = 0.060
+    private var elapsed = 0.0
+    private(set) var velocity = 0.0
+    private(set) var active = false
+
+    mutating func begin(from value: Float, velocity: Double) {
+        origin = value.isFinite ? max(0, Double(value)) : 0
+        initialVelocity = origin > 0 && velocity.isFinite ? velocity : 0
+        self.velocity = initialVelocity
+        elapsed = 0
+        let travelTime = abs(origin) / max(0.01, abs(initialVelocity))
+        timeConstant = DampedMotion.timeConstant(min(0.080, max(0.035, travelTime * 0.50)),
+                                                from: origin, velocity: initialVelocity, to: 0)
+        // Leave room for the unchanged fade and 800 ms cleanup watchdog,
+        // including disabling the effect from a deep fold.
+        while DampedMotion.response(from: origin, velocity: initialVelocity, to: 0,
+                                    timeConstant: timeConstant, elapsed: 0.650).value != 0 {
+            timeConstant *= 0.9
         }
-        return (Float(next), nextVelocity)
+        active = origin != 0 || initialVelocity != 0
+    }
+
+    mutating func step(elapsed delta: Double) -> Float {
+        guard active else { return 0 }
+        if delta.isFinite { elapsed += max(0, delta) }
+        let state = DampedMotion.response(from: origin, velocity: initialVelocity, to: 0,
+                                          timeConstant: timeConstant, elapsed: elapsed)
+        velocity = state.velocity
+        active = state.value != 0 || state.velocity != 0
+        return Float(state.value)
     }
 }
 
@@ -112,6 +199,9 @@ struct HandoffTransition {
     enum Curve { case balanced, pauseRestoration }
 
     static let duration: Double = 0.100
+    static func pauseRestorationDuration(for fold: Float) -> Double {
+        min(0.600, 0.340 + sqrt(Double(abs(fold))) * 0.20)
+    }
     private var origin: Float = 0
     private var initialVelocity: Double = 0
     private var transitionDuration = Self.duration
@@ -119,7 +209,6 @@ struct HandoffTransition {
     private(set) var velocity: Double = 0
     private(set) var active = false
     private var firstFrame = false
-    private var curve: Curve = .balanced
 
     mutating func begin(from value: Float, velocity: Double = 0, duration: Double = Self.duration,
                         holdFirstFrame: Bool = true, curve: Curve = .balanced) {
@@ -127,9 +216,8 @@ struct HandoffTransition {
         initialVelocity = velocity.isFinite ? velocity : 0
         self.velocity = initialVelocity
         transitionDuration = duration.isFinite
-            ? min(curve == .pauseRestoration ? 0.500 : 0.300, max(0.060, duration)) : Self.duration
+            ? min(curve == .pauseRestoration ? 0.650 : 0.300, max(0.060, duration)) : Self.duration
         firstFrame = holdFirstFrame
-        self.curve = curve
         elapsed = 0
         active = true
     }
@@ -155,11 +243,10 @@ struct HandoffTransition {
         let baseBlend = t * t * t * (t * (t * 6 - 15) + 10)
         let tangentBlend = t - 6 * pow(t, 3) + 8 * pow(t, 4) - 3 * pow(t, 5)
         let baseDerivative = 30 * t * t * (1 - t) * (1 - t)
-        // The pause return makes more progress early, then settles gently.
-        // This added hump has zero slope at both ends and stays monotonic.
-        let pauseBias = curve == .pauseRestoration ? 8.0 : 0.0
-        let blend = baseBlend + pauseBias * pow(t, 3) * pow(1 - t, 3)
-        let blendDerivative = baseDerivative + pauseBias * 3 * t * t * (1 - t) * (1 - t) * (1 - 2 * t)
+        // Both curves use balanced acceleration. Pause restoration gets its
+        // gentler peak speed from a longer distance-aware duration.
+        let blend = baseBlend
+        let blendDerivative = baseDerivative
         let tangentDerivative = 1 - 18 * t * t + 32 * pow(t, 3) - 15 * pow(t, 4)
         velocity = distance * blendDerivative / transitionDuration + startVelocity * tangentDerivative
             + blend * (targetVelocity.isFinite ? targetVelocity : 0)

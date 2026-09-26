@@ -7,6 +7,7 @@ import MetalPerformanceShaders
 
 /// Draws an opaque, angle-driven desktop transition. All public instance calls use the main queue.
 final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegate {
+    enum CompletionMode { case lid, pause, disabled }
     private weak var view: MTKView?
     private let device: MTLDevice
     private let commandQueue: MTLCommandQueue
@@ -22,8 +23,11 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
     private var smoothing = MotionSmoothing()
     private var lastDrawTime: TimeInterval?
     private var handoff = HandoffTransition()
+    private var programmaticReturn = ProgrammaticReturn()
+    private var completionMode: CompletionMode?
     private var renderedFold: Float = 0
-    private var ending = false
+    private var ending: Bool { completionMode != nil }
+    private var lastMotionAdvanceTime: Double?
     private var transitionGeneration = 0
     private var onReturnToFlat: (() -> Void)?
     private var displayLink: CAMetalDisplayLink?
@@ -45,6 +49,11 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
     private(set) var renderedFrameCount = 0
 
     var isRendering: Bool { displayLink?.isPaused == false }
+    var isFinishingWithLid: Bool { completionMode == .lid }
+    var manualCompletionIsAdvancing: Bool {
+        isFinishingWithLid && isRendering
+            && ProcessInfo.processInfo.systemUptime - (lastMotionAdvanceTime ?? 0) < 0.250
+    }
 
     var hasPreparedSnapshot: Bool {
         sourceBuffer != nil && sourceTexture != nil && filteredTexture != nil && !sourceNeedsFiltering
@@ -52,28 +61,38 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
 
     func beginAnimation(opening: Bool = false) {
         let interruptedReturn = ending
+        let interruptedLidCompletion = isFinishingWithLid
         transitionGeneration += 1
-        ending = false
+        completionMode = nil
         fadingOut = false
         onReturnToFlat = nil
-        if !opening || interruptedReturn {
+        // Reclosing during manual completion is still the same lid gesture.
+        // Keep its filter and any existing entrance handoff exactly as they are.
+        if !interruptedLidCompletion && (!opening || interruptedReturn) {
             handoff.begin(from: renderedFold, velocity: renderedVelocity, holdFirstFrame: false)
         }
         fade(to: 1, duration: opening ? 0.050 : (opacity < 1 ? 0.040 : 0))
         scheduleSettling()
     }
 
-    func finishAnimation(restoringPause: Bool = false, completion: @escaping () -> Void) {
+    func finishAnimation(_ mode: CompletionMode, completion: @escaping () -> Void) {
         transitionGeneration += 1
-        ending = true
+        completionMode = mode
         onReturnToFlat = completion
         fadingOut = false
-        let distance = Double(abs(renderedFold))
-        let duration = restoringPause ? min(0.480, max(0.260, 0.260 + distance * 0.16))
-            : min(0.180, max(0.060, distance / max(0.5, abs(renderedVelocity))))
-        handoff.begin(from: renderedFold, velocity: restoringPause ? 0 : renderedVelocity,
-                      duration: duration, holdFirstFrame: false,
-                      curve: restoringPause ? .pauseRestoration : .balanced)
+        switch mode {
+        case .lid:
+            // Zero is an ordinary sensor target. Do not restart the trajectory,
+            // change its damping, or detach the final degree from the lid.
+            break
+        case .pause:
+            handoff.begin(from: renderedFold, velocity: renderedVelocity,
+                          duration: HandoffTransition.pauseRestorationDuration(for: renderedFold),
+                          holdFirstFrame: false, curve: .pauseRestoration)
+        case .disabled:
+            programmaticReturn.begin(from: renderedFold, velocity: renderedVelocity)
+            handoff = HandoffTransition()
+        }
         fadeDuration = 0
         scheduleSettling()
     }
@@ -259,7 +278,9 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         fadeDuration = 0
         fadingOut = false
         handoff = HandoffTransition()
-        ending = false
+        programmaticReturn = ProgrammaticReturn()
+        completionMode = nil
+        lastMotionAdvanceTime = nil
         transitionGeneration += 1
         onReturnToFlat = nil
     }
@@ -309,17 +330,23 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         render(to: update.drawable.texture, drawable: update.drawable, at: update.targetPresentationTimestamp)
     }
 
-    private func render(to texture: MTLTexture, drawable: CAMetalDrawable? = nil, at now: Double) {
-        guard now.isFinite, lastDrawTime.map({ now >= $0 }) ?? true else { return }
-        renderedFrameCount += 1
+    private func advanceMotion(at now: Double) {
         let elapsed = max(0, now - (lastDrawTime ?? now))
         lastDrawTime = now
-        let followingFold = ending ? 0 : smoothing.step(at: now)
-        let displayedFold = handoff.step(toward: followingFold,
-                                        velocity: ending ? 0 : smoothing.velocity, elapsed: elapsed)
-        renderedFold = displayedFold
-        renderedVelocity = handoff.active ? handoff.velocity : (ending ? 0 : smoothing.velocity)
-        if ending, !handoff.active, !fadingOut {
+        let followsLid = !ending || isFinishingWithLid
+        let followingFold = followsLid ? smoothing.step(at: now) : 0
+        let followingVelocity = followsLid ? smoothing.velocity : 0
+        if completionMode == .disabled {
+            renderedFold = programmaticReturn.step(elapsed: elapsed)
+            renderedVelocity = programmaticReturn.velocity
+        } else {
+            renderedFold = handoff.step(toward: followingFold, velocity: followingVelocity, elapsed: elapsed)
+            renderedVelocity = handoff.active ? handoff.velocity : followingVelocity
+        }
+        let atIdentity = renderedFold == 0 && renderedVelocity == 0 && !handoff.active
+            && (completionMode != .disabled || !programmaticReturn.active)
+            && (!isFinishingWithLid || foldRadians == 0)
+        if ending, atIdentity, !fadingOut {
             // Reveal live pixels only after geometry and material reach identity.
             fadingOut = true
             fade(to: 0, duration: 0.050)
@@ -329,6 +356,14 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             opacity = fadeOrigin + (fadeTarget - fadeOrigin) * Float(t * t * (3 - 2 * t))
             if t == 1 { fadeDuration = 0 }
         }
+    }
+
+    private func render(to texture: MTLTexture, drawable: CAMetalDrawable? = nil, at now: Double) {
+        guard now.isFinite, lastDrawTime.map({ now >= $0 }) ?? true else { return }
+        renderedFrameCount += 1
+        let previousFold = renderedFold, previousOpacity = opacity
+        advanceMotion(at: now)
+        let displayedFold = renderedFold
         let finished = ending && fadingOut && opacity == 0
         let settled = (!handoff.active && !ending && displayedFold == foldRadians && fadeDuration == 0)
             || finished || progress == 0
@@ -338,6 +373,9 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         descriptor.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 0)
         descriptor.colorAttachments[0].storeAction = .store
         guard let command = encode(descriptor: descriptor, displayedFold: displayedFold, opacity: opacity) else { return }
+        if renderedFold != previousFold || opacity != previousOpacity {
+            lastMotionAdvanceTime = ProcessInfo.processInfo.systemUptime
+        }
         let token = transitionGeneration
         if finished, let completion = onReturnToFlat {
             onReturnToFlat = nil
@@ -472,6 +510,10 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         CVPixelBufferUnlockBaseAddress(buffer, [])
         renderer.update(pixelBuffer: buffer)
         guard renderer.sourceTexture != nil else { throw failure("CVMetalTexture conversion failed") }
+        if !benchmark {
+            try checkManualCompletion(renderer: renderer)
+            renderer.pauseSnapshot()
+        }
         try FileManager.default.createDirectory(at: outputURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         // The sharp intermediate frames test the actual shader independently of
         // the frosting. They must match rays through a rotating physical panel.
@@ -666,6 +708,60 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
 
     /// High-contrast and dark, flat synthetic images expose color/quantization
     /// errors that the illustrated desktop and broad blur-energy test can hide.
+    /// Exercise the actual renderer timeline against uninterrupted lid tracking,
+    /// so a separate easing path at the threshold cannot pass unnoticed.
+    private static func checkManualCompletion(renderer: EffectRenderer) throws {
+        func check(_ condition: Bool, _ message: String) throws {
+            if !condition {
+                throw NSError(domain: "Glissform.RendererMotionTest", code: 1,
+                              userInfo: [NSLocalizedDescriptionKey: message])
+            }
+        }
+        let degree = Float(Double.pi / 180)
+        for reclose in [false, true] {
+            renderer.pauseSnapshot()
+            renderer.foldRadians = 3 * degree
+            renderer.renderedFold = 3 * degree
+            renderer.smoothing.reset(to: 3 * degree, at: 0)
+            renderer.lastDrawTime = 0
+            var uninterrupted = renderer.smoothing
+            for frame in 1...420 {
+                let time = Double(frame) / 120
+                if frame.isMultiple(of: 2) {
+                    let angle = reclose && frame >= 204 ? 99 : 97 + Double(min(3, frame / 60))
+                    renderer.setLidAngle(angle, referenceAngle: 100, sampleTime: time)
+                    uninterrupted.ingest(target: ScreenProjection.foldRadians(lidAngle: angle, referenceAngle: 100), at: time)
+                    if frame == 180 { renderer.finishAnimation(.lid) {} }
+                    if reclose && frame == 204 { renderer.beginAnimation() }
+                }
+                renderer.advanceMotion(at: time)
+                let expected = uninterrupted.step(at: time)
+                try check(abs(renderer.renderedFold - expected) < 0.000001
+                          && abs(renderer.renderedVelocity - uninterrupted.velocity) < 0.000001,
+                          "The final degree and reclose must follow exactly the same lid trajectory")
+                if expected > 0 {
+                    try check(renderer.opacity == 1, "Manual completion cannot hide unfinished lid movement")
+                }
+                if frame == 179 {
+                    try check(renderer.renderedFold >= degree && !renderer.ending,
+                              "Holding one degree below the threshold must not start an automatic return")
+                }
+                if frame == 188 {
+                    try check(renderer.renderedFold > 0.7 * degree,
+                              "The last slow degree must not snap flat in four display frames")
+                }
+                if !reclose && frame == 276 {
+                    try check(renderer.renderedFold > 0 && renderer.opacity == 1,
+                              "Slow tracking may legitimately continue past an 800 ms finish deadline")
+                }
+            }
+            try check(reclose ? (renderer.renderedFold == degree && renderer.opacity == 1 && !renderer.ending)
+                      : (renderer.renderedFold == 0 && renderer.opacity == 0),
+                      "Manual completion must either follow the reclosed lid or finish flat before fading")
+        }
+        print("PASS: final manual degree and reclose match uninterrupted lid tracking; fade waits for flat")
+    }
+
     private static func checkMaterial(renderer: EffectRenderer) throws {
         func failure(_ message: String) -> NSError {
             NSError(domain: "Glissform.MaterialTest", code: 1,

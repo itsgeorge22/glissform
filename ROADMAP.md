@@ -63,6 +63,8 @@ The first feature, Infinite Screen, implements screenshot-based closing animatio
 - [x] Correct full-angle hinge compensation, smooth quantized-input tracking speed, reduce entrance delay, and tune progressive full-image frost toward the supplied Duo references; add synthetic desktop material previews alongside projection, tracking and lifecycle regression checks.
 - [ ] Evaluate slow/fast closing, pauses, abrupt reversals, and capture handoffs with repeatable physical tests.
 - [ ] Investigate any remaining visible angle steps, flashes, or discontinuities with measurements rather than only stronger easing.
+- [x] Refine degree-cadence smoothing, reject brief one-degree direction chatter, preserve reversal velocity, keep manual reopening lid-driven through zero, and reduce pause-return peak speed without changing the visual material or projection. Implementation is unreleased; see the Unreleased changelog.
+- [ ] Physically compare the refined motion against the alpha.8 checkpoint at slow and fast speeds, including the added smoothing delay, deliberate one-degree reversals, abrupt stops, shallow/deep pause returns, reclose during return, and sleep/wake.
 - [ ] Measure capture latency, frame pacing, CPU/GPU load, memory use, and idle/battery impact.
 - [ ] Strengthen recovery from denied/revoked permissions, unavailable screenshots, sensor disconnects, and display changes.
 - [ ] Test full-screen applications, Dock/menu behavior, external displays, multiple Spaces, sleep/wake, and quitting during transitions.

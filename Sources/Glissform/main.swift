@@ -281,12 +281,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let progress = beganOpening ? currentProgress : motion.update(angle: angle, time: time)
         currentProgress = progress
         settingsModel.updateLearnedStartAngle(motion.learnedStartAngle)
-        sensor.setActivePolling(motion.active || wakeOpening.pending)
-        if motion.active || !finishingGesture {
+        sensor.setActivePolling(motion.active || wakeOpening.pending || (hasSnapshot && !motion.desktopResumed))
+        if motion.active || !finishingGesture || renderer?.isFinishingWithLid == true {
             renderer?.setLidAngle(angle, referenceAngle: motion.activationAngle, sampleTime: time)
         }
         guard motion.active else {
-            finishGesture(restoringPause: motion.desktopResumed, playSound: true)
+            finishGesture(mode: motion.desktopResumed ? .pause : .lid, playSound: true)
             setStatus(motion.desktopResumed ? "Desktop restored" : "Ready")
             return
         }
@@ -498,12 +498,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !hasSnapshot { window?.alphaValue = 0 }
     }
 
-    private func finishGesture(restoringPause: Bool = false, playSound: Bool = false) {
+    private func finishGesture(mode: EffectRenderer.CompletionMode = .disabled, playSound: Bool = false) {
         guard hasSnapshot else { endGesture(); return }
         guard !finishingGesture else { return }
         finishingGesture = true
         let token = snapshotToken
-        renderer?.finishAnimation(restoringPause: restoringPause) { [weak self] in
+        renderer?.finishAnimation(mode) { [weak self] in
             guard let self, self.finishingGesture, self.snapshotToken == token else { return }
             self.endGesture()
         }
@@ -515,9 +515,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Display callbacks can stop when occluded. Never leave a snapshot
         // blocking input indefinitely while waiting for a final frame.
         cleanupTimer?.invalidate()
-        let timer = Timer(timeInterval: 0.8, repeats: false) { [weak self] _ in
+        // Slow manual tracking can legitimately take more than 800 ms to settle.
+        // Only extend its watchdog while rendered motion is actually advancing;
+        // stopped callbacks still release input on the next watchdog tick.
+        let timer = Timer(timeInterval: 0.8, repeats: mode == .lid) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, self.finishingGesture, self.snapshotToken == token else { return }
+                if mode == .lid && self.renderer?.manualCompletionIsAdvancing == true { return }
                 self.endGesture()
             }
         }
@@ -1162,6 +1166,29 @@ extension AppDelegate {
             try checkCleared(app)
             print("PASS: return sound toggle mutes manual snap without changing the return")
         }
+        // The longer ordinary return must remain cancellable while its
+        // snapshot is visible, including callbacks queued before cancellation.
+        for interruption in ["sleep", "display change", "quit"] {
+            let (app, source) = try makeGesture()
+            defer { app.shutdown(); app.window?.close() }
+            try await waitForCapture(source)
+            try await Task.sleep(nanoseconds: 50_000_000)
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await app.snapshotTask?.value
+            try await Task.sleep(nanoseconds: 100_000_000)
+            app.handleLidReading(100)
+            try check(app.finishingGesture, "Reopening must begin the ordinary return")
+            switch interruption {
+            case "sleep": app.suspend()
+            case "display change": app.restart(startHardware: false)
+            default: app.shutdown()
+            }
+            try await Task.sleep(nanoseconds: 180_000_000)
+            try checkCleared(app)
+            print("PASS: continuous ordinary return interrupted by \(interruption)")
+        }
+
         // Expire the still-lid timer through the real coordinator with fresh
         // synthetic timestamps, including captures that have not completed yet.
         for visible in [false, true] {
@@ -1522,6 +1549,12 @@ extension AppDelegate {
         try check(app.hasSnapshot && !app.finishingGesture && source.count == 1 && app.window!.alphaValue == 1,
                   "Reclosing must retain one snapshot and reject the old return completion")
         app.handleLidReading(100)
+        if let view = app.window?.contentView as? MTKView { app.renderer?.draw(in: view) }
+        try check(app.renderer?.manualCompletionIsAdvancing == true,
+                  "The manual final degree must keep advancing on the lid trajectory")
+        app.cleanupTimer?.fire()
+        try check(app.hasSnapshot && app.finishingGesture,
+                  "The cleanup watchdog must not cut off progressing manual lid motion")
         try await waitForCleanup(app)
         try checkCleared(app)
         print("PASS: identity entrance, interrupted return, one-snapshot reclose, aligned fade cleanup")

@@ -10,7 +10,11 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ### Changed
 
+- Smooth Infinite Screen's degree-to-degree speed using a short cadence history and gradual response changes. Brief one-degree direction chatter no longer triggers a fast reversal; confirmed reversals brake existing momentum instead of resetting velocity.
+- Keep manual reopening on the same lid-driven smoothing through the final degree, with no separate return trajectory. Continue sensor updates until the image is flat, and preserve direct tracking if the lid recloses before cleanup. Give pause restoration balanced acceleration and a longer, fold-dependent 340–600 ms return with a lower peak speed. Keep the existing perspective, stretch, blur, gradients, shadow, screenshot model, and final fade.
 - Stabilize only the Settings lid-angle number and illustration: a one-degree change appears after 250 ms of continuous readings, while a change of two degrees or more appears immediately. Animation, automatic angle selection, and **Use current angle** continue to use raw sensor readings.
+
+The motion refinements remain unreleased. Synthetic checks bound tracking delay, speed variation, reversal continuity, return speed, and cleanup; physical lid, stop, reversal, and sleep/wake acceptance on the development Mac is still required.
 
 ## 0.1.0-alpha.8 — 2026-09-26
 
