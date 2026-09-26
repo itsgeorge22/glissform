@@ -1085,22 +1085,23 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         // gently. Large colored shapes survive after text and icon detail merge.
         float frostAmount = (1.0f - exp(-3.0f * uniforms.x)) / (1.0f - exp(-3.0f));
         float radius = frostAmount * uniforms.z * mix(0.015f, 0.090f, verticalBlur) * frost;
-        // A controlled Gaussian pyramid is prepared once per screenshot. Its
-        // variance grows as (4^level - 1) / 3. Split the desired variance between
-        // a finer pyramid level and a small weighted kernel, so magnifying a
-        // coarse mip never turns small colored shapes into interpolation cells.
-        // Both approach the untouched base level continuously at zero.
-        float lod = 0.5f * log2(1.0f + 0.5f * radius * radius);
-        float2 step = radius * 0.577350269f / max(uniforms.yz, float2(1));
-        const float weights[] = {0.25f, 0.5f, 0.25f};
+        // A Gaussian pyramid is prepared once per screenshot. Keep only one
+        // quarter of the target variance in its mip level, then reconstruct the
+        // rest with a wider 5x5 binomial kernel. Bright controls exposed cells
+        // from the old coarser mip and nine-tap reconstruction. The pyramid
+        // variance is (4^level - 1) / 3; the kernel variance is step squared.
+        // Together they retain the previous total blur variance of radius²/3.
+        float lod = 0.5f * log2(1.0f + 0.25f * radius * radius);
+        float2 step = radius * 0.5f / max(uniforms.yz, float2(1));
+        const float weights[] = {0.0625f, 0.25f, 0.375f, 0.25f, 0.0625f};
         float3 color = float3(0);
-        for (uint y = 0; y < 3; ++y) {
-            for (uint x = 0; x < 3; ++x) {
-                float2 offset = float2(float(x) - 1.0f, float(y) - 1.0f) * step;
+        for (uint y = 0; y < 5; ++y) {
+            for (uint x = 0; x < 5; ++x) {
+                float2 offset = float2(float(x) - 2.0f, float(y) - 2.0f) * step;
                 color += desktop.sample(sampling, uv + offset, level(lod)).rgb * weights[x] * weights[y];
             }
         }
-        // With zero-addressed taps, each of the three sample columns crosses
+        // With zero-addressed taps, each sample column crosses
         // the source edge separately and draws a visible parallel contour at
         // either side of the projected desktop. Treat the screenshot as one
         // soft rectangle instead: clamp its colors, then fade their coverage

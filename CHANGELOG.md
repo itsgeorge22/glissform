@@ -12,6 +12,7 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ### Changed
 
+- Sample finer Gaussian blur levels with a wider 5×5 reconstruction kernel to reduce the blocky texture seen in bright controls while keeping the same nominal blur strength and soft side edges. Owner testing found an overall improvement, though fine texture remains visible on bright controls; frame cost has not been measured.
 - On a fast close, request the single screenshot up to three degrees before the selected start angle after confirmed downward movement. Keep it hidden until the threshold is crossed, and discard it if the lid reverses or pauses before the effect begins. Physical validation of the first visible frame remains pending.
 - Prefer the lid sensor's hundredths-of-a-degree report when available, with a whole-degree fallback. Ignore tiny sensor jitter in the motion target while keeping manual reopening controlled by the lid through the final angle; the settings illustration still displays whole degrees.
 - Let slow sub-degree lid changes contribute their actual size to motion smoothing, with a quarter-degree lower bound to limit lag. Whole-degree fallback and fast movement keep their existing response.
