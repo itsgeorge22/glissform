@@ -8,6 +8,8 @@ Use the [submission chooser](https://github.com/itsgeorge22/glissform/issues/new
 
 Include the affected feature, Mac model, macOS version, Glissform version, steps to reproduce, and expected versus actual behaviour. For Infinite Screen, include the chosen start angle, external displays, full-screen apps, and whether the Mac slept. Remove private desktop content from any media you choose to share.
 
+For Charging Ripple in an unreleased source build, distinguish the manual preview from connecting power, and mention any repeated or missing effect. This experience is not included in the published alpha.8 source tag.
+
 ## Propose a change
 
 1. Keep the change focused and explain the user-visible problem.

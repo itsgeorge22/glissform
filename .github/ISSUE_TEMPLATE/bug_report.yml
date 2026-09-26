@@ -37,6 +37,7 @@ body:
     label: Affected area
     options:
     - Infinite Screen
+    - Charging Ripple (unreleased source builds)
     - Settings or preview
     - Installation or permissions
     - Other / unsure

@@ -12,9 +12,13 @@ swiftc -swift-version 5 Sources/Glissform/ClosingMotion.swift Sources/Glissform/
 build/tests/wake-opening-checks
 swiftc -swift-version 5 -parse-as-library Sources/Glissform/DesktopCapture.swift Tests/CaptureChecks.swift -o build/tests/capture-checks
 build/tests/capture-checks
+swiftc -swift-version 5 -parse-as-library Sources/Glissform/ChargingFeedback.swift Sources/Glissform/ChargingRippleRenderer.swift Sources/Glissform/OverlayWindow.swift Tests/ChargingFeedbackChecks.swift -o build/tests/charging-feedback-checks
+build/tests/charging-feedback-checks
 if [[ "${1:-}" == "--motion-only" ]]; then
     echo "SKIP: Metal rendering checks (--motion-only requested)"
 elif [ -x build/Glissform.app/Contents/MacOS/Glissform ]; then
+    swiftc -swift-version 5 -parse-as-library Sources/Glissform/ChargingRippleRenderer.swift Tests/ChargingRippleRenderChecks.swift -o build/tests/charging-ripple-render-checks
+    build/tests/charging-ripple-render-checks
     build/Glissform.app/Contents/MacOS/Glissform --render-test
     build/Glissform.app/Contents/MacOS/Glissform --lifecycle-test
     swiftc -swift-version 5 -parse-as-library Sources/Glissform/OverlayWindow.swift Tests/OverlayChecks.swift -o build/tests/overlay-checks

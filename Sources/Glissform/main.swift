@@ -7,11 +7,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private let statusLine = NSMenuItem(title: "Starting…", action: nil, keyEquivalent: "")
     private let enableMenuItem = NSMenuItem(title: "Enable Infinite Screen", action: nil, keyEquivalent: "")
+    private let chargingMenuItem = NSMenuItem(title: "Power connection ripple", action: nil, keyEquivalent: "")
+    private let lowBatteryMenuItem = NSMenuItem(title: "Battery at 20% ripple", action: nil, keyEquivalent: "")
     private let sensor = LidSensor()
     private let capture: DesktopScreenshotSource
     private let desktopAvailable: (CGDirectDisplayID) -> Bool
     private let screenAccessAllowed: () -> Bool
     private let settingsModel = SettingsModel()
+    private let chargingFeedback = ChargingFeedbackController()
+    private var chargingPowerMonitor: ChargingPowerMonitor?
+    private var chargingSuppressedUntil = 0.0
     private var settingsWindowController: SettingsWindowController?
     private var window: OverlayWindow?
     private var renderer: EffectRenderer?
@@ -78,7 +83,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.button?.toolTip = "Glissform"
         UserDefaults.standard.register(defaults: ["animationStartAngle": 100.0, "animationEnabled": true,
                                                   "resumeAfterPause": false,
-                                                  "automaticStartAngleEnabled": false])
+                                                  "automaticStartAngleEnabled": false,
+                                                  "chargingFeedbackEnabled": true,
+                                                  "lowBatteryRippleEnabled": true])
         let storedAngle = UserDefaults.standard.double(forKey: "animationStartAngle")
         let startAngle = storedAngle.isFinite ? min(130, max(20, storedAngle)).rounded() : 100
         let animationEnabled = UserDefaults.standard.bool(forKey: "animationEnabled")
@@ -93,6 +100,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         enableMenuItem.action = #selector(toggleAnimation)
         enableMenuItem.state = animationEnabled ? .on : .off
         menu.addItem(enableMenuItem)
+        chargingMenuItem.target = self
+        chargingMenuItem.action = #selector(toggleChargingFeedback)
+        chargingMenuItem.state = UserDefaults.standard.bool(forKey: "chargingFeedbackEnabled") ? .on : .off
+        menu.addItem(chargingMenuItem)
+        lowBatteryMenuItem.target = self
+        lowBatteryMenuItem.action = #selector(toggleLowBatteryRipple)
+        lowBatteryMenuItem.state = UserDefaults.standard.bool(forKey: "lowBatteryRippleEnabled") ? .on : .off
+        menu.addItem(lowBatteryMenuItem)
         let settings = menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
         settings.target = self
         menu.addItem(.separator())
@@ -106,7 +121,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             startAngle: startAngle,
             screenCaptureAllowed: CGPreflightScreenCaptureAccess(),
             resumeAfterPause: motion.resumeAfterPause,
-            automaticStartAngle: motion.automaticStartAngle
+            automaticStartAngle: motion.automaticStartAngle,
+            chargingFeedbackEnabled: UserDefaults.standard.bool(forKey: "chargingFeedbackEnabled"),
+            lowBatteryRippleEnabled: UserDefaults.standard.bool(forKey: "lowBatteryRippleEnabled")
         )
         settingsModel.onAnimationEnabledChange = { [weak self] enabled in
             self?.applyAnimationEnabled(enabled)
@@ -123,6 +140,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             UserDefaults.standard.set(enabled, forKey: "resumeAfterPause")
         }
         settingsModel.onOpenPermissions = { [weak self] in self?.openPermissions() }
+        settingsModel.onChargingFeedbackEnabledChange = { [weak self] enabled in
+            UserDefaults.standard.set(enabled, forKey: "chargingFeedbackEnabled")
+            self?.chargingMenuItem.state = enabled ? .on : .off
+            if !enabled { self?.chargingFeedback.stop(if: .connected) }
+        }
+        settingsModel.onLowBatteryRippleEnabledChange = { [weak self] enabled in
+            UserDefaults.standard.set(enabled, forKey: "lowBatteryRippleEnabled")
+            self?.lowBatteryMenuItem.state = enabled ? .on : .off
+            if !enabled { self?.chargingFeedback.stop(if: .lowBattery) }
+        }
 
         let center = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.willSleepNotification, NSWorkspace.screensDidSleepNotification] {
@@ -184,6 +211,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             })
         }
+        chargingPowerMonitor = ChargingPowerMonitor(onConnect: { [weak self] in
+            MainActor.assumeIsolated { self?.playChargingFeedback(style: .connected) }
+        }, onLowBattery: { [weak self] in
+            MainActor.assumeIsolated { self?.playChargingFeedback(style: .lowBattery) }
+        })
         startSensor()
         connect()
         DispatchQueue.main.async { [weak self] in
@@ -392,6 +424,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func playChargingFeedback(style: BatteryRippleStyle) {
+        guard !quitting, !sleeping, !screenLocked, !sessionInactive, !hasSnapshot,
+              !snapshotRequested, !earlyCaptureRequested, !motion.active, !wakeOpening.pending,
+              (style == .connected ? settingsModel.chargingFeedbackEnabled : settingsModel.lowBatteryRippleEnabled),
+              ProcessInfo.processInfo.systemUptime >= chargingSuppressedUntil,
+              let screen = builtInScreen(),
+              let id = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value,
+              CGDisplayIsAsleep(id) == 0 else { return }
+        chargingFeedback.play(on: screen, style: style)
+    }
+
     private func matchesConnection(_ screen: NSScreen) -> Bool {
         let id = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
         return displayID == id && window?.frame == screen.frame
@@ -408,6 +451,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func handleDisplayChange() {
         guard !quitting else { return }
+        chargingFeedback.stop()
         invalidateCaptureMetadata()
         if let screen = builtInScreen(), matchesConnection(screen) {
             if !sleeping, wakeOpening.pending { connect() }
@@ -432,6 +476,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func prepareGestureSnapshot() {
+        // Keep the separate charging overlay out of Infinite Screen's one capture.
+        chargingFeedback.stop()
         guard let displayID, canUseDesktop() else {
             cancelWake("desktop unavailable")
             motion.reset()
@@ -605,6 +651,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func suspend() {
         guard !sleeping else { return }
+        chargingFeedback.stop()
+        chargingPowerMonitor?.refreshSilently()
         invalidateCaptureMetadata()
         let retain = screenAccessAllowed() && (canRetainClosingSnapshot
             || (retainedClosingSnapshot && sleepPreparationTimer != nil && recentClosedLid))
@@ -625,6 +673,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func resume(startHardware: Bool = true) {
         guard sleeping else { return }
         sleeping = false
+        chargingFeedback.stop()
+        chargingPowerMonitor?.refreshSilently()
+        chargingSuppressedUntil = ProcessInfo.processInfo.systemUptime + 1
         sensorRestartedAt = Date()
         let hadClosedEvidence = wakeOpening.awaitingWake
         let eligible = settingsModel.animationEnabled && retainedClosingSnapshot
@@ -733,6 +784,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func handleScreenLock(_ locked: Bool) {
         screenLocked = locked
+        if locked { chargingFeedback.stop() }
         wakeLog.notice("screen lock changed: locked=\(locked), sleeping=\(self.sleeping), awaitingWake=\(self.wakeOpening.awaitingWake), pending=\(self.wakeOpening.pending)")
         if locked { blockDesktop() }
         else if sleepPreparationTimer != nil { cancelWake("unlocked without sleep") }
@@ -740,6 +792,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func handleSessionActivity(inactive: Bool) {
         sessionInactive = inactive
+        if inactive { chargingFeedback.stop() }
         wakeLog.notice("session changed: inactive=\(inactive), sleeping=\(self.sleeping), awaitingWake=\(self.wakeOpening.awaitingWake), pending=\(self.wakeOpening.pending)")
         if inactive {
             invalidateCaptureMetadata()
@@ -751,6 +804,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func handleActiveSpaceChange() {
         guard !quitting else { return }
+        chargingFeedback.stop()
         invalidateCaptureMetadata()
         cancelWake("active Space changed")
         endGesture()
@@ -804,6 +858,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func toggleAnimation() {
         settingsModel.setAnimationEnabled(!settingsModel.animationEnabled)
+    }
+
+    @objc private func toggleChargingFeedback() {
+        settingsModel.setChargingFeedbackEnabled(!settingsModel.chargingFeedbackEnabled)
+    }
+
+    @objc private func toggleLowBatteryRipple() {
+        settingsModel.setLowBatteryRippleEnabled(!settingsModel.lowBatteryRippleEnabled)
     }
 
     @objc private func showAbout() {
@@ -889,6 +951,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func shutdown() {
         quitting = true
+        chargingFeedback.stop()
+        chargingPowerMonitor = nil
         invalidateCaptureMetadata()
         cancelWake("quit")
         heartbeat?.invalidate()

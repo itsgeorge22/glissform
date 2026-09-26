@@ -57,7 +57,8 @@ body:
   attributes:
     label: What did you try?
     description: 'For example: closing/reopening, pauses, sleep, locked wake, full-screen
-      apps, Space switching, or external displays. Only list what you actually checked.'
+      apps, Space switching, external displays, or Charging Ripple on a source build.
+      Only list what you actually checked.'
   validations:
     required: true
 - type: textarea

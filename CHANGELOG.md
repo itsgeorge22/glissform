@@ -4,6 +4,11 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+### Added
+
+- Add Features and More section titles in the Settings sidebar, with a Found a bug tab that opens a placeholder page reading “Nothing here yet.”
+- Add Battery Ripple as a second experience: a translucent wave unfurls from the built-in display's lower-left corner when power connects (emerald) or the built-in battery crosses down to 20% while unplugged (red). The events have independent saved Settings and menu-bar switches, with no overall feature switch. Its curling edge and soft internal folds dissolve over 2.15 seconds. It takes no screenshot, needs no new permission, does not take focus or mouse input, and stops on sleep, lock, Space/display change, disable, or quit. Reduce Motion uses a shorter static glow. The owner confirmed one green ripple on one unplug/reconnect trial with the earlier visual design and approved the revised emerald appearance on 2026-09-26. The red ripple and broader interruption and full-screen behavior await physical confirmation.
+
 ### Fixed
 
 - After automatic angle selection restores the desktop at a paused lid angle, closing past the newly learned starting angle starts a fresh animation without first opening the lid farther.
@@ -12,14 +17,19 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ### Changed
 
+- Reduce the gap between the Infinite Screen and Battery Ripple sidebar tabs to 4 points.
+- Place the More group directly below the feature tabs and use title-case sidebar section headings.
+- Keep the Settings window frame the same height as its rounded surface, removing the transparent toolbar-height strip below it. Use a wider, lighter shadow that follows the actual window frame.
+- Organize Settings with a persistent sidebar and separate Infinite Screen, Battery Ripple, and Privacy & About pages. Keep the window size steady while switching pages, retain each feature’s saved controls, and reset page scrolling on navigation.
+- Refine Settings with a native unified toolbar and window controls over a narrower sidebar, compact selected rows, and smaller filled navigation icons. Give sidebar rows equal padding and a radius concentric with their icon tiles, and keep icons at full opacity while pressed. Clip the full-size content to round every window corner, use a fine edge outline. Remove the titlebar separator. Use subtle 12%-opacity icon tiles with coloured symbols inside the pages. Remove both feature previews and place each switch in its own card. Separate Infinite Screen’s manual angle, automatic selection, and pause controls into compact cards, retaining the live lid reading. Remove feature-page privacy notes; Privacy & About keeps the full explanation.
 - Add a modest, even Core Image Gaussian blur after projection, blended more strongly toward the top, to soften fine texture in bright controls. Preserve the original projected edge near transparency and use the same captured frame and source-space frost. The owner preferred the resulting appearance on the development Mac; frame pacing has not been measured.
 - Sample finer Gaussian blur levels with a wider 5×5 reconstruction kernel to reduce the blocky texture seen in bright controls while keeping the same nominal blur strength and soft side edges. Owner testing found an overall improvement, though fine texture remains visible on bright controls; frame cost has not been measured.
 - On a fast close, request the single screenshot up to three degrees before the selected start angle after confirmed downward movement. Keep it hidden until the threshold is crossed, and discard it if the lid reverses or pauses before the effect begins. Physical validation of the first visible frame remains pending.
-- Prefer the lid sensor's hundredths-of-a-degree report when available, with a whole-degree fallback. Ignore tiny sensor jitter in the motion target while keeping manual reopening controlled by the lid through the final angle; the settings illustration still displays whole degrees.
+- Prefer the lid sensor's hundredths-of-a-degree report when available, with a whole-degree fallback. Ignore tiny sensor jitter in the motion target while keeping manual reopening controlled by the lid through the final angle; the settings reading still displays whole degrees.
 - Let slow sub-degree lid changes contribute their actual size to motion smoothing, with a quarter-degree lower bound to limit lag. Whole-degree fallback and fast movement keep their existing response.
 - Smooth Infinite Screen's degree-to-degree speed using a short cadence history and gradual response changes. Brief one-degree direction chatter no longer triggers a fast reversal; confirmed reversals brake existing momentum instead of resetting velocity.
 - Keep manual reopening on the same lid-driven smoothing through the final degree, with no separate return trajectory. Continue sensor updates until the image is flat, and preserve direct tracking if the lid recloses before cleanup. Give pause restoration balanced acceleration and a longer, fold-dependent 340–600 ms return with a lower peak speed. Keep the existing perspective, stretch, blur, gradients, shadow, screenshot model, and final fade.
-- Stabilize only the Settings lid-angle number and illustration: a one-degree change appears after 250 ms of continuous readings, while a change of two degrees or more appears immediately. Animation, automatic angle selection, and **Use current angle** continue to use raw sensor readings.
+- Stabilize only the Settings lid-angle number: a one-degree change appears after 250 ms of continuous readings, while a change of two degrees or more appears immediately. Animation, automatic angle selection, and **Use current angle** continue to use raw sensor readings.
 
 The motion refinements remain unreleased. Synthetic checks bound tracking delay, speed variation, reversal continuity, return speed, and cleanup; physical lid, stop, reversal, and sleep/wake acceptance on the development Mac is still required.
 
@@ -35,7 +45,7 @@ Eighth public alpha: automatic starting-angle selection, clearer settings states
 
 - Give the two-second pause restoration a longer, front-loaded ease into the live desktop, with an exact flat finish and no bounce.
 - Give automatic angle selection a blue-leaning indigo icon tile and desktop restoration a green one, so the two feature actions are easier to distinguish.
-- Label the live lid reading, mark the illustration while previewing, show saved-settings guidance when Infinite Screen is off, and clarify the waiting message before a new automatic angle is learned.
+- Label the live lid reading, show saved-settings guidance when Infinite Screen is off, and clarify the waiting message before a new automatic angle is learned.
 - Clarify that a still lid sets or updates the automatic starting angle, while a lid pause below that angle restores the desktop.
 
 ### Validation and limitations

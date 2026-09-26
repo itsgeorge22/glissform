@@ -8,17 +8,23 @@ Glissform is a small passion project. The owner's intended price is $1.90, with 
 
 ## Current — 0.1.0-alpha.8
 
-The first feature, Infinite Screen, implements screenshot-based closing animation with full-angle hinge compensation, steadier adaptive smoothing, progressive full-image frost and shadow, awake reversal, cached post-sleep opening, native settings with a configurable starting angle and capture-free preview, optional desktop restoration after a fixed two-second still-lid pause, menu bar controls, and lifecycle cleanup. On 2026-09-21, the owner confirmed correct smoothness, speed, abrupt lid stops, reversals, and opening after sleep without locking on the development Mac. Locked wake is outside that confirmation. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
+The first feature, Infinite Screen, implements screenshot-based closing animation with full-angle hinge compensation, steadier adaptive smoothing, progressive full-image frost and shadow, awake reversal, cached post-sleep opening, native settings with a configurable starting angle, optional desktop restoration after a fixed two-second still-lid pause, menu bar controls, and lifecycle cleanup. On 2026-09-21, the owner confirmed correct smoothness, speed, abrupt lid stops, reversals, and opening after sleep without locking on the development Mac. Locked wake is outside that confirmation. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
 
 ## Current priority — Space-change verification
 
 - [x] Resolve [#1: Infinite Screen breaks when switching Spaces with a full-screen app open](https://github.com/itsgeorge22/glissform/issues/1) in code: keep visible pixels in their source Space instead of duplicating them across the transition, then cancel the animation, release input and discard its screenshot when the active Space changes; require reopening above the active starting angle before the next gesture.
-- [ ] Physically confirm normal and full-screen Space changes on the development Mac, with settings both open and closed, before closing the issue.
+- [x] Owner confirmed normal and full-screen Space changes on the development Mac, with settings open and closed, on 2026-09-26. Issue #1 was already closed after the code fix; this owner check supplied the remaining physical acceptance.
 
 ## Product development
 
+- [x] Implement Battery Ripple with independent power-connection and 20%-battery switches, using public power-source notifications and a reduced-motion fallback. This is unreleased main-branch work.
+- [x] Replace the original concentric connection rings with a fluid emerald light wave, a curling silhouette, and translucent folds; reuse the geometry in red for the 20% battery event. The owner approved the revised emerald appearance on 2026-09-26; the red variant awaits physical approval.
+- [ ] Complete physical Battery Ripple checks for both triggers with settings closed, full-screen apps, sleep/wake, lock, and Reduce Motion. On 2026-09-26, the owner confirmed one green ripple on one unplug/reconnect trial with the earlier visual design. The 20% event has only synthetic checks so far.
 - [ ] Design and validate additional animation and quality-of-life experiences for everyday Mac interactions.
-- [ ] Evolve feature discovery and settings as more experiences become available, keeping the interface coherent and easy to understand.
+- [x] Add sidebar navigation with separate Infinite Screen, Battery Ripple, and Privacy & About pages, plus a Found a bug placeholder grouped under More.
+- [x] Refine the compact settings composition with native toolbar controls over a narrower sidebar, concentric navigation rows and icons, subtle page icon tiles, separate enable cards, and distinct Infinite Screen control cards. Remove both feature previews and feature-page privacy footers.
+- [x] Build and run the full regression suite for the card and sidebar revision (2026-09-26). Inspect all three pages in the running app's Light appearance, including compact rows, separate cards, icon tiles, and removal of previews. Live Dark and earlier-macOS checks remain pending.
+- [ ] Complete live Dark appearance, Reduce Transparency, Increase Contrast, and earlier-macOS checks. Offscreen samples do not validate native selection, focus, or system accessibility integration. The owner's green Battery Ripple appearance approval covers the desktop effect, not this settings revision or the red variant.
 - [ ] Define the purpose, controls, permissions, accessibility behaviour, and performance budget of each new experience before release.
 - [ ] Continue improving existing features alongside new work; expansion is not dependent on making Infinite Screen the entire product.
 
@@ -76,7 +82,7 @@ The first feature, Infinite Screen, implements screenshot-based closing animatio
 - [x] Refine the native interface with compact navigation, adaptive neutral surfaces, a distinctive perspective illustration, and a clearer control hierarchy.
 - [x] Add a capture-free, in-window gesture preview with a still alternative for Reduce Motion and contextual first-gesture guidance.
 - [x] Introduce and simplify native settings with a dedicated live-angle display, precise trigger controls, and screen-access status, and an About page with prominent privacy information.
-- [ ] Validate the settings, preview, and permission guidance with first-time testers, including keyboard and VoiceOver use, then refine onboarding and diagnostics.
+- [ ] Validate the settings and permission guidance with first-time testers, including keyboard and VoiceOver use, then refine onboarding and diagnostics.
 - [ ] Decide the project's license before describing it as open source.
 
 ## Beta gate — 0.1.0-beta.1
@@ -103,7 +109,6 @@ A release candidate is a complete proposed stable build. Publish 1.0.0 when thos
 
 ## Further possibilities — not committed
 
-- Charging feedback: when the charger is plugged in, show a ripple spreading from the bottom-left corner with a green haze. Visual reference: the proximity-sharing animation when the tops of two iPhones are brought together to share contacts (NameDrop/AirDrop). Idea only; not implemented.
 - Touch ID feedback: a similar ripple spreading from the bottom-right corner with a red haze. Idea only; the exact Touch ID event and feasibility still need to be determined. Not implemented.
 - Broader wake-opening support after the prototype passes timing, privacy, and physical acceptance gates; no first-frame or locked-wake guarantee.
 - Optional launch at login; a lightweight enable/pause control is already available in the working settings and menu.

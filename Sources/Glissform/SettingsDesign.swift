@@ -8,70 +8,70 @@ enum SettingsDesign {
         static let detail: CGFloat = 4
         static let label: CGFloat = 8
         static let controls: CGFloat = 12
-        static let cards: CGFloat = 16
-        static let cardInset: CGFloat = 20
+        static let cards: CGFloat = 12
+        static let cardInset: CGFloat = 16
+        static let featureInset: CGFloat = 12
         static let groups: CGFloat = 24
-        static let sections: CGFloat = 28
-        static let page: CGFloat = 32
+        static let sections: CGFloat = 18
+        static let page: CGFloat = 24
         static let optical: CGFloat = 2
     }
 
     enum Typography {
-        static let pageTitle = Font.system(size: 28, weight: .semibold, design: .rounded)
+        static let pageTitle = Font.system(size: 24, weight: .semibold, design: .rounded)
         static let aboutTitle = Font.system(size: 24, weight: .semibold, design: .rounded)
-        static let sectionTitle = Font.system(size: 20, weight: .semibold, design: .rounded)
-        static let controlTitle = Font.system(size: 14, weight: .semibold)
+        static let sectionTitle = Font.system(size: 17, weight: .semibold)
+        static let controlTitle = Font.system(size: 13, weight: .semibold)
         static let body = Font.system(size: 13)
         static let caption = Font.system(size: 11)
-        static let action = Font.system(size: 11, weight: .medium)
-        static let liveValue = Font.system(size: 28, weight: .light, design: .rounded).monospacedDigit()
+        static let action = Font.system(size: 12, weight: .medium)
+        static let liveValue = Font.system(size: 13, weight: .medium, design: .rounded).monospacedDigit()
         static let editableValue = Font.system(size: 20, weight: .medium, design: .rounded).monospacedDigit()
         static let angleUnit = Font.system(size: 20)
     }
 
     enum Radius {
-        static let card: CGFloat = 20
+        static let card: CGFloat = 18
         static let icon: CGFloat = 12
         static let control: CGFloat = 8
         static let small: CGFloat = 4
     }
 
     enum Palette {
-        static let background = Color(nsColor: .textBackgroundColor)
-        static let card = Color.primary.opacity(0.035)
-        static let cardBorder = Color.primary.opacity(0.04)
-        static let dividerOverlay = Color.primary.opacity(0.025)
+        static let background = Color(nsColor: .windowBackgroundColor)
+        static let card = Color(nsColor: .controlBackgroundColor)
+        static let cardBorder = Color.primary.opacity(0.065)
         static let field = Color.primary.opacity(0.045)
         static let focus = Color.accentColor.opacity(0.65)
         static let switchOff = Color(nsColor: .tertiaryLabelColor)
         static let feature = Color(red: 78 / 255, green: 103 / 255, blue: 216 / 255)
         static let success = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
         static let attention = Color(red: 1, green: 159 / 255, blue: 10 / 255)
-        static let iconTileOpacity = 0.16
-
-        static func cardIcon(_ color: CardIconColor, scheme: ColorScheme) -> Color {
-            let hex: UInt32
-            switch (color, scheme) {
-            case (.feature, .light): hex = 0x435CCD
-            case (.success, .light): hex = 0x2AB84D
-            case (.attention, .light): hex = 0xE08C09
-            case (.feature, _): hex = 0x667CE7
-            case (.success, _): hex = 0x30D158
-            case (.attention, _): hex = 0xFF9F0A
-            }
-            return Color(red: Double((hex >> 16) & 255) / 255,
-                         green: Double((hex >> 8) & 255) / 255,
-                         blue: Double(hex & 255) / 255)
-        }
-
+        static let danger = Color(red: 1, green: 69 / 255, blue: 58 / 255)
         enum CardIconColor {
-            case feature, success, attention
+            case feature, success, attention, danger, neutral
 
             var tile: Color {
                 switch self {
                 case .feature: return Palette.feature
                 case .success: return Palette.success
                 case .attention: return Palette.attention
+                case .danger: return Palette.danger
+                case .neutral: return Color.gray
+                }
+            }
+
+            func symbol(in scheme: ColorScheme) -> Color {
+                switch (self, scheme) {
+                case (.feature, .light): return Color(red: 0x43 / 255, green: 0x5C / 255, blue: 0xCD / 255)
+                case (.success, .light): return Color(red: 0x2A / 255, green: 0xB8 / 255, blue: 0x4D / 255)
+                case (.attention, .light): return Color(red: 0xE0 / 255, green: 0x8C / 255, blue: 0x09 / 255)
+                case (.danger, .light): return Color(red: 0xDF / 255, green: 0x38 / 255, blue: 0x35 / 255)
+                case (.feature, _): return Color(red: 0x66 / 255, green: 0x7C / 255, blue: 0xE7 / 255)
+                case (.success, _): return Palette.success
+                case (.attention, _): return Palette.attention
+                case (.danger, _): return Palette.danger
+                case (.neutral, _): return .secondary
                 }
             }
         }
@@ -90,8 +90,13 @@ enum SettingsDesign {
     }
 
     enum Metrics {
-        static let windowWidth: CGFloat = 720
-        static let preferredHeight: CGFloat = 780
+        static let contentWidth: CGFloat = 544
+        static let sidebarWidth: CGFloat = 204
+        static let sidebarIconRadius: CGFloat = 8
+        static let sidebarRowInset: CGFloat = 7
+        static let sidebarRowRadius = sidebarIconRadius + sidebarRowInset
+        static let windowWidth = sidebarWidth + contentWidth
+        static let preferredHeight: CGFloat = 560
         static let arrowWidth: CGFloat = 24
         static let arrowHeight: CGFloat = 20
         static let iconSize: CGFloat = 44
