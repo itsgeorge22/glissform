@@ -4,7 +4,8 @@ import os
 
 /// Read-only access to Apple's lid-angle HID feature report. The HID API is public;
 /// this device's usage/report layout is undocumented and may change with macOS.
-/// Protocol reference: github.com/samhenrigold/LidAngleSensor (HardwareCompat.swift).
+/// Protocol references: github.com/samhenrigold/LidAngleSensor and
+/// github.com/danielradosa/clamshell (fractional feature report 7).
 /// Lifecycle methods are called on the main thread; device I/O runs on a serial queue.
 final class LidSensor {
     private let queue = DispatchQueue(label: "app.glissform.lid-sensor", qos: .userInitiated)
@@ -33,7 +34,7 @@ final class LidSensor {
     }
 
     /// Higher polling is limited to an active gesture; it does not change the
-    /// sensor's whole-degree resolution or perform any additional screen capture.
+    /// sensor's update rate or perform any additional screen capture.
     func setActivePolling(_ active: Bool) {
         precondition(Thread.isMainThread)
         guard let worker else { return }
@@ -59,7 +60,7 @@ final class LidSensor {
         do {
             try connection.open()
             let angle = try connection.read()
-            return "Lid sensor detected: Apple HID 05ac:8104, usage 0020:008a; angle \(Int(angle))°"
+            return String(format: "Lid sensor detected: Apple HID 05ac:8104, usage 0020:008a; angle %.2f°", angle)
         } catch {
             return "Lid sensor unavailable: \(error.localizedDescription)"
         }
@@ -173,6 +174,7 @@ final class LidSensor {
     private final class Connection {
         private var device: IOHIDDevice?
         private var manager: IOHIDManager?
+        private var fineReportAvailable = true
         private static let options = IOOptionBits(kIOHIDOptionsTypeNone)
 
         func open() throws {
@@ -214,20 +216,29 @@ final class LidSensor {
         }
 
         func read() throws -> Double {
+            if fineReportAvailable {
+                if let angle = try? readReport(7, scale: 100) { return angle }
+                fineReportAvailable = false
+            }
+            return try readReport(1, scale: 1)
+        }
+
+        private func readReport(_ id: CFIndex, scale: Double) throws -> Double {
             guard let device else { throw SensorError("Sensor is disconnected") }
             var bytes = [UInt8](repeating: 0, count: 8)
             var count = bytes.count
-            let result = IOHIDDeviceGetReport(device, kIOHIDReportTypeFeature, 1, &bytes, &count)
+            let result = IOHIDDeviceGetReport(device, kIOHIDReportTypeFeature, id, &bytes, &count)
             guard result == kIOReturnSuccess else {
-                throw SensorError("HID report failed (\(result))")
+                throw SensorError("HID report \(id) failed (\(result))")
             }
             guard count >= 3 else { throw SensorError("Incomplete lid-angle report") }
-            // Feature report 1 stores whole degrees as little-endian bytes 1 and 2.
-            let degrees = Int(bytes[1]) + (Int(bytes[2]) << 8)
-            guard (0...180).contains(degrees) else {
-                throw SensorError("Invalid lid angle: \(degrees)")
+            // Report 7 uses hundredths of a degree; report 1 uses whole degrees.
+            let raw = Int(bytes[1]) + (Int(bytes[2]) << 8)
+            let angle = Double(raw) / scale
+            guard (0...180).contains(angle) else {
+                throw SensorError("Invalid lid angle: \(angle)")
             }
-            return Double(degrees)
+            return angle
         }
 
         deinit {

@@ -1,6 +1,6 @@
 import Foundation
 
-/// Reconstructs whole-degree readings without extrapolating sensor motion.
+/// Smooths lid readings without extrapolating sensor motion.
 /// Sensor samples advance an analytic trajectory; display queries never change
 /// its cadence or history, even when rendering runs ahead to a presentation time.
 struct MotionSmoothing {
@@ -9,7 +9,7 @@ struct MotionSmoothing {
     private var sampleValue: Float = 0
     private var sampleVelocity: Double = 0
     private var sampleTime: Double?
-    private var target: Float = 0
+    private(set) var target: Float = 0
     private var direction: Float = 0
     private var targetChangeTime: Double?
     private var timeConstant = 0.020
@@ -19,6 +19,7 @@ struct MotionSmoothing {
     private var pendingReversal: (target: Float, since: Double)?
     private var compatibilityTime: Double = 0
     private var lastPresentationTime: Double?
+    private let noiseFloor = Float(0.08 * .pi / 180)
 
     mutating func reset(to value: Float = 0, at time: Double? = nil) {
         self.value = value
@@ -54,20 +55,28 @@ struct MotionSmoothing {
             pendingReversal = nil
             return
         }
+        guard nextTarget == 0 || abs(change) >= noiseFloor else {
+            // Fractional HID reports fluctuate by a few hundredths of a degree
+            // even when the lid is still. Keep the last meaningful target.
+            return
+        }
         let nextDirection: Float = change > 0 ? 1 : -1
         let reversing = direction != 0 && nextDirection != direction
-        // A single backwards degree can be boundary chatter. Confirm it over
-        // 50 ms, or immediately when movement spans more than one degree.
+        // A backwards movement under one degree may be boundary chatter.
+        // Confirm the direction over 50 ms even as fractional readings change.
         // This gate affects only presentation, never gesture/sleep decisions.
-        if reversing && abs(change) < Float(1.1 * .pi / 180) {
-            if pendingReversal?.target != nextTarget {
+        if reversing && nextTarget != 0 && abs(change) < Float(1.1 * .pi / 180) {
+            if pendingReversal == nil {
                 pendingReversal = (nextTarget, time)
                 return
             }
             if time - (pendingReversal?.since ?? time) < 0.050 { return }
         }
         pendingReversal = nil
-        let degrees = max(1, Double(abs(change)) * 180 / .pi)
+        // Fractional readings can be much smaller than one degree. Preserve
+        // their measured cadence, but cap the response to a quarter-degree
+        // step so very slow motion does not acquire excessive lag.
+        let degrees = max(0.25, Double(abs(change)) * 180 / .pi)
         let interval = min(0.5, max(0.000001, time - (targetChangeTime ?? (time - 1.0 / 30))) / degrees)
         // Degree cadence belongs to the acquisition clock, not to queue delivery
         // or the display callback. Repeated samples retain the last change time.

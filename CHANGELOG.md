@@ -7,9 +7,14 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 ### Fixed
 
 - After automatic angle selection restores the desktop at a paused lid angle, closing past the newly learned starting angle starts a fresh animation without first opening the lid farther.
+- Spread frost-gradient dithering across neighboring rows and columns to reduce horizontal banding in pale areas caused by the repeated 8-bit output pattern.
+- Smooth the projected screenshot's side boundaries as one continuous blurred edge to reduce the parallel dark contours left by separately clipped blur samples.
 
 ### Changed
 
+- On a fast close, request the single screenshot up to three degrees before the selected start angle after confirmed downward movement. Keep it hidden until the threshold is crossed, and discard it if the lid reverses or pauses before the effect begins. Physical validation of the first visible frame remains pending.
+- Prefer the lid sensor's hundredths-of-a-degree report when available, with a whole-degree fallback. Ignore tiny sensor jitter in the motion target while keeping manual reopening controlled by the lid through the final angle; the settings illustration still displays whole degrees.
+- Let slow sub-degree lid changes contribute their actual size to motion smoothing, with a quarter-degree lower bound to limit lag. Whole-degree fallback and fast movement keep their existing response.
 - Smooth Infinite Screen's degree-to-degree speed using a short cadence history and gradual response changes. Brief one-degree direction chatter no longer triggers a fast reversal; confirmed reversals brake existing momentum instead of resetting velocity.
 - Keep manual reopening on the same lid-driven smoothing through the final degree, with no separate return trajectory. Continue sensor updates until the image is flat, and preserve direct tracking if the lid recloses before cleanup. Give pause restoration balanced acceleration and a longer, fold-dependent 340–600 ms return with a lower peak speed. Keep the existing perspective, stretch, blur, gradients, shadow, screenshot model, and final fade.
 - Stabilize only the Settings lid-angle number and illustration: a one-degree change appears after 250 ms of continuous readings, while a change of two degrees or more appears immediately. Animation, automatic angle selection, and **Use current angle** continue to use raw sensor readings.

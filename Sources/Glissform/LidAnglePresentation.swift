@@ -17,6 +17,7 @@ struct LidAnglePresentation {
 
     mutating func ingest(_ reading: Double, at time: Double) -> Double? {
         guard reading.isFinite, (0...180).contains(reading), time.isFinite else { return angle }
+        let reading = reading.rounded()
         defer { lastSampleTime = time }
 
         guard let shown = angle else {

@@ -10,7 +10,7 @@ final class SettingsModel: ObservableObject {
     @Published private(set) var automaticStartAngle = false
     @Published private(set) var learnedStartAngle: Double?
     var effectiveStartAngle: Double { automaticStartAngle ? (learnedStartAngle ?? startAngle) : startAngle }
-    @Published private(set) var currentAngle: Double?
+    private(set) var currentAngle: Double?
     @Published private(set) var displayedLidAngle: Double?
     private var lidAnglePresentation = LidAnglePresentation()
     @Published private(set) var sensorStatus = "Connecting…"

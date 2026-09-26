@@ -45,9 +45,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let animationLog = Logger(subsystem: "com.george.glissform.mvp", category: "AnimationTiming")
     private let timingEnabled = ProcessInfo.processInfo.environment["GLISSFORM_MOTION_DIAGNOSTICS"] == "1"
     private var hasSnapshot = false
+    private var snapshotPresented = false
     private var finishingGesture = false
     private var snapshotTask: Task<Void, Never>?
     private var snapshotRequested = false
+    private var earlyCaptureRequested = false
+    private var earlyCaptureBlocked = false
+    private var earlyCaptureAngle = 0.0
+    private var earlyCaptureTime = 0.0
     private var snapshotToken = 0
     private var displayID: CGDirectDisplayID?
     private var sleeping = false
@@ -233,6 +238,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             motion.reset()
             return
         }
+        let previousAngle = lastLidAngle
+        let previousTime = lastLidTime
         lastReading = Date()
         lastLidAngle = angle
         lastLidTime = time
@@ -273,9 +280,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let progress = beganOpening ? currentProgress : motion.update(angle: angle, time: time)
         currentProgress = progress
         settingsModel.updateLearnedStartAngle(motion.learnedStartAngle)
-        sensor.setActivePolling(motion.active || wakeOpening.pending || (hasSnapshot && !motion.desktopResumed))
+        sensor.setActivePolling(motion.active || earlyCaptureRequested || wakeOpening.pending
+                                || (hasSnapshot && !motion.desktopResumed))
         if motion.active || !finishingGesture || renderer?.isFinishingWithLid == true {
             renderer?.setLidAngle(angle, referenceAngle: motion.activationAngle, sampleTime: time)
+        }
+        if !motion.active && !openingGesture && !wakeOpening.pending,
+           let startAngle = motion.effectiveStartAngle, !motion.desktopResumed {
+            if angle >= startAngle + 3 { earlyCaptureBlocked = false }
+            if earlyCaptureRequested {
+                if angle > earlyCaptureAngle + 0.25 || time - earlyCaptureTime > 0.35 {
+                    endGesture()
+                    earlyCaptureBlocked = true
+                    return
+                } else {
+                    // The screenshot is kept hidden until the actual threshold.
+                    return
+                }
+            } else if !earlyCaptureBlocked && !snapshotRequested && !finishingGesture && canUseDesktop(),
+                      let previousAngle, previousTime.isFinite {
+                let elapsed = time - previousTime
+                let drop = previousAngle - angle
+                if angle >= startAngle && angle < startAngle + 3,
+                   elapsed > 0 && elapsed <= 0.12,
+                   drop >= 0.15 && drop / elapsed >= 12 {
+                    earlyCaptureRequested = true
+                    earlyCaptureAngle = angle
+                    earlyCaptureTime = time
+                    sensor.setActivePolling(true)
+                    prepareGestureSnapshot()
+                    return
+                }
+            }
+        } else if motion.active {
+            earlyCaptureRequested = false
         }
         guard motion.active else {
             finishGesture(mode: motion.desktopResumed ? .pause : .lid)
@@ -290,6 +328,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if !snapshotRequested { prepareGestureSnapshot() }
         showProgress()
+        if hasSnapshot { presentPreparedSnapshot() }
     }
 
     private func connect() {
@@ -422,40 +461,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     if timingEnabled {
                         animationLog.debug("capture: metadataWaitMs=\((captureStarted - started) * 1000), pixelsMs=\((ProcessInfo.processInfo.systemUptime - captureStarted) * 1000), width=\(CVPixelBufferGetWidth(buffer)), height=\(CVPixelBufferGetHeight(buffer))")
                     }
-                    guard !Task.isCancelled, token == snapshotToken, motion.active,
+                    guard !Task.isCancelled, token == snapshotToken,
+                          (motion.active || earlyCaptureRequested),
                           ready, !sleeping, !quitting else { return }
                     guard captureMayPresent() else { discardCapture(); return }
                     try await renderer.prepareSnapshot(pixelBuffer: buffer)
                 }
-                guard !Task.isCancelled, token == snapshotToken, motion.active,
+                guard !Task.isCancelled, token == snapshotToken,
+                      (motion.active || earlyCaptureRequested),
                       ready, !sleeping, !quitting else { return }
                 guard captureMayPresent() else { discardCapture(); return }
                 hasSnapshot = true
                 if timingEnabled {
                     animationLog.debug("prepared: opening=\(self.openingGesture), totalMs=\((ProcessInfo.processInfo.systemUptime - started) * 1000)")
                 }
-                // Raise only after capture: the snapshot retains the normal Dock
-                // and menu bar, while their live counterparts stay underneath.
-                window?.pinToCurrentSpace()
-                window?.level = NSWindow.Level(rawValue: NSWindow.Level.popUpMenu.rawValue + 1)
-                window?.ignoresMouseEvents = false
-                window?.orderFrontRegardless()
-                setStatus(openingGesture ? "Animating · Opening" : "Animating · Reopen to reverse")
-                // Closing replaces matching flat pixels without a double-image
-                // dissolve. Wake fades the retained fold on the render timeline.
-                    if openingGesture {
-                    logWake("cached frame prepared; reveal requested")
-                    clearWakeTracking()
+                if motion.active {
+                    showProgress()
+                    presentPreparedSnapshot()
                 }
-                showProgress()
-                revealOverlay()
             } catch {
                 guard token == snapshotToken, !Task.isCancelled else { return }
+                let wasEarlyCapture = earlyCaptureRequested
                 discardCapture()
+                if wasEarlyCapture { earlyCaptureBlocked = true }
                 setStatus("Screenshot unavailable · check permission")
                 NSLog("Screenshot: %@", error.localizedDescription)
             }
         }
+    }
+
+    private func presentPreparedSnapshot() {
+        guard hasSnapshot, motion.active, !snapshotPresented, captureMayPresent() else { return }
+        snapshotPresented = true
+        // The prepared screenshot retains the Dock and menu bar underneath.
+        window?.pinToCurrentSpace()
+        window?.level = NSWindow.Level(rawValue: NSWindow.Level.popUpMenu.rawValue + 1)
+        window?.ignoresMouseEvents = false
+        window?.orderFrontRegardless()
+        setStatus(openingGesture ? "Animating · Opening" : "Animating · Reopen to reverse")
+        if openingGesture {
+            logWake("cached frame prepared; reveal requested")
+            clearWakeTracking()
+        }
+        revealOverlay()
     }
 
     private func invalidateCaptureMetadata() {
@@ -536,6 +584,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         snapshotTask = nil
         snapshotRequested = false
         hasSnapshot = false
+        snapshotPresented = false
+        earlyCaptureRequested = false
+        earlyCaptureBlocked = false
         retainedClosingSnapshot = retainingSnapshot && renderer?.hasPreparedSnapshot == true
         if retainedClosingSnapshot { renderer?.pauseSnapshot() }
         else { renderer?.clear() }

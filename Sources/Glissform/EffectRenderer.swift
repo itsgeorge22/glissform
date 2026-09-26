@@ -123,8 +123,8 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         fullClosureRadians = ScreenProjection.foldRadians(lidAngle: 4, referenceAngle: referenceAngle)
         let next = ScreenProjection.foldRadians(lidAngle: angle, referenceAngle: referenceAngle)
         smoothing.ingest(target: next, at: sampleTime)
-        guard next != foldRadians else { return }
-        foldRadians = next
+        guard smoothing.target != foldRadians else { return }
+        foldRadians = smoothing.target
         scheduleSettling()
     }
 
@@ -158,7 +158,9 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         self.device = device
         self.commandQueue = queue
         self.gaussianPyramid = MPSImageGaussianPyramid(device: device)
-        self.gaussianPyramid.edgeMode = .zero
+        // The shader applies one continuous soft image boundary. Clamping the
+        // pyramid itself avoids baking separate dark borders into every mip.
+        self.gaussianPyramid.edgeMode = .clamp
         self.view = view
         super.init()
         guard CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, device, nil, &textureCache) == kCVReturnSuccess else {
@@ -1056,7 +1058,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
                                    constant float4 &uniforms [[buffer(0)]], constant float &frost [[buffer(1)]],
                                    constant float2 &eye [[buffer(2)]], constant float &opacity [[buffer(3)]],
                                    constant float &ditherScale [[buffer(4)]]) {
-        constexpr sampler sampling(coord::normalized, address::clamp_to_zero, filter::linear, mip_filter::linear);
+        constexpr sampler sampling(coord::normalized, address::clamp_to_edge, filter::linear, mip_filter::linear);
         float theta = max(0.0f, uniforms.w);
         // Only the displayed angle controls effect strength; a raw sensor
         // threshold must never switch the shader on or off during a handoff.
@@ -1098,6 +1100,16 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
                 color += desktop.sample(sampling, uv + offset, level(lod)).rgb * weights[x] * weights[y];
             }
         }
+        // With zero-addressed taps, each of the three sample columns crosses
+        // the source edge separately and draws a visible parallel contour at
+        // either side of the projected desktop. Treat the screenshot as one
+        // soft rectangle instead: clamp its colors, then fade their coverage
+        // continuously over approximately two blur sigmas at every edge.
+        float2 feather = max(float2(radius * 1.154700538f) / max(uniforms.yz, float2(1)),
+                             float2(0.5f) / max(uniforms.yz, float2(1)));
+        float2 entering = smoothstep(-feather, feather, uv);
+        float2 leaving = 1.0f - smoothstep(1.0f - feather, 1.0f + feather, uv);
+        color *= entering.x * entering.y * leaving.x * leaving.y;
         // Broad closure shading stays gentle; a separate contact shadow is
         // anchored to the physical top bezel, independent of projected image UVs.
         // Drive its onset with actual displayed degrees, not eased full-gesture
@@ -1109,16 +1121,23 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         float contactDepth = 0.035f + 0.20f * (1.0f - exp(-degrees / 22.0f));
         float contactShadow = contactStrength * exp(-pow(in.uv.y / contactDepth, 1.6f));
         color *= (1.0f - broadShadow) * (1.0f - contactShadow);
-        // A fixed 8x8 ordered threshold spreads the final 8-bit rounding over
-        // neighboring pixels. Scale in linear light by the sRGB transfer slope:
-        // the perturbation stays below half an encoded code value. Static screen
-        // coordinates avoid temporal noise; zero identity and black stay exact.
+        // A fixed ordered threshold spreads final 8-bit rounding across pixels.
+        // Repeating the same 8x8 tile made each row favor a different shade,
+        // which left horizontal bands in broad pale gradients. Rotate the tile's
+        // row phase across neighboring columns so every 64-pixel span samples
+        // all 64 thresholds on each row. Keep the pattern fixed on screen to
+        // avoid temporal noise. Zero identity and black stay exact.
         uint2 position = uint2(in.position.xy);
+        uint2 tile = position >> 3;
+        uint2 local = (position + uint2((tile.x * 3u + tile.y * 5u) & 7u,
+                                           (tile.x * 5u + tile.y * 3u) & 7u)) & 7u;
         uint rank = 0;
         for (uint bit = 0; bit < 3; ++bit) {
-            rank |= (((position.x >> bit) ^ (position.y >> bit)) & 1u) << (5u - 2u * bit);
-            rank |= ((position.y >> bit) & 1u) << (4u - 2u * bit);
+            rank |= (((local.x >> bit) ^ (local.y >> bit)) & 1u) << (5u - 2u * bit);
+            rank |= ((local.y >> bit) & 1u) << (4u - 2u * bit);
         }
+        // Scale in linear light by the sRGB transfer slope; the perturbation
+        // remains below half an encoded code value.
         float noise = ((float(rank) + 0.5f) / 64.0f - 0.5f) * ditherScale / 255.0f;
         float3 slope = select(float3(1.0f / 12.92f),
                              (2.4f / 1.055f) * pow(color, float3(1.4f / 2.4f)), color > 0.0031308f);

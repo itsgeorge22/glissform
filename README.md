@@ -31,11 +31,11 @@ See the [changelog](CHANGELOG.md) for released changes and any upcoming work.
 | Tested hardware | MacBook Air M5 15-inch (Mac17,4), the development machine. Other models are unverified. |
 | Permission | Screen Recording access for individual desktop screenshots. |
 
-The lid sensor uses an undocumented protocol. If you try Glissform on another configuration, [share a compatibility report](https://github.com/itsgeorge22/glissform/issues/new?template=compatibility_report.yml), whether it works or fails. Community reports help build coverage; they are not hardware certification.
+The lid sensor uses an undocumented protocol. Glissform tries fractional angle readings and falls back to whole degrees when unavailable. If you try Glissform on another configuration, [share a compatibility report](https://github.com/itsgeorge22/glissform/issues/new?template=compatibility_report.yml), whether it works or fails. Community reports help build coverage; they are not hardware certification.
 
 ## Privacy
 
-One screenshot is taken per gesture and kept in memory. A completed closing image may remain through lid-close sleep for the following opening; it stays hidden while locked or asleep and is released after completion or cancellation. There is no continuous recording, audio capture, screenshot saving, networking, or analytics. Normal system sleep remains enabled.
+One screenshot is taken per closing attempt and kept in memory. On a fast close it may be requested just before the selected start angle; if the lid reverses or stops before that angle, the hidden image is discarded. A completed closing image may remain through lid-close sleep for the following opening; it stays hidden while locked or asleep and is released after completion or cancellation. There is no continuous recording, audio capture, screenshot saving, networking, or analytics. Normal system sleep remains enabled.
 
 ## Feedback and support
 
@@ -59,6 +59,6 @@ Developer build and verification steps are documented in [Contributing](CONTRIBU
 
 ## Credits and licensing
 
-The [LidAngleSensor project](https://github.com/samhenrigold/LidAngleSensor) was consulted for the HID protocol. Glissform's sensor implementation and visual effect were written independently. Interface icons are by [Iconly](https://iconly.pro), used under the owner's paid license; see [provenance](docs/ICONLY.md). See [app artwork](Artwork/README.md) for the native icon sources.
+The [LidAngleSensor project](https://github.com/samhenrigold/LidAngleSensor) and [Clamshell](https://github.com/danielradosa/clamshell) were consulted for the HID reports. Glissform's sensor implementation and visual effect were written independently. Interface icons are by [Iconly](https://iconly.pro), used under the owner's paid license; see [provenance](docs/ICONLY.md). See [app artwork](Artwork/README.md) for the native icon sources.
 
 **No open-source license has been selected.** Public source availability does not itself grant an open-source license. Third-party assets retain their own terms.
