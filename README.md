@@ -18,7 +18,7 @@ The main branch also contains unreleased improvements; see the [changelog](CHANG
 
 - Experience a lid-driven desktop animation with full-angle perspective, progressive frost, and shadow.
 - Reverse the effect by reopening the lid, including experimental opening after lid-close sleep using the same screenshot.
-- Choose the starting angle and optionally restore desktop access after a two-second pause.
+- Choose the starting angle manually or let a two-second lid pause set it automatically, one degree below the held angle; optionally restore desktop access after a pause.
 - Try a capture-free motion preview inside settings.
 - Keep Glissform running from the menu bar when its settings window is closed.
 

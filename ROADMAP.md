@@ -12,7 +12,7 @@ The first feature, Infinite Screen, implements screenshot-based closing animatio
 
 ## Current priority — Space-change verification
 
-- [x] Resolve [#1: Infinite Screen breaks when switching Spaces with a full-screen app open](https://github.com/itsgeorge22/glissform/issues/1) in code: keep visible pixels in their source Space instead of duplicating them across the transition, then cancel the animation, release input and discard its screenshot when the active Space changes; require reopening above **Begin at** before the next gesture.
+- [x] Resolve [#1: Infinite Screen breaks when switching Spaces with a full-screen app open](https://github.com/itsgeorge22/glissform/issues/1) in code: keep visible pixels in their source Space instead of duplicating them across the transition, then cancel the animation, release input and discard its screenshot when the active Space changes; require reopening above the active starting angle before the next gesture.
 - [ ] Physically confirm normal and full-screen Space changes on the development Mac, with settings both open and closed, before closing the issue.
 
 ## Product development
@@ -23,6 +23,9 @@ The first feature, Infinite Screen, implements screenshot-based closing animatio
 - [ ] Continue improving existing features alongside new work; expansion is not dependent on making Infinite Screen the entire product.
 
 ## Next alpha iterations — shared foundations and Infinite Screen
+
+- [x] Add **Set starting angle automatically** and implement two-second resting-angle selection one degree below the held angle, **Begin at** fallback, gesture and wake reference locking, and adoption of a lower angle after optional pause restoration.
+- [ ] Physically verify automatic angle learning, changes to the manual fallback, pause restoration, reversal, sleep/wake, and sensor gaps on the development Mac.
 
 - [x] Implement unreleased capture metadata preparation, backing-pixel validation, and overlay-only exclusion with a safe hidden-overlay fallback that preserves known settings windows; retain one screenshot per gesture.
 - [x] Implement acquisition-timed smoothing, higher active polling, display-linked motion and opacity, a prepared flat closing entrance, velocity-aware returns, and bounded cleanup when display callbacks stop.

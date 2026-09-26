@@ -4,6 +4,15 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+### Added
+
+- Activate **Set starting angle automatically**: a steady open lid for two seconds sets the next closing angle one degree below the held angle, overriding **Begin at**. Until an angle is learned, **Begin at** remains the fallback. Once learned, its saved controls dim and become unavailable until automatic selection is switched off. The learned angle stays fixed through a gesture and eligible wake opening. If pause-to-resume is also on, restoring the desktop at a lower paused angle adopts a threshold one degree below it without immediately rearming; reopening above the held angle permits the next gesture. Switching the option off restores manual control.
+
+### Changed
+
+- Label the live lid reading, mark the illustration while previewing, show saved-settings guidance when Infinite Screen is off, and clarify the waiting message before a new automatic angle is learned.
+- Clarify that a still lid sets or updates the automatic starting angle, while a lid pause below that angle restores the desktop.
+
 ## 0.1.0-alpha.7 — 2026-09-21
 
 Seventh public alpha: smoother display-linked motion and screenshot handoffs, refined frost and contact shadow, safer Space switching, stronger capture validation, and expanded public project guidance. Space changes now keep a visible snapshot in its source Space and cancel the gesture after the transition; physical confirmation of the full-screen transition remains pending. Source release; local builds remain ad-hoc signed and are not notarized.

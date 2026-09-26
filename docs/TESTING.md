@@ -6,7 +6,7 @@ Glissform’s current feature-specific checks cover Infinite Screen. Shared UI c
 
 Run `bash scripts/build.sh` followed by `bash scripts/test.sh`.
 
-Motion checks exercise thresholds, repeated closure, slow whole-degree readings, reversal, settling, zero-effect entrance, interrupted handoffs, low-lid startup, and reset behavior. Quantized sensor traces run on 60/120 Hz frame clocks, including uneven report intervals and mixed one/two-degree reports. Acquisition-time checks separate sample history from render queries, cover batched delivery and future presentation queries, and verify bounded velocity-aware returns. Both tracking error and frame-to-frame speed ripple are bounded; checking delay alone can reward visibly uneven movement. Full-angle checks cover starting angles from 20° to 130°. Requested polling rates are not measurements of real sensor update frequency.
+Motion checks exercise thresholds, automatic two-second resting-angle learning and fallback, repeated closure, slow whole-degree readings, reversal, settling, zero-effect entrance, interrupted handoffs, low-lid startup, and reset behavior. A synthetic lifecycle check verifies that changing the manual fallback does not cancel a capture anchored to a learned angle. Quantized sensor traces run on 60/120 Hz frame clocks, including uneven report intervals and mixed one/two-degree reports. Acquisition-time checks separate sample history from render queries, cover batched delivery and future presentation queries, and verify bounded velocity-aware returns. Both tracking error and frame-to-frame speed ripple are bounded; checking delay alone can reward visibly uneven movement. Full-angle checks cover starting angles from 20° to 130°. Requested polling rates are not measurements of real sensor update frequency.
 
 Capture checks use synthetic dimensions, window identities and asynchronous metadata loaders. They cover scaled backing sizes, mismatched output rejection, overlay-only exclusion, the hidden-overlay application fallback, preservation of known settings windows, cache expiry, shared discovery, waiter cancellation and invalidation. They take no desktop screenshots. Physical capture composition and pixel matching still need the tests below.
 
@@ -118,7 +118,7 @@ Record the app version, Mac model, macOS version, display arrangement, start ang
 - Let the Mac sleep, wake and unlock, then close again.
 - Exercise permission denial/revocation, display changes, and unavailable capture/sensor paths where practical.
 - Check external displays, multiple Spaces, full-screen apps, Dock/menu coverage, and restoration of mouse access.
-- While an animation is pending and while it is visible, switch between a normal Space and another app's native full-screen Space. Confirm the frozen effect remains only on its source side instead of appearing on both sides of the switch animation, then clears, mouse access returns, movement below **Begin at** does not restart it, and reopening above **Begin at** permits one fresh screenshot and animation in the new Space. Repeat with settings open and closed.
+- While an animation is pending and while it is visible, switch between a normal Space and another app's native full-screen Space. Confirm the frozen effect remains only on its source side instead of appearing on both sides of the switch animation, then clears, mouse access returns, movement below the active starting angle does not restart it, and reopening above that angle permits one fresh screenshot and animation in the new Space. Repeat with settings open and closed.
 - Reopen and quit. Confirm no overlay remains.
 
 Measure capture delay, frame timing, CPU/GPU use, memory, and power before making performance claims. Hardware tests are not complete merely because synthetic tests pass.
@@ -128,6 +128,10 @@ Measure capture delay, frame timing, CPU/GPU use, memory, and power before makin
 Automated checks cover the default-off behavior, 0.5/2/10-second motion-model test delays (the app uses a fixed two seconds), jitter tolerance, gradual movement, reversals, stale and invalid reports, rearming strictly above the threshold, delayed screenshot rejection, visible return-to-flat, and sleep/display/quit interruptions. These use synthetic sensor timestamps and screenshots; they do not replace physical lid testing.
 
 On hardware, enable Resume desktop after a pause, set a 95° trigger, open above 95°, then close to 80° and hold. Confirm the effect returns to zero and the desktop accepts input; subsequent movement below 95° must not retrigger it. Reopen above 95° and close to verify a new gesture. The app uses a fixed two-second delay. Repeat with slow movement, direction changes, sleep, and toggle changes. Check that the toggle survives relaunch and that older saved custom delays have no effect.
+
+## Automatic starting angle
+
+On the development Mac, turn on Set starting angle automatically with Begin at set to a different value. Hold the open lid still for two seconds and confirm Settings shows a learned angle one degree below the held reading. Close quickly and slowly through that threshold, then reopen; changing Begin at during the gesture must leave its screenshot and image plane intact. With Resume desktop after a pause also on, hold the lid still at a lower angle until the desktop returns; confirm the new start is one degree below the held angle without an immediate restart. Reopen above the held angle, close again, and check one fresh screenshot. Repeat with short rests, slow movement, sensor gaps, sleep/wake, and the automatic toggle off/on. These physical checks remain pending; the synthetic suite covers state transitions and capture cleanup only.
 
 ### Permission card presentation
 

@@ -72,12 +72,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.button?.image = BrandIcon.menuBar
         statusItem.button?.toolTip = "Glissform"
         UserDefaults.standard.register(defaults: ["animationStartAngle": 100.0, "animationEnabled": true,
-                                                  "resumeAfterPause": false])
+                                                  "resumeAfterPause": false,
+                                                  "automaticStartAngleEnabled": false])
         let storedAngle = UserDefaults.standard.double(forKey: "animationStartAngle")
         let startAngle = storedAngle.isFinite ? min(130, max(20, storedAngle)).rounded() : 100
         let animationEnabled = UserDefaults.standard.bool(forKey: "animationEnabled")
         motion.startAngle = startAngle
         motion.resumeAfterPause = UserDefaults.standard.bool(forKey: "resumeAfterPause")
+        motion.automaticStartAngle = UserDefaults.standard.bool(forKey: "automaticStartAngleEnabled")
         let menu = NSMenu()
         statusLine.isEnabled = false
         menu.addItem(statusLine)
@@ -98,13 +100,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             animationEnabled: animationEnabled,
             startAngle: startAngle,
             screenCaptureAllowed: CGPreflightScreenCaptureAccess(),
-            resumeAfterPause: motion.resumeAfterPause
+            resumeAfterPause: motion.resumeAfterPause,
+            automaticStartAngle: motion.automaticStartAngle
         )
         settingsModel.onAnimationEnabledChange = { [weak self] enabled in
             self?.applyAnimationEnabled(enabled)
         }
         settingsModel.onStartAngleChange = { [weak self] angle in
             self?.applyStartAngle(angle)
+        }
+        settingsModel.onAutomaticStartAngleChange = { [weak self] enabled in
+            self?.applyAutomaticStartAngle(enabled)
         }
         settingsModel.onResumeAfterPauseChange = { [weak self] enabled in
             guard let self else { return }
@@ -244,7 +250,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if firstSample {
                 logWake("first sensor sample: angle=\(angle), locked=\(screenLocked), sessionInactive=\(sessionInactive)")
             }
-            switch wakeOpening.observe(angle: angle, time: time, referenceAngle: settingsModel.startAngle,
+            switch wakeOpening.observe(angle: angle, time: time,
+                                       referenceAngle: motion.effectiveStartAngle ?? settingsModel.startAngle,
                                        desktopAvailable: ready && canUseDesktop()) {
             case .prepare:
                 guard retainedClosingSnapshot, renderer?.hasPreparedSnapshot == true else {
@@ -265,8 +272,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard ready else { return }
         let progress = beganOpening ? currentProgress : motion.update(angle: angle, time: time)
         currentProgress = progress
+        settingsModel.updateLearnedStartAngle(motion.learnedStartAngle)
         sensor.setActivePolling(motion.active || wakeOpening.pending)
-        renderer?.setLidAngle(angle, referenceAngle: motion.activationAngle, sampleTime: time)
+        if motion.active || !finishingGesture {
+            renderer?.setLidAngle(angle, referenceAngle: motion.activationAngle, sampleTime: time)
+        }
         guard motion.active else {
             finishGesture(restoringPause: motion.desktopResumed)
             setStatus(motion.desktopResumed ? "Desktop restored" : "Ready")
@@ -600,7 +610,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func captureMayPresent() -> Bool {
         guard canUseDesktop() else { return false }
         return !openingGesture || wakeOpening.canPresent(time: ProcessInfo.processInfo.systemUptime,
-            referenceAngle: settingsModel.startAngle, desktopAvailable: true)
+            referenceAngle: motion.effectiveStartAngle ?? settingsModel.startAngle, desktopAvailable: true)
     }
 
     private func checkWakeProgress() {
@@ -691,7 +701,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         endGesture()
         motion.reset()
         if settingsModel.animationEnabled, ready, !sleeping {
-            setStatus("Ready · Open above \(Int(settingsModel.startAngle))° to rearm")
+            setStatus("Ready · Open above \(Int(motion.effectiveStartAngle ?? settingsModel.startAngle))° to rearm")
             // Let AppKit finish the Space transition before discovering capture
             // metadata for the newly active desktop.
             DispatchQueue.main.async { [weak self] in self?.warmCaptureMetadata() }
@@ -700,12 +710,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func applyStartAngle(_ angle: Double) {
         guard motion.startAngle != angle else { return }
+        let previousReference = motion.effectiveStartAngle
+        motion.startAngle = angle
+        UserDefaults.standard.set(angle, forKey: "animationStartAngle")
+        guard motion.effectiveStartAngle != previousReference else { return }
         cancelWake("starting angle changed")
         endGesture()
         motion.reset()
-        motion.startAngle = angle
-        UserDefaults.standard.set(angle, forKey: "animationStartAngle")
         setStatus("Ready · Close past \(Int(angle))° to animate")
+    }
+
+    private func applyAutomaticStartAngle(_ enabled: Bool) {
+        cancelWake("automatic starting angle changed")
+        endGesture()
+        motion.automaticStartAngle = enabled
+        settingsModel.updateLearnedStartAngle(nil)
+        UserDefaults.standard.set(enabled, forKey: "automaticStartAngleEnabled")
+        if settingsModel.animationEnabled {
+            setStatus(enabled ? "Ready · Hold the open lid still to set the starting angle"
+                              : "Ready · Close past \(Int(settingsModel.startAngle))° to animate")
+        } else {
+            setStatus("Infinite Screen is off")
+        }
     }
 
     private func applyAnimationEnabled(_ enabled: Bool) {
@@ -715,7 +741,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         endGesture()
         motion.reset()
         if enabled {
-            setStatus("Ready · Close past \(Int(settingsModel.startAngle))° to animate")
+            setStatus("Ready · Close past \(Int(motion.effectiveStartAngle ?? settingsModel.startAngle))° to animate")
         } else {
             setStatus("Infinite Screen is off")
         }
@@ -849,7 +875,7 @@ extension AppDelegate {
 
     /// Real gesture/cancellation paths with synthetic pixels and no capture permission.
     static func lifecycleSelfTest() async throws {
-        let savedSettings = ["animationStartAngle", "animationEnabled"].map {
+        let savedSettings = ["animationStartAngle", "animationEnabled", "automaticStartAngleEnabled"].map {
             ($0, UserDefaults.standard.object(forKey: $0))
         }
         defer {
@@ -882,7 +908,8 @@ extension AppDelegate {
         memset(CVPixelBufferGetBaseAddress(buffer), 0, CVPixelBufferGetDataSize(buffer))
         CVPixelBufferUnlockBaseAddress(buffer, [])
 
-        func makeGesture(screenAccessAllowed: @escaping () -> Bool = { true }) throws -> (AppDelegate, SyntheticCapture) {
+        func makeGesture(screenAccessAllowed: @escaping () -> Bool = { true },
+                         startGesture: Bool = true) throws -> (AppDelegate, SyntheticCapture) {
             let source = SyntheticCapture()
             let app = AppDelegate(capture: source, desktopAvailable: { _ in true }, screenAccessAllowed: screenAccessAllowed)
             let window = OverlayWindow(contentRect: NSRect(x: 16, y: 16, width: 64, height: 64))
@@ -899,8 +926,10 @@ extension AppDelegate {
             app.ready = true
             app.settingsModel.configure(animationEnabled: true, startAngle: 100, screenCaptureAllowed: true)
             app.motion.startAngle = 100
-            app.handleLidReading(110)
-            app.handleLidReading(80)
+            if startGesture {
+                app.handleLidReading(110)
+                app.handleLidReading(80)
+            }
             return (app, source)
         }
         func checkCleared(_ app: AppDelegate) throws {
@@ -931,6 +960,36 @@ extension AppDelegate {
                 }
                 try await Task.sleep(nanoseconds: 10_000_000)
             }
+        }
+        do {
+            let (app, source) = try makeGesture(startGesture: false)
+            defer { app.shutdown(); app.window?.close() }
+            app.motion.automaticStartAngle = true
+            app.settingsModel.configure(animationEnabled: true, startAngle: 100,
+                                        screenCaptureAllowed: true, automaticStartAngle: true)
+            app.settingsModel.onStartAngleChange = { [weak app] angle in app?.applyStartAngle(angle) }
+            app.settingsModel.onAutomaticStartAngleChange = { [weak app] enabled in
+                app?.applyAutomaticStartAngle(enabled)
+            }
+            for frame in 0...40 { app.handleLidReading(110, time: Double(frame) / 20) }
+            try check(app.motion.learnedStartAngle == 109 && app.settingsModel.learnedStartAngle == 109,
+                      "The live settings model must show the automatically learned angle")
+            app.handleLidReading(80, time: 2.05)
+            try await waitForCapture(source)
+            let captureTask = app.snapshotTask
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await captureTask?.value
+            try check(app.hasSnapshot && app.motion.active, "The learned angle must start a real gesture")
+            app.settingsModel.setStartAngle(120)
+            try check(app.hasSnapshot && app.motion.active && app.motion.activationAngle == 109
+                      && app.motion.effectiveStartAngle == 109,
+                      "Editing the manual fallback must not cancel an automatically anchored capture")
+            app.settingsModel.setAutomaticStartAngle(false)
+            try checkCleared(app)
+            try check(app.motion.effectiveStartAngle == 120 && app.settingsModel.learnedStartAngle == nil,
+                      "Turning automatic selection off must restore the manual trigger and clear capture")
+            print("PASS: live automatic learning, manual edit without capture restart, toggle-off cleanup")
         }
         // Closing settings must preserve both an in-flight capture and a visible
         // gesture. Reopening must reuse the window and restore foreground access.

@@ -4,16 +4,70 @@ import Foundation
 struct ClosingMotion {
     private(set) var activationAngle: Double = 80
     var startAngle: Double?
+    var automaticStartAngle = false {
+        didSet {
+            guard automaticStartAngle != oldValue else { return }
+            learnedStartAngle = nil
+            reset()
+        }
+    }
+    private(set) var learnedStartAngle: Double?
+    var effectiveStartAngle: Double? {
+        automaticStartAngle ? (learnedStartAngle ?? startAngle) : startAngle
+    }
     private var armed = false
     private var hasReference = false
     private(set) var active = false
     var resumeAfterPause = false { didSet { clearPauseTracking() } }
     var pauseDuration: Double = 2 { didSet { clearPauseTracking() } }
     private(set) var desktopResumed = false
+    private var desktopResumeRearmAngle: Double?
     private var stillSince: Double?
     private var lastSampleTime: Double?
     private var lowestAngle = 0.0
     private var highestAngle = 0.0
+    private var restingSince: Double?
+    private var restingLastSampleTime: Double?
+    private var restingLowestAngle = 0.0
+    private var restingHighestAngle = 0.0
+
+    private mutating func clearRestingTracking() {
+        restingSince = nil
+        restingLastSampleTime = nil
+    }
+
+    private func automaticThreshold(below angle: Double) -> Double {
+        angle.rounded() - 1
+    }
+
+    private mutating func learnRestingAngle(_ angle: Double, time: Double) {
+        guard automaticStartAngle, !active, !desktopResumed,
+              angle.isFinite, (20...130).contains(angle), time.isFinite else {
+            clearRestingTracking()
+            return
+        }
+        if let learnedStartAngle, abs((learnedStartAngle + 1) - angle) <= 1 {
+            clearRestingTracking()
+            return
+        }
+        if restingSince == nil || restingLastSampleTime.map({ time < $0 || time - $0 > 0.25 }) == true {
+            restingSince = time
+            restingLowestAngle = angle
+            restingHighestAngle = angle
+        }
+        restingLowestAngle = min(restingLowestAngle, angle)
+        restingHighestAngle = max(restingHighestAngle, angle)
+        if restingHighestAngle - restingLowestAngle > 1 {
+            restingSince = time
+            restingLowestAngle = angle
+            restingHighestAngle = angle
+        }
+        restingLastSampleTime = time
+        if time - (restingSince ?? time) >= 2 {
+            learnedStartAngle = automaticThreshold(below: angle)
+            clearRestingTracking()
+        }
+    }
 
     private mutating func clearPauseTracking() {
         stillSince = nil
@@ -46,26 +100,36 @@ struct ClosingMotion {
         hasReference = false
         active = false
         desktopResumed = false
+        desktopResumeRearmAngle = nil
         clearPauseTracking()
+        clearRestingTracking()
     }
 
     /// Only the wake coordinator may arm below the threshold, after fresh
     /// upward readings. Ordinary startup and setting changes remain unarmed.
     mutating func beginOpening(angle: Double, time: Double) -> Float {
-        guard let startAngle, angle.isFinite, (0..<startAngle).contains(angle) else { return 0 }
+        guard let referenceAngle = effectiveStartAngle, angle.isFinite,
+              (0..<referenceAngle).contains(angle) else { return 0 }
         reset()
         armed = true
+        clearRestingTracking()
         return update(angle: angle, time: time)
     }
 
     mutating func update(angle: Double, time: Double = ProcessInfo.processInfo.systemUptime) -> Float {
-        guard angle.isFinite, (0...180).contains(angle) else { clearPauseTracking(); return 0 }
-        if let startAngle {
-            activationAngle = startAngle
+        guard angle.isFinite, (0...180).contains(angle) else {
+            clearPauseTracking()
+            clearRestingTracking()
+            return 0
+        }
+        learnRestingAngle(angle, time: time)
+        if let startAngle = effectiveStartAngle {
             if desktopResumed {
-                guard angle > startAngle else { return 0 }
+                guard angle > max(startAngle, desktopResumeRearmAngle ?? startAngle) else { return 0 }
                 desktopResumed = false
+                desktopResumeRearmAngle = nil
             }
+            activationAngle = startAngle
             if angle >= startAngle {
                 armed = true
                 active = false
@@ -75,10 +139,15 @@ struct ClosingMotion {
             guard armed else { return 0 }
             active = true
             if pauseExpired(angle: angle, time: time) {
+                if automaticStartAngle, (20...130).contains(angle) {
+                    learnedStartAngle = automaticThreshold(below: angle)
+                }
                 active = false
                 armed = false
                 desktopResumed = true
+                desktopResumeRearmAngle = angle
                 clearPauseTracking()
+                clearRestingTracking()
                 return 0
             }
             let raw = min(1, max(0, (startAngle - angle) / max(1, startAngle - 4)))

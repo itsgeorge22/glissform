@@ -50,7 +50,11 @@ This checklist is part of normal project work, not a background automation. It d
 
 ## Verification
 
-- Run bash scripts/build.sh and bash scripts/test.sh for app changes.
+- For documentation or workflow-only changes, check the affected text, links, and formatting; do not build or run app tests.
+- For UI copy, icons, or layout changes without behavior changes, run `bash scripts/build.sh` once after the final edit and inspect the built app in the relevant visual states. Skip the full test suite unless the change also affects interaction or state behavior.
+- For motion, sensor, capture, gesture, sleep/wake, permission, settings-logic, or app-lifecycle changes, run relevant focused checks while working. After the implementation is final, run `bash scripts/build.sh` and `bash scripts/test.sh` once. Avoid repeating the full suite after each small adjustment.
+- Before a release, run the full build and test suite on the intended release build and complete the relevant physical checks. Automated checks do not replace lid, sleep, or wake validation on the development Mac.
+- Summarize successful checks briefly; inspect and report detailed output when a check fails. Keep generated test output out of Git.
 - CI uses --motion-only because hosted runners are not hardware/GPU acceptance tests. Never describe CI as physical lid verification.
 - Test snapshot cancellation and cleanup on reversal, sleep, display changes, and quit when changing lifecycle behavior.
 - Keep screenshots, generated binaries, logs, caches, signing material, and credentials out of Git.

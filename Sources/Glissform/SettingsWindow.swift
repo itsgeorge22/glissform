@@ -7,6 +7,9 @@ final class SettingsModel: ObservableObject {
     @Published var selectedPage: Page = .infiniteScreen
     @Published private(set) var animationEnabled = true
     @Published private(set) var startAngle = 100.0
+    @Published private(set) var automaticStartAngle = false
+    @Published private(set) var learnedStartAngle: Double?
+    var effectiveStartAngle: Double { automaticStartAngle ? (learnedStartAngle ?? startAngle) : startAngle }
     @Published private(set) var currentAngle: Double?
     @Published private(set) var sensorStatus = "Connecting…"
     @Published private(set) var screenCaptureAllowed = false
@@ -14,16 +17,30 @@ final class SettingsModel: ObservableObject {
 
     var onAnimationEnabledChange: ((Bool) -> Void)?
     var onStartAngleChange: ((Double) -> Void)?
+    var onAutomaticStartAngleChange: ((Bool) -> Void)?
     @Published private(set) var resumeAfterPause = false
     var onResumeAfterPauseChange: ((Bool) -> Void)?
 
     var onOpenPermissions: (() -> Void)?
 
-    func configure(animationEnabled: Bool, startAngle: Double, screenCaptureAllowed: Bool, resumeAfterPause: Bool = false) {
+    func configure(animationEnabled: Bool, startAngle: Double, screenCaptureAllowed: Bool,
+                   resumeAfterPause: Bool = false, automaticStartAngle: Bool = false) {
         self.animationEnabled = animationEnabled
         self.startAngle = startAngle
         self.screenCaptureAllowed = screenCaptureAllowed
         self.resumeAfterPause = resumeAfterPause
+        self.automaticStartAngle = automaticStartAngle
+    }
+
+    func setAutomaticStartAngle(_ enabled: Bool) {
+        guard automaticStartAngle != enabled else { return }
+        automaticStartAngle = enabled
+        learnedStartAngle = nil
+        onAutomaticStartAngleChange?(enabled)
+    }
+
+    func updateLearnedStartAngle(_ angle: Double?) {
+        if learnedStartAngle != angle { learnedStartAngle = angle }
     }
 
     func setResumeAfterPause(_ enabled: Bool) {
@@ -236,7 +253,9 @@ private struct AnimationSettingsView: View {
                         Text("Infinite Screen")
                             .font(SettingsDesign.Typography.pageTitle)
                             .tracking(-0.6)
-                        Text("Your desktop stays in place as the lid closes.")
+                        Text(model.animationEnabled
+                             ? "Your desktop stays in place as the lid closes."
+                             : "Infinite Screen is off. Your settings are saved.")
                             .font(SettingsDesign.Typography.body).foregroundStyle(.secondary)
                     }
                     Spacer()
@@ -257,6 +276,11 @@ private struct AnimationSettingsView: View {
 
                 previewPanel
                     .padding(.top, showsAccessCard ? SettingsDesign.Spacing.cards : SettingsDesign.Spacing.sections)
+                    .padding(.bottom, SettingsDesign.Spacing.cards)
+
+                automaticAngleControls
+                    .padding(.vertical, SettingsDesign.Spacing.cardInset)
+                    .modifier(SettingsCardSurface())
                     .padding(.bottom, SettingsDesign.Spacing.cards)
 
                 pauseControls
@@ -315,18 +339,21 @@ private struct AnimationSettingsView: View {
     }
 
     private var angleControls: some View {
-        VStack(alignment: .leading, spacing: SettingsDesign.Spacing.controls) {
+        let automaticAngleIsActive = model.automaticStartAngle && model.learnedStartAngle != nil
+        return VStack(alignment: .leading, spacing: SettingsDesign.Spacing.controls) {
             HStack {
                 VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
                     Text("Begin at").font(SettingsDesign.Typography.controlTitle)
-                    Text("Higher angles start the effect sooner.")
+                    Text(automaticAngleIsActive
+                         ? "Turn off automatic selection to edit this saved angle."
+                         : "Higher angles start the effect sooner.")
                         .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
                 AngleEntry(model: model)
             }
             VStack(spacing: SettingsDesign.Spacing.detail) {
-                AngleSlider(value: angleBinding)
+                AngleSlider(value: angleBinding, isFallback: automaticAngleIsActive)
                     .frame(height: 22)
                     .accessibilityLabel("Animation start angle")
                     .accessibilityValue("\(Int(model.startAngle)) degrees")
@@ -349,20 +376,27 @@ private struct AnimationSettingsView: View {
                 .font(SettingsDesign.Typography.caption)
             }
         }
+        .disabled(automaticAngleIsActive)
+        .opacity(automaticAngleIsActive ? 0.72 : 1)
     }
 
     private var previewPanel: some View {
         VStack(spacing: 0) {
             HStack(alignment: .top) {
-                Text(model.currentAngle.map { "\(Int($0))°" } ?? "—")
-                    .font(SettingsDesign.Typography.liveValue)
-                    .accessibilityLabel("Current lid angle")
-                    .accessibilityValue(model.currentAngle.map { "\(Int($0)) degrees" } ?? "Unavailable")
+                VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
+                    Text("Current lid angle")
+                        .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                    Text(model.currentAngle.map { "\(Int($0))°" } ?? "—")
+                        .font(SettingsDesign.Typography.liveValue)
+                        .accessibilityLabel("Current lid angle")
+                        .accessibilityValue(model.currentAngle.map { "\(Int($0)) degrees" } ?? "Unavailable")
+                }
                 Spacer()
                 Button {
                     if !isIllustrating {
                         preview.startingAngle = displayedAngle
-                        preview.referenceAngle = max(model.startAngle, displayedAngle)
+                        preview.referenceAngle = max(model.effectiveStartAngle, displayedAngle)
                         preview.angle = displayedAngle
                     }
                     if reduceMotion {
@@ -378,10 +412,19 @@ private struct AnimationSettingsView: View {
                 .help("An illustration of the effect. No screenshot or screen permission needed.")
             }
             .padding(.horizontal, SettingsDesign.Spacing.cardInset).padding(.top, SettingsDesign.Spacing.cardInset)
-            MotionIllustration(angle: displayedAngle, referenceAngle: isIllustrating ? preview.referenceAngle : max(model.startAngle, displayedAngle))
+            MotionIllustration(angle: displayedAngle, referenceAngle: isIllustrating ? preview.referenceAngle : max(model.effectiveStartAngle, displayedAngle))
                 .frame(height: 165)
                 .animation(reduceMotion || preview.isPlaying ? nil : .easeOut(duration: 0.16), value: displayedAngle)
                 .accessibilityHidden(true)
+                .overlay(alignment: .bottom) {
+                    if isIllustrating {
+                        Text("Preview")
+                            .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
+                            .padding(.bottom, SettingsDesign.Spacing.label)
+                            .offset(y: SettingsDesign.Spacing.controls + SettingsDesign.Spacing.optical)
+                            .accessibilityHidden(true)
+                    }
+                }
                 .padding(.bottom, SettingsDesign.Spacing.cards)
 
             SettingsDivider()
@@ -396,7 +439,7 @@ private struct AnimationSettingsView: View {
             PauseFeatureIcon().accessibilityHidden(true)
             VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
                 Text("Resume desktop after a pause").font(SettingsDesign.Typography.controlTitle)
-                Text("Restore your desktop after a 2-second pause below the starting angle.")
+                Text("Restore your desktop after a 2-second lid pause below the starting angle.")
                     .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -408,6 +451,39 @@ private struct AnimationSettingsView: View {
             .accessibilityLabel("Resume desktop after a pause")
         }
         .padding(.horizontal, SettingsDesign.Spacing.cardInset)
+    }
+
+    private var automaticAngleControls: some View {
+        HStack(spacing: SettingsDesign.Spacing.cards) {
+            CardIconTile(color: .feature) {
+                IconlyIcon(.laptop, size: 24, isCardIcon: true)
+            }
+            .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
+                Text("Set starting angle automatically").font(SettingsDesign.Typography.controlTitle)
+                Text(automaticAngleDescription)
+                    .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Toggle("Set starting angle automatically", isOn: Binding(
+                get: { model.automaticStartAngle }, set: { model.setAutomaticStartAngle($0) }
+            ))
+                .labelsHidden().toggleStyle(AppleSwitchStyle())
+                .accessibilityLabel("Set starting angle automatically")
+                .accessibilityHint(automaticAngleDescription)
+        }
+        .padding(.horizontal, SettingsDesign.Spacing.cardInset)
+    }
+
+    private var automaticAngleDescription: String {
+        if model.automaticStartAngle, let angle = model.learnedStartAngle {
+            return "Using \(Int(angle))° instead of Begin at. Hold the lid still for 2 seconds to update it."
+        }
+        if model.automaticStartAngle {
+            return "Hold the lid still for 2 seconds to set a new starting angle. Begin at applies until then."
+        }
+        return "Set the starting angle after a 2-second lid pause instead of Begin at."
     }
 
     private var previewButtonTitle: String {
@@ -881,6 +957,7 @@ private struct SwitchFeedbackBody: View {
 /// Keep AppKit slider tracking, keyboard input and accessibility with a solid white thumb.
 private struct AngleSlider: NSViewRepresentable {
     @Binding var value: Double
+    let isFallback: Bool
     @Environment(\.isEnabled) private var isEnabled
 
     func makeNSView(context: Context) -> ThumbFeedbackSlider {
@@ -899,7 +976,8 @@ private struct AngleSlider: NSViewRepresentable {
         context.coordinator.value = $value
         slider.doubleValue = value
         slider.isEnabled = isEnabled
-        slider.toolTip = "Choose the lid angle at which the effect starts."
+        slider.toolTip = isFallback ? "Choose the manual fallback angle."
+                                    : "Choose the lid angle at which the effect starts."
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(value: $value) }

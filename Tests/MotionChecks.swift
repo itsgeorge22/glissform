@@ -338,6 +338,101 @@ import Foundation
         precondition(threshold.update(angle: 51) == 0)
         precondition(threshold.update(angle: 49) > 0 && threshold.activationAngle == 50)
         print("PASS: selected threshold, below-threshold startup, threshold reversal, changed threshold")
+
+        var automatic = ClosingMotion()
+        automatic.startAngle = 95
+        automatic.automaticStartAngle = true
+        _ = automatic.update(angle: 110, time: 0)
+        _ = automatic.update(angle: 111, time: 1)
+        precondition(automatic.learnedStartAngle == nil, "A short or jittering rest must retain the manual fallback")
+        for frame in 21...62 { _ = automatic.update(angle: 110, time: Double(frame) / 20) }
+        precondition(automatic.learnedStartAngle == 109 && automatic.effectiveStartAngle == 109,
+                     "A two-second open-lid rest must start one degree below the held angle")
+        precondition(automatic.update(angle: 109, time: 3.15) == 0 && !automatic.active)
+        precondition(automatic.update(angle: 108, time: 3.17) > 0 && automatic.activationAngle == 109)
+        automatic.startAngle = 120
+        precondition(automatic.update(angle: 94, time: 3.2) > 0 && automatic.activationAngle == 109,
+                     "Editing Begin at must not move an automatically anchored gesture")
+        precondition(automatic.update(angle: 109, time: 3.25) == 0 && !automatic.active)
+        _ = automatic.update(angle: 100, time: 3.3)
+        precondition(automatic.active && automatic.activationAngle == 109,
+                     "Crossing the custom angle must not replace the learned angle")
+        automatic.reset()
+        precondition(automatic.learnedStartAngle == 109 && automatic.effectiveStartAngle == 109,
+                     "A lifecycle reset must preserve the learned reference")
+        precondition(automatic.beginOpening(angle: 30, time: 3.35) > 0 && automatic.activationAngle == 109,
+                     "Wake opening must use the closing reference")
+        automatic.automaticStartAngle = false
+        precondition(automatic.learnedStartAngle == nil && automatic.effectiveStartAngle == 120,
+                     "Turning automatic selection off must restore the manual angle")
+
+        var lowRest = ClosingMotion()
+        lowRest.startAngle = 95
+        lowRest.automaticStartAngle = true
+        for frame in 0...40 { _ = lowRest.update(angle: 80, time: Double(frame) / 20) }
+        precondition(lowRest.learnedStartAngle == 79 && !lowRest.active,
+                     "A stable opening below the manual fallback may become the start angle")
+        precondition(lowRest.update(angle: 79, time: 2.05) == 0 && !lowRest.active)
+        precondition(lowRest.update(angle: 78, time: 2.1) > 0 && lowRest.activationAngle == 79)
+
+        var gaps = ClosingMotion()
+        gaps.startAngle = 95
+        gaps.automaticStartAngle = true
+        _ = gaps.update(angle: 110, time: 0)
+        _ = gaps.update(angle: 110, time: 2.1)
+        precondition(gaps.learnedStartAngle == nil, "Missing sensor samples cannot establish a rest")
+        _ = gaps.update(angle: .nan, time: 2.15)
+        for frame in 44...85 { _ = gaps.update(angle: 110, time: Double(frame) / 20) }
+        precondition(gaps.learnedStartAngle == 109, "Fresh samples can learn after an interruption")
+
+        var jitter = ClosingMotion()
+        jitter.startAngle = 95
+        jitter.automaticStartAngle = true
+        for frame in 0...40 {
+            _ = jitter.update(angle: frame.isMultiple(of: 2) ? 110 : 111,
+                              time: Double(frame) / 20)
+        }
+        precondition(jitter.learnedStartAngle == 109,
+                     "One-degree sensor chatter must not prevent learning")
+        for frame in 41...90 {
+            _ = jitter.update(angle: frame.isMultiple(of: 2) ? 110 : 111,
+                              time: Double(frame) / 20)
+        }
+        precondition(jitter.learnedStartAngle == 109,
+                     "One-degree sensor chatter must not repeatedly move the learned threshold")
+        var unsupported = ClosingMotion()
+        unsupported.startAngle = 95
+        unsupported.automaticStartAngle = true
+        for frame in 0...40 { _ = unsupported.update(angle: 140, time: Double(frame) / 20) }
+        precondition(unsupported.learnedStartAngle == nil && unsupported.effectiveStartAngle == 95,
+                     "Out-of-range rests must leave the manual fallback in control")
+
+        var restored = ClosingMotion()
+        restored.startAngle = 95
+        restored.automaticStartAngle = true
+        restored.resumeAfterPause = true
+        for frame in 0...40 { _ = restored.update(angle: 110, time: Double(frame) / 20) }
+        _ = restored.update(angle: 80, time: 2.05)
+        for frame in 42...82 { _ = restored.update(angle: 80, time: Double(frame) / 20) }
+        precondition(restored.desktopResumed && restored.learnedStartAngle == 79
+                     && restored.activationAngle == 109,
+                     "An active pause restoration must adopt its new resting angle")
+        for frame in 83...125 { _ = restored.update(angle: 80, time: Double(frame) / 20) }
+        precondition(!restored.active && restored.desktopResumed && restored.effectiveStartAngle == 79,
+                     "A learned pause angle must not restart the effect while still")
+        precondition(restored.update(angle: 79, time: 6.27) == 0 && restored.desktopResumed,
+                     "Movement below the held angle must not release the pause latch")
+        _ = restored.update(angle: 81, time: 6.3)
+        precondition(restored.update(angle: 78, time: 6.35) > 0 && restored.activationAngle == 79,
+                     "A fresh close after reopening must use the paused angle")
+        var noRestore = ClosingMotion()
+        noRestore.startAngle = 95
+        noRestore.automaticStartAngle = true
+        for frame in 0...40 { _ = noRestore.update(angle: 110, time: Double(frame) / 20) }
+        for frame in 41...95 { _ = noRestore.update(angle: 80, time: Double(frame) / 20) }
+        precondition(noRestore.active && noRestore.learnedStartAngle == 109,
+                     "Automatic selection must respect the separate pause-restoration toggle")
+        print("PASS: automatic rest learning, manual fallback, gesture lock, wake reference, sample gaps and pause latch")
         print("PASS: ordinary angles, closing progression, reversal, repeated closure, low-lid startup, wake reset, invalid angles")
     }
 }

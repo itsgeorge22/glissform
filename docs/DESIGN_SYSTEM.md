@@ -4,7 +4,7 @@ Glissform’s shared settings interface supports a growing collection of animati
 
 ## Layout
 
-The page is a single column, 720 points wide, with 32-point content padding. Its window height follows the measured page content, including the 32-point bottom padding, and is capped to available screen space; both pages scroll when necessary. It resizes when navigating or showing/hiding the permission card. The Infinite Screen page groups its preview and angle controls, pause-to-resume settings, and privacy footer. A permission card appears above the preview only when access is missing or briefly after a detected grant. Privacy & About shows the app name/version and separate privacy-information and access cards, with no introductory description or text below the cards.
+The page is a single column, 720 points wide, with 32-point content padding. Its window height follows the measured page content, including the 32-point bottom padding, and is capped to available screen space; both pages scroll when necessary. It resizes when navigating or showing/hiding the permission card. The Infinite Screen page groups its preview and angle controls, automatic starting-angle and pause-to-resume settings, and privacy footer. A permission card appears above the preview only when access is missing or briefly after a detected grant. Privacy & About shows the app name/version and separate privacy-information and access cards, with no introductory description or text below the cards.
 
 | Spacing role | Points |
 | --- | ---: |
@@ -41,7 +41,7 @@ The degree symbol uses a 20-point regular font. Icons are vector artwork rather 
 - Card fill: primary colour at 3.5%; outline: primary colour at 4%.
 - Divider: native divider with a 2.5% primary overlay, spanning the whole card width.
 - Field fill: primary colour at 4.5%; editing outline: accent at 65%.
-- Feature icon: a bright blue `#0A84FF` fill at 16% opacity with a contrasting Bold pause symbol; the toggle communicates its on/off state.
+- Feature icons: a bright blue `#0A84FF` fill at 16% opacity with contrasting Bold laptop and pause symbols; each adjacent toggle communicates its on/off state.
 - Permission allowed: green `#30D158` fill at 16% opacity, with a contrasting check.
 - Permission required: amber `#FF9F0A` fill at 16% opacity, with a contrasting attention mark.
 - Switch and slider thumbs use white. Neutral surfaces adapt to light and dark appearances; the permission tints retain their semantic hue.
@@ -52,7 +52,7 @@ Colour is accompanied by a text state and a different icon mark. Missing permiss
 
 All cards use the same 20-point corner radius, surface and outline, with 20-point inner padding. The preview, permission and settings layouts differ according to their content. About uses the same card foundation, with separate privacy-information and access cards spaced 16 points apart; there is no divider inside the privacy-information card.
 
-Controls use 8-point corners, the permission icon container uses 12-point continuous corners, and small arrow highlights use 4-point corners. Switches remain capsules. Permission and pause icons share a 44 × 44-point tile with a solid 16%-opacity fill, no border, and Iconly Bold / Regular artwork on a 24-point canvas by default. Custom preserves path geometry and strengthens the secondary layer to 56% in Light Mode and 43% in Dark Mode. Foreground colours are blue `#0974E0` / `#0A84FF`, green `#2AB84D` / `#30D158`, and amber `#E08C09` / `#FF9F0A` (Light / Dark). Light Mode uses a modest darkening of the vivid Dark Mode colours to preserve the colourful appearance; these decorative icons have adjacent text labels and are not claimed to meet 3:1 in every colour. Bold uses the same foreground colours with its original solid artwork; Custom retains the two-tone treatment for comparison. The pause card is one row with an icon, title, description and toggle; it has no divider or duration control.
+Controls use 8-point corners, the permission icon container uses 12-point continuous corners, and small arrow highlights use 4-point corners. Switches remain capsules. Permission, automatic-angle, and pause icons share a 44 × 44-point tile with a solid 16%-opacity fill, no border, and Iconly Bold / Regular artwork on a 24-point canvas by default. Custom preserves path geometry and strengthens the secondary layer to 56% in Light Mode and 43% in Dark Mode. Foreground colours are blue `#0974E0` / `#0A84FF`, green `#2AB84D` / `#30D158`, and amber `#E08C09` / `#FF9F0A` (Light / Dark). Light Mode uses a modest darkening of the vivid Dark Mode colours to preserve the colourful appearance; these decorative icons have adjacent text labels and are not claimed to meet 3:1 in every colour. Bold uses the same foreground colours with its original solid artwork; Custom retains the two-tone treatment for comparison. Automatic-angle and pause cards are each one row with an icon, title, description, and toggle; the pause card has no divider or duration control.
 
 Angle arrows have independent 24 × 20-point targets and repeat while held. The numeric text area remains 38 points wide. Native slider behaviour is retained. Pause-to-resume uses a fixed two-second delay.
 
