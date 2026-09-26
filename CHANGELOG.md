@@ -4,14 +4,25 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+## 0.1.0-alpha.8 — 2026-09-26
+
+Eighth public alpha: automatic starting-angle selection, clearer settings states, distinct feature colours, and a smoother pause restoration. Source release; local builds remain ad-hoc signed and are not notarized.
+
 ### Added
 
 - Activate **Set starting angle automatically**: a steady open lid for two seconds sets the next closing angle one degree below the held angle, overriding **Begin at**. Until an angle is learned, **Begin at** remains the fallback. Once learned, its saved controls dim and become unavailable until automatic selection is switched off. The learned angle stays fixed through a gesture and eligible wake opening. If pause-to-resume is also on, restoring the desktop at a lower paused angle adopts a threshold one degree below it without immediately rearming; reopening above the held angle permits the next gesture. Switching the option off restores manual control.
 
 ### Changed
 
+- Give the two-second pause restoration a longer, front-loaded ease into the live desktop, with an exact flat finish and no bounce.
+- Give automatic angle selection a blue-leaning indigo icon tile and desktop restoration a green one, so the two feature actions are easier to distinguish.
 - Label the live lid reading, mark the illustration while previewing, show saved-settings guidance when Infinite Screen is off, and clarify the waiting message before a new automatic angle is learned.
 - Clarify that a still lid sets or updates the automatic starting angle, while a lid pause below that angle restores the desktop.
+
+### Validation and limitations
+
+- The release build and automated motion, capture, Metal, lifecycle, and overlay checks passed locally on 2026-09-26. The new pause curve was checked for monotonic motion and an exact flat finish in synthetic tests.
+- Automatic-angle learning and the new pause-return feel still need physical lid validation on the development Mac. Prior physical confirmation of closing, reversals, and opening after sleep without locking remains limited to the earlier alpha.7 behavior. Wider hardware compatibility and locked wake remain unverified.
 
 ## 0.1.0-alpha.7 — 2026-09-21
 

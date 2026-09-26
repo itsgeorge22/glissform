@@ -109,6 +109,8 @@ struct MotionSmoothing {
 
 /// A bounded quintic handoff that can preserve motion already on screen.
 struct HandoffTransition {
+    enum Curve { case balanced, pauseRestoration }
+
     static let duration: Double = 0.100
     private var origin: Float = 0
     private var initialVelocity: Double = 0
@@ -117,14 +119,17 @@ struct HandoffTransition {
     private(set) var velocity: Double = 0
     private(set) var active = false
     private var firstFrame = false
+    private var curve: Curve = .balanced
 
     mutating func begin(from value: Float, velocity: Double = 0, duration: Double = Self.duration,
-                        holdFirstFrame: Bool = true) {
+                        holdFirstFrame: Bool = true, curve: Curve = .balanced) {
         origin = value
         initialVelocity = velocity.isFinite ? velocity : 0
         self.velocity = initialVelocity
-        transitionDuration = duration.isFinite ? min(0.300, max(0.060, duration)) : Self.duration
+        transitionDuration = duration.isFinite
+            ? min(curve == .pauseRestoration ? 0.500 : 0.300, max(0.060, duration)) : Self.duration
         firstFrame = holdFirstFrame
+        self.curve = curve
         elapsed = 0
         active = true
     }
@@ -147,9 +152,14 @@ struct HandoffTransition {
         }
         if delta.isFinite { elapsed += max(0, delta) }
         let t = min(1, elapsed / transitionDuration)
-        let blend = t * t * t * (t * (t * 6 - 15) + 10)
+        let baseBlend = t * t * t * (t * (t * 6 - 15) + 10)
         let tangentBlend = t - 6 * pow(t, 3) + 8 * pow(t, 4) - 3 * pow(t, 5)
-        let blendDerivative = 30 * t * t * (1 - t) * (1 - t)
+        let baseDerivative = 30 * t * t * (1 - t) * (1 - t)
+        // The pause return makes more progress early, then settles gently.
+        // This added hump has zero slope at both ends and stays monotonic.
+        let pauseBias = curve == .pauseRestoration ? 8.0 : 0.0
+        let blend = baseBlend + pauseBias * pow(t, 3) * pow(1 - t, 3)
+        let blendDerivative = baseDerivative + pauseBias * 3 * t * t * (1 - t) * (1 - t) * (1 - 2 * t)
         let tangentDerivative = 1 - 18 * t * t + 32 * pow(t, 3) - 15 * pow(t, 4)
         velocity = distance * blendDerivative / transitionDuration + startVelocity * tangentDerivative
             + blend * (targetVelocity.isFinite ? targetVelocity : 0)

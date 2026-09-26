@@ -235,6 +235,23 @@ import Foundation
         precondition(deepReturn.step(toward: 0, elapsed: 0.140) == 0 && !deepReturn.active)
         print("PASS: boundary velocity, prepared-frame movement, bounded returns and moving-target join")
 
+        var pauseReturn = HandoffTransition()
+        pauseReturn.begin(from: 1, duration: 0.400, holdFirstFrame: false, curve: .pauseRestoration)
+        var previousPauseValue: Float = 1
+        for frame in 1...40 {
+            let value = pauseReturn.step(toward: 0, elapsed: 0.010)
+            precondition(value >= 0 && value <= previousPauseValue,
+                         "Pause restoration must settle without reversing or bouncing")
+            if frame == 20 {
+                precondition(value < 0.45 && value > 0.25,
+                             "Pause restoration should move decisively before its soft landing")
+            }
+            previousPauseValue = value
+        }
+        precondition(previousPauseValue == 0 && pauseReturn.velocity == 0 && !pauseReturn.active,
+                     "Pause restoration must finish exactly flat and at rest")
+        print("PASS: eased pause restoration, monotonic return and exact flat finish")
+
         // Pause-to-resume uses a monotonic sample clock, not time since capture.
         func pausingMotion(duration: Double = 2, enabled: Bool = true) -> ClosingMotion {
             var state = ClosingMotion()

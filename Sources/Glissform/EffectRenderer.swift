@@ -69,9 +69,11 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         onReturnToFlat = completion
         fadingOut = false
         let distance = Double(abs(renderedFold))
-        let duration = restoringPause ? min(0.300, max(0.100, distance * 0.35))
+        let duration = restoringPause ? min(0.480, max(0.260, 0.260 + distance * 0.16))
             : min(0.180, max(0.060, distance / max(0.5, abs(renderedVelocity))))
-        handoff.begin(from: renderedFold, velocity: renderedVelocity, duration: duration, holdFirstFrame: false)
+        handoff.begin(from: renderedFold, velocity: restoringPause ? 0 : renderedVelocity,
+                      duration: duration, holdFirstFrame: false,
+                      curve: restoringPause ? .pauseRestoration : .balanced)
         fadeDuration = 0
         scheduleSettling()
     }

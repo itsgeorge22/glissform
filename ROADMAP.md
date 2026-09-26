@@ -6,7 +6,7 @@ New experiences should feel native, have a clear purpose, stay lightweight, and 
 
 Glissform is a small passion project. The owner's intended price is $1.90, with occasional improvements and new features after launch. Keep release preparation proportional to that scope; broad hardware certification, formal performance studies, and a fixed tester cohort are not prerequisites.
 
-## Current — 0.1.0-alpha.7
+## Current — 0.1.0-alpha.8
 
 The first feature, Infinite Screen, implements screenshot-based closing animation with full-angle hinge compensation, steadier adaptive smoothing, progressive full-image frost and shadow, awake reversal, cached post-sleep opening, native settings with a configurable starting angle and capture-free preview, optional desktop restoration after a fixed two-second still-lid pause, menu bar controls, and lifecycle cleanup. On 2026-09-21, the owner confirmed correct smoothness, speed, abrupt lid stops, reversals, and opening after sleep without locking on the development Mac. Locked wake is outside that confirmation. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
 
@@ -27,14 +27,14 @@ The first feature, Infinite Screen, implements screenshot-based closing animatio
 - [x] Add **Set starting angle automatically** and implement two-second resting-angle selection one degree below the held angle, **Begin at** fallback, gesture and wake reference locking, and adoption of a lower angle after optional pause restoration.
 - [ ] Physically verify automatic angle learning, changes to the manual fallback, pause restoration, reversal, sleep/wake, and sensor gaps on the development Mac.
 
-- [x] Implement unreleased capture metadata preparation, backing-pixel validation, and overlay-only exclusion with a safe hidden-overlay fallback that preserves known settings windows; retain one screenshot per gesture.
+- [x] Implement capture metadata preparation, backing-pixel validation, and overlay-only exclusion with a safe hidden-overlay fallback that preserves known settings windows; retain one screenshot per gesture.
 - [x] Implement acquisition-timed smoothing, higher active polling, display-linked motion and opacity, a prepared flat closing entrance, velocity-aware returns, and bounded cleanup when display callbacks stop.
 - [x] Implement a reusable Gaussian blur pyramid, linear-light material rendering, and fixed shadow-gradient dithering; add numeric timing diagnostics and a display-sized synthetic GPU benchmark.
-- [x] Complete local build, motion/capture/Metal/lifecycle/overlay regression checks, capture-metadata validation, and settings-window launch for these unreleased changes.
+- [x] Complete local build, motion/capture/Metal/lifecycle/overlay regression checks, capture-metadata validation, and settings-window launch for these changes.
 - [x] Obtain owner approval of the top-bezel contact shadow on the development Mac and pass the local build and full regression suite after its tuning (2026-09-21).
 - [ ] Compare entrance, awake and cached-wake exit, deep-fold pause restoration, and material quality on the target Mac. Measure real sensor changes, presentation intervals, memory, and power before claiming an improvement in physical smoothness.
 
-- [x] Prepare an initial unreleased wake-opening prototype with immediate reconnection, remaining-angle motion, bounded eligibility, local timing diagnostics, and synthetic cancellation checks.
+- [x] Prepare an initial wake-opening prototype with immediate reconnection, remaining-angle motion, bounded eligibility, local timing diagnostics, and synthetic cancellation checks.
 - [x] Correct loss of numeric wake eligibility when a lock/session notification follows sleep, and cover lock-before-wake, lock-after-wake, unlock with remaining motion, completed opening and timeout sequences in synthetic checks.
 - [x] Correct premature sensor-loss cancellation by a heartbeat delivered immediately after wake, preserving the bounded sensor-recovery and wake deadlines.
 - [x] Replace fresh wake capture with the completed closing image and prepared texture, retained in memory through lid-close sleep. Add hidden retention, lock ordering, skipping when no frame is available, cleanup checks, and updated privacy copy.

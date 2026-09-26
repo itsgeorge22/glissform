@@ -8,11 +8,11 @@ Subtle animations and quality-of-life improvements for everyday interactions on 
 
 ## Project status
 
-**In development — not yet available for public download.** The current development version is 0.1.0-alpha.7.
+**In development — not yet available for public download.** The current development version is 0.1.0-alpha.8.
 
 The app will be available once a `.dmg` is ready and published on GitHub. Download links and installation instructions will be added then.
 
-The main branch also contains unreleased improvements; see the [changelog](CHANGELOG.md) for the distinction between released and upcoming changes.
+See the [changelog](CHANGELOG.md) for released changes and any upcoming work.
 
 ## Current features
 

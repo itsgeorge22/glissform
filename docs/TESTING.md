@@ -34,7 +34,7 @@ For physical acceptance, repeat a close/reopen gesture over a full-screen app wi
 
 ## Physical acceptance
 
-### Unreleased capture and rendering changes
+### Capture and rendering changes
 
 On 2026-09-21, the owner manually tested the latest top-bezel contact shadow on the development Mac and approved its appearance. After that tuning, `bash scripts/build.sh` and the full `bash scripts/test.sh` suite passed locally, covering motion, wake eligibility, capture metadata, Metal rendering, lifecycle cancellation/cleanup, and overlay placement. This does not verify the known full-screen Space-switching bug. The launch, live metadata, and benchmark results below precede that adjustment.
 
@@ -125,9 +125,9 @@ Measure capture delay, frame timing, CPU/GPU use, memory, and power before makin
 
 ## Pause-to-resume
 
-Automated checks cover the default-off behavior, 0.5/2/10-second motion-model test delays (the app uses a fixed two seconds), jitter tolerance, gradual movement, reversals, stale and invalid reports, rearming strictly above the threshold, delayed screenshot rejection, visible return-to-flat, and sleep/display/quit interruptions. These use synthetic sensor timestamps and screenshots; they do not replace physical lid testing.
+Automated checks cover the default-off behavior, 0.5/2/10-second motion-model test delays (the app uses a fixed two seconds), jitter tolerance, gradual movement, reversals, stale and invalid reports, rearming strictly above the threshold, a monotonic eased return to an exact flat finish, delayed screenshot rejection, visible return-to-flat, and sleep/display/quit interruptions. These use synthetic sensor timestamps and screenshots; they do not replace physical lid testing.
 
-On hardware, enable Resume desktop after a pause, set a 95° trigger, open above 95°, then close to 80° and hold. Confirm the effect returns to zero and the desktop accepts input; subsequent movement below 95° must not retrigger it. Reopen above 95° and close to verify a new gesture. The app uses a fixed two-second delay. Repeat with slow movement, direction changes, sleep, and toggle changes. Check that the toggle survives relaunch and that older saved custom delays have no effect.
+On hardware, enable Resume desktop after a pause, set a 95° trigger, open above 95°, then close to 80° and hold. Confirm the effect moves decisively back toward flat, settles without a bounce, and then restores desktop input; subsequent movement below 95° must not retrigger it. Try shallower and deeper folds to judge the 260–480 ms return. Reopen above 95° and close to verify a new gesture. The app uses a fixed two-second delay. Repeat with slow movement, direction changes, sleep, and toggle changes. Check that the toggle survives relaunch and that older saved custom delays have no effect.
 
 ## Automatic starting angle
 

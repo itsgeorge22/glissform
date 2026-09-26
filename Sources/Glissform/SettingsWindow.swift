@@ -686,7 +686,7 @@ private struct CardIconTile<Content: View>: View {
 
 private struct PauseFeatureIcon: View {
     var body: some View {
-        CardIconTile(color: .feature) {
+        CardIconTile(color: .success) {
             IconlyIcon(.pause, size: 24, isCardIcon: true)
         }
     }

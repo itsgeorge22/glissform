@@ -4,7 +4,7 @@ Glissform brings subtle animations and quality-of-life improvements to everyday 
 
 **Infinite Screen is its first available feature:** your desktop appears to stay in place as you close your MacBook lid, with perspective, blur, and shadow responding to the movement. Glissform’s scope extends beyond this effect; additional experiences will be introduced as they are designed and validated.
 
-**Development version: 0.1.0-alpha.7. The app is not yet available for public download.** A `.dmg` and installation instructions will be published on GitHub when ready. Development testing uses a MacBook Air M5 15-inch; wider compatibility is still being evaluated.
+**Development version: 0.1.0-alpha.8. The app is not yet available for public download.** A `.dmg` and installation instructions will be published on GitHub when ready. Development testing uses a MacBook Air M5 15-inch; wider compatibility is still being evaluated.
 
 This source release includes the capture, motion, material, and Space-change improvements described below. Repeatable physical acceptance remains pending where noted.
 
@@ -18,7 +18,7 @@ This source release includes the capture, motion, material, and Space-change imp
 - Closing starts at exactly zero stretch, blur, and shadow, then eases into the current angle. Wake opening prepares the current fold directly and follows the remaining opening movement.
 - Compensates the full lid rotation around a fixed hinge, including closures that travel more than 90° from the starting angle.
 - Timestamps lid readings when acquired and uses those timestamps for critically damped smoothing. Polling requests 60 reads per second during gestures and 30 while idle; the sensor's actual update rate and whole-degree resolution remain hardware limits. Rendering follows the display's presentation clock and pauses when settled.
-- Replaces the live desktop with a prepared, full-opacity flat screenshot before a 100 ms geometric entrance. Reopening returns from the current motion to a flat image, then fades it out over 50 ms on the same rendering clock. Deeper pause restorations receive more return time; cached wake opening uses a 50 ms entrance fade.
+- Replaces the live desktop with a prepared, full-opacity flat screenshot before a 100 ms geometric entrance. Reopening returns from the current motion to a flat image, then fades it out over 50 ms on the same rendering clock. Pause restoration eases back without overshoot over 260–480 ms depending on the fold; cached wake opening uses a 50 ms entrance fade.
 - Captures the display's backing pixel dimensions, checks that they match the overlay, and preserves known Glissform settings windows while excluding the animation overlay. Display and window metadata may be prepared in advance; no screen pixels are captured while idle.
 - Diffuses the entire image into a frosted-glass appearance as the lid closes, including the bottom. Fine text and icons soften while larger shapes retain enough definition to show the perspective skew; a smooth vertical gradient keeps the blur lighter at the hinge and heavier at the top. Reopening clears it continuously.
 - Builds a Gaussian blur pyramid once from each screenshot, filters and shades in linear light, and uses a subtle fixed dither to reduce visible steps in the shadow gradient. The flat screenshot remains sharp and unchanged by the material.

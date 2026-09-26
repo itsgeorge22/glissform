@@ -44,7 +44,7 @@ enum SettingsDesign {
         static let field = Color.primary.opacity(0.045)
         static let focus = Color.accentColor.opacity(0.65)
         static let switchOff = Color(nsColor: .tertiaryLabelColor)
-        static let feature = Color(red: 10 / 255, green: 132 / 255, blue: 1)
+        static let feature = Color(red: 78 / 255, green: 103 / 255, blue: 216 / 255)
         static let success = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
         static let attention = Color(red: 1, green: 159 / 255, blue: 10 / 255)
         static let iconTileOpacity = 0.16
@@ -52,10 +52,10 @@ enum SettingsDesign {
         static func cardIcon(_ color: CardIconColor, scheme: ColorScheme) -> Color {
             let hex: UInt32
             switch (color, scheme) {
-            case (.feature, .light): hex = 0x0974E0
+            case (.feature, .light): hex = 0x435CCD
             case (.success, .light): hex = 0x2AB84D
             case (.attention, .light): hex = 0xE08C09
-            case (.feature, _): hex = 0x0A84FF
+            case (.feature, _): hex = 0x667CE7
             case (.success, _): hex = 0x30D158
             case (.attention, _): hex = 0xFF9F0A
             }
