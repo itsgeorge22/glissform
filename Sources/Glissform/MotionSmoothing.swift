@@ -208,6 +208,7 @@ struct HandoffTransition {
     private var elapsed: Double = 0
     private(set) var velocity: Double = 0
     private(set) var active = false
+    var fractionComplete: Double { active ? min(1, elapsed / transitionDuration) : 1 }
     private var firstFrame = false
 
     mutating func begin(from value: Float, velocity: Double = 0, duration: Double = Self.duration,

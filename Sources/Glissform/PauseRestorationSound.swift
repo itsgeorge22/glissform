@@ -1,25 +1,38 @@
-import AppKit
+import AVFoundation
+import Foundation
 
-@MainActor
-final class PauseRestorationSound {
+/// Keep audio setup and playback away from the main run loop that renders lid motion.
+final class PauseRestorationSound: @unchecked Sendable {
     static let shared = PauseRestorationSound()
 
-    private let sound: NSSound?
+    private let queue = DispatchQueue(label: "app.glissform.return-sound", qos: .userInitiated)
+    // Accessed only on queue.
+    private var player: AVAudioPlayer?
+    private var didAttemptLoad = false
 
-    private init() {
-        guard let url = Bundle.module.url(forResource: "PauseRestored", withExtension: "wav") else {
-            sound = nil
-            return
+    func prepare() {
+        queue.async {
+            guard let player = self.loadPlayer() else { return }
+            // A completed click releases the player's prepared audio resources.
+            _ = player.prepareToPlay()
         }
-        let loaded = NSSound(contentsOf: url, byReference: false)
-        loaded?.volume = 0.4
-        sound = loaded
     }
 
     func play() {
-        guard let sound else { return }
-        if sound.isPlaying { _ = sound.stop() }
-        sound.currentTime = 0
-        _ = sound.play()
+        queue.async {
+            guard let player = self.loadPlayer() else { return }
+            player.currentTime = 0
+            _ = player.play()
+        }
+    }
+
+    private func loadPlayer() -> AVAudioPlayer? {
+        if didAttemptLoad { return player }
+        didAttemptLoad = true
+        guard let url = Bundle.module.url(forResource: "PauseRestored", withExtension: "wav"),
+              let loaded = try? AVAudioPlayer(contentsOf: url) else { return nil }
+        loaded.volume = 0.4
+        player = loaded
+        return loaded
     }
 }

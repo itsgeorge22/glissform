@@ -480,7 +480,7 @@ private struct AnimationSettingsView: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
                 Text("Play sound when desktop returns").font(SettingsDesign.Typography.controlTitle)
-                Text("Hear a click when the desktop snaps back after you reopen or pause the lid.")
+                Text("A short click accompanies the desktop returning.")
                     .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

@@ -64,7 +64,9 @@ The first feature, Infinite Screen, implements screenshot-based closing animatio
 - [ ] Evaluate slow/fast closing, pauses, abrupt reversals, and capture handoffs with repeatable physical tests.
 - [ ] Investigate any remaining visible angle steps, flashes, or discontinuities with measurements rather than only stronger easing.
 - [x] Refine degree-cadence smoothing, reject brief one-degree direction chatter, preserve reversal velocity, keep manual reopening lid-driven through zero, and reduce pause-return peak speed without changing the visual material or projection. Implementation is unreleased; see the Unreleased changelog.
+- [x] Move desktop-return sound preparation and playback off the render loop; align the manual reopening cue with the start of the final fade and the pause restoration cue ahead of the fast middle of its return motion.
 - [ ] Physically compare the refined motion against the alpha.8 checkpoint at slow and fast speeds, including the added smoothing delay, deliberate one-degree reversals, abrupt stops, shallow/deep pause returns, reclose during return, and sleep/wake.
+- [ ] Compare slow and fast manual reopening and pause restoration with sound on and off on the development Mac; confirm the click plays on every completed return, check displayed-frame pacing, and assess its timing against the desktop reveal.
 - [ ] Measure capture latency, frame pacing, CPU/GPU load, memory use, and idle/battery impact.
 - [ ] Strengthen recovery from denied/revoked permissions, unavailable screenshots, sensor disconnects, and display changes.
 - [ ] Test full-screen applications, Dock/menu behavior, external displays, multiple Spaces, sleep/wake, and quitting during transitions.
