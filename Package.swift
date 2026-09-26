@@ -7,9 +7,7 @@ let package = Package(
     products: [.executable(name: "Glissform", targets: ["Glissform"])],
     targets: [
         .executableTarget(name: "Glissform", resources: [
-            .copy("Resources/Iconly"),
-            .copy("Resources/SoundIcons"),
-            .copy("Resources/PauseRestored.wav")
+            .copy("Resources/Iconly")
         ])
     ]
 )

@@ -22,6 +22,7 @@ struct ClosingMotion {
     var pauseDuration: Double = 2 { didSet { clearPauseTracking() } }
     private(set) var desktopResumed = false
     private var desktopResumeRearmAngle: Double?
+    private var desktopResumeCanRearmByClosing = false
     private var stillSince: Double?
     private var lastSampleTime: Double?
     private var lowestAngle = 0.0
@@ -101,6 +102,7 @@ struct ClosingMotion {
         active = false
         desktopResumed = false
         desktopResumeRearmAngle = nil
+        desktopResumeCanRearmByClosing = false
         clearPauseTracking()
         clearRestingTracking()
     }
@@ -125,9 +127,13 @@ struct ClosingMotion {
         learnRestingAngle(angle, time: time)
         if let startAngle = effectiveStartAngle {
             if desktopResumed {
-                guard angle > max(startAngle, desktopResumeRearmAngle ?? startAngle) else { return 0 }
+                let openedPastRest = angle > max(startAngle, desktopResumeRearmAngle ?? startAngle)
+                let closedPastLearnedStart = desktopResumeCanRearmByClosing && angle < startAngle
+                guard openedPastRest || closedPastLearnedStart else { return 0 }
                 desktopResumed = false
                 desktopResumeRearmAngle = nil
+                desktopResumeCanRearmByClosing = false
+                armed = true
             }
             activationAngle = startAngle
             if angle >= startAngle {
@@ -139,7 +145,8 @@ struct ClosingMotion {
             guard armed else { return 0 }
             active = true
             if pauseExpired(angle: angle, time: time) {
-                if automaticStartAngle, (20...130).contains(angle) {
+                desktopResumeCanRearmByClosing = automaticStartAngle && (20...130).contains(angle)
+                if desktopResumeCanRearmByClosing {
                     learnedStartAngle = automaticThreshold(below: angle)
                 }
                 active = false

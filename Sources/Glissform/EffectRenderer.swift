@@ -29,7 +29,6 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
     private var ending: Bool { completionMode != nil }
     private var lastMotionAdvanceTime: Double?
     private var transitionGeneration = 0
-    private var onCueFrame: (() -> Void)?
     private var onReturnToFlat: (() -> Void)?
     private var displayLink: CAMetalDisplayLink?
     private var frameRate: Float = 60
@@ -66,7 +65,6 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         transitionGeneration += 1
         completionMode = nil
         fadingOut = false
-        onCueFrame = nil
         onReturnToFlat = nil
         // Reclosing during manual completion is still the same lid gesture.
         // Keep its filter and any existing entrance handoff exactly as they are.
@@ -77,11 +75,9 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         scheduleSettling()
     }
 
-    func finishAnimation(_ mode: CompletionMode, onCueFrame: (() -> Void)? = nil,
-                         completion: @escaping () -> Void) {
+    func finishAnimation(_ mode: CompletionMode, completion: @escaping () -> Void) {
         transitionGeneration += 1
         completionMode = mode
-        self.onCueFrame = onCueFrame
         onReturnToFlat = completion
         fadingOut = false
         switch mode {
@@ -286,7 +282,6 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         completionMode = nil
         lastMotionAdvanceTime = nil
         transitionGeneration += 1
-        onCueFrame = nil
         onReturnToFlat = nil
     }
 
@@ -409,16 +404,6 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         } }
         if let drawable { command.present(drawable) }
         command.commit()
-        let cueFrame = (completionMode == .lid && fadingOut)
-            || (completionMode == .pause && handoff.fractionComplete >= 0.20)
-        if cueFrame, let onCueFrame {
-            self.onCueFrame = nil
-            // The pause curve moves fastest around its midpoint. Start audio
-            // earlier so its audible onset lands near that visual snap.
-            // Manual completion cues when its final fade starts, after the
-            // lid-driven image reaches flat and before the desktop is revealed.
-            onCueFrame()
-        }
         if settled { displayLink?.isPaused = true }
     }
 

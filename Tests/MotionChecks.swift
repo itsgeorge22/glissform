@@ -555,10 +555,21 @@ import Foundation
         precondition(!restored.active && restored.desktopResumed && restored.effectiveStartAngle == 79,
                      "A learned pause angle must not restart the effect while still")
         precondition(restored.update(angle: 79, time: 6.27) == 0 && restored.desktopResumed,
-                     "Movement below the held angle must not release the pause latch")
-        _ = restored.update(angle: 81, time: 6.3)
-        precondition(restored.update(angle: 78, time: 6.35) > 0 && restored.activationAngle == 79,
-                     "A fresh close after reopening must use the paused angle")
+                     "The learned starting angle must not recapture the still desktop")
+        precondition(restored.update(angle: 78, time: 6.3) > 0 && restored.activationAngle == 79
+                     && !restored.desktopResumed,
+                     "Closing past the learned angle must restart without opening farther first")
+        _ = restored.update(angle: 79, time: 6.35)
+        precondition(!restored.active, "Reopening to the learned angle must finish the new gesture")
+        var directlyReclosed = ClosingMotion()
+        directlyReclosed.startAngle = 95
+        directlyReclosed.automaticStartAngle = true
+        directlyReclosed.resumeAfterPause = true
+        for frame in 0...40 { _ = directlyReclosed.update(angle: 110, time: Double(frame) / 20) }
+        _ = directlyReclosed.update(angle: 80, time: 2.05)
+        for frame in 42...82 { _ = directlyReclosed.update(angle: 80, time: Double(frame) / 20) }
+        precondition(directlyReclosed.update(angle: 78, time: 4.15) > 0,
+                     "The first reading after restoration may already be below the learned angle")
         var noRestore = ClosingMotion()
         noRestore.startAngle = 95
         noRestore.automaticStartAngle = true

@@ -6,11 +6,7 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ### Fixed
 
-- Keep the optional desktop-return click off the animation's main-thread render loop. Prepare and play it on a dedicated audio queue, and queue the manual reopening click when its final desktop-reveal fade starts and the pause restoration click at 20% of its return motion, giving audio more lead time before the fast middle. Reprepare audio for each gesture and play directly, avoiding short device-clock scheduling windows that could drop the click on slow openings. A return interrupted before its cue frame stays silent. Trim the cue's quiet lead and faint tail while preserving its audible click and decay.
-
-### Added
-
-- Play a short click near the finish of a visible manual reopening or pause restoration, with a saved on/off switch in its own card below **Resume desktop after a pause**. Its cyan light-blue tile uses the supplied volume-on and volume-off SVGs to reflect the switch state. Sound starts on, and switching it off leaves the animation unchanged. The sound is [“Videogame Menu BUTTON CLICK” by Christopherderp](https://freesound.org/people/Christopherderp/sounds/342200/), used under CC0. Returns without a visible screenshot remain silent.
+- After automatic angle selection restores the desktop at a paused lid angle, closing past the newly learned starting angle starts a fresh animation without first opening the lid farther.
 
 ### Changed
 
