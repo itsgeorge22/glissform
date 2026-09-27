@@ -1203,9 +1203,10 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         float heightFromHinge = 1.0f - in.uv.y;
         // Trace to the original image plane. Retain a positive image response
         // through the full fold while limiting late vertical enlargement.
-        // Top width and the vertical source position share one bounded
-        // perspective response. Width changes linearly through the screen
-        // height so the sides and vertical lines stay straight.
+        // Top width begins changing promptly while the vertical source
+        // position follows a continuously bounded perspective response.
+        // Width changes linearly through the screen height so the sides and
+        // vertical lines stay straight.
         // Tracking, frost and shadow continue to use the physical angle.
         float eyeDistance = eye.x;
         float eyeHeight = eye.y;

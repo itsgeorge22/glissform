@@ -295,17 +295,21 @@ import Foundation
             }
             let depth = sin(imageAngle)
             let projectedTop = (4 * cos(imageAngle) - 1.1 * depth) / (4 - depth)
-            precondition(abs(topWidth - projectedTop) < 0.00001,
-                         "Top edge and image source height must use the same projection")
+            precondition(abs(topWidth - projectedTop) < 0.027,
+                         "Top edge and image source height must remain visually aligned")
             previousImageAngle = imageAngle
             previousTopWidth = topWidth
         }
-        let sampledHeight = ScreenProjection.topWidth(for: 130 * radians)
+        let earlyAngle = ScreenProjection.imageRadians(for: 25 * radians)
+        precondition(earlyAngle > 23 * radians && earlyAngle < 25 * radians,
+                     "The first quarter of the fold must retain a prompt projection response")
+        let finalAngle = ScreenProjection.imageRadians(for: 130 * radians)
+        let finalDepth = sin(finalAngle)
+        let sampledHeight = (4 * cos(finalAngle) - 1.1 * finalDepth) / (4 - finalDepth)
         precondition(sampledHeight > 0.43 && sampledHeight < 0.45,
                      "Deep closure must sample enough image height to avoid excessive stretch")
-        precondition(ScreenProjection.topWidth(for: 45 * radians) > 0.82 &&
-                     ScreenProjection.topWidth(for: 90 * radians) > 0.59,
-                     "Mid and late folds must retain the reduced vertical stretch")
+        precondition(abs(ScreenProjection.topWidth(for: 130 * radians) - 0.42) < 0.00001,
+                     "Upper-edge tightening must remain bounded at the deepest fold")
         for reference in [20.0, 85, 100, 105, 130] {
             var previousWidth = ScreenProjection.topWidth(for: 0)
             precondition(abs(previousWidth - 1) < 0.00001)
@@ -316,12 +320,12 @@ import Foundation
                              "Every supported start angle must retain visible geometry motion")
                 previousWidth = width
             }
-            precondition(previousWidth >= sampledHeight,
+            precondition(previousWidth >= ScreenProjection.topWidth(for: 130 * radians),
                          "A shorter fold must not narrow farther than the maximum fold")
         }
         let widthAt60 = ScreenProjection.topWidth(for: ScreenProjection.foldRadians(lidAngle: 60, referenceAngle: 105))
         let widthAt4 = ScreenProjection.topWidth(for: ScreenProjection.foldRadians(lidAngle: 4, referenceAngle: 105))
-        precondition(widthAt60 - widthAt4 > 0.27,
+        precondition(widthAt60 - widthAt4 > 0.245,
                      "Upper edge must continue tightening visibly below a 60° lid angle")
         precondition(widthAt4 > 0.545 && widthAt4 < 0.555,
                      "Default-length closure must retain its intended final width")

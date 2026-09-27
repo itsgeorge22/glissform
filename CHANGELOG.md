@@ -11,7 +11,7 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ### Changed
 
-- Use one continuous bounded projection for Seamless Close's image content and upper-edge width, replacing the early/late rotation handoff. Their visible shapes now change together through the full close, including below a 60° lid angle, while deep vertical stretch remains limited. Spread blur buildup through the full gesture while reducing its final strength by about 20% at the top and 30% at the hinge. Keep lid-driven timing and the single-screenshot behavior. Physical appearance awaits owner review.
+- Use smooth, coordinated geometry for Seamless Close's image content and upper edge, replacing the early/late rotation handoff. Restore a stronger response in the first degrees while keeping the later fold active below a 60° lid angle and limiting deep vertical stretch. Spread blur buildup through the full gesture while reducing its final strength by about 20% at the top and 30% at the hinge. Keep lid-driven timing and the single-screenshot behavior. The owner approved the revised closing feel on the development Mac on 2026-09-28; broader gesture and material checks remain pending.
 
 ## 0.1.0-alpha.9 — 2026-09-27
 

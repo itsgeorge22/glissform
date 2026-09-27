@@ -10,22 +10,29 @@ enum ScreenProjection {
         Float(max(0, min(180, referenceAngle) - max(0, lidAngle)) * .pi / 180)
     }
 
-    /// One continuous perspective response replaces the early/late angle
-    /// handoff. The 96° scale keeps the top source sample near 55% after a
-    /// typical 101° fold and above 43% even at the largest supported 130°
-    /// fold. The derivative stays positive, so the image keeps moving late.
+    /// Preserve almost one-to-one rotation at the start, then softly limit
+    /// vertical enlargement without an early/late handoff. The fourth-power
+    /// cap keeps the initial response strong; its positive 22% residual keeps
+    /// the image moving late. The top source sample stays above 43% even at
+    /// the largest supported 130° fold.
     static func imageRadians(for fold: Float) -> Float {
-        let scale = Float(96 * Double.pi / 180)
+        let scale = Float(34 * Double.pi / 180)
+        let residual: Float = 0.22
         let positiveFold = max(0, fold)
-        return positiveFold * scale / (scale + positiveFold)
+        let normalized = positiveFold / scale
+        let square = normalized * normalized
+        let softCap = positiveFold / sqrt(sqrt(1 + square * square))
+        return residual * positiveFold + (1 - residual) * softCap
     }
 
-    /// Match the visible top width to the top row's source-plane height under
-    /// that same projection. Both dimensions then change together, without a
-    /// separate taper curve or excessive squeezing from a low start angle.
+    /// Begin narrowing the upper edge immediately. This nearly matches the
+    /// projected top source height from the middle onward, while allowing a
+    /// stronger first response than the source-height curve alone provides.
+    /// The fixed angular slope prevents short low-angle folds from squeezing
+    /// all the way to the same final width as a full fold.
     static func topWidth(for fold: Float) -> Float {
-        let angle = imageRadians(for: fold)
-        let depth = sin(angle)
-        return (eyeDistance * cos(angle) - eyeHeight * depth) / (eyeDistance - depth)
+        let longestFold = Float(130 * Double.pi / 180)
+        let progress = min(1, max(0, fold / longestFold))
+        return 1 - 0.58 * progress
     }
 }

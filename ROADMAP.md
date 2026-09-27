@@ -37,7 +37,8 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 
 - [x] Add a saved Blur switch to Seamless Close that disables both blur passes without changing the projection, shadow, or one-screenshot gesture.
 
-- [ ] Physically compare the unified lower-stretch projection, continuously narrowing upper edge, and later-building lighter blur against alpha.9 on the development Mac, including a slow close below a 60° lid angle, a deep pause, and reopening; tune or revert them based on the owner's visual judgment.
+- [x] Owner approved the revised Seamless Close closing feel on the development Mac on 2026-09-28, including its stronger start and continuing later movement.
+- [ ] Physically check a deep pause, reopening, and Blur on/off with the revised geometry on the development Mac; broader gesture and material acceptance remains separate from the approved closing feel.
 
 - [x] Add **Detect starting angle** and implement one-second resting-angle selection one degree below the held angle, **Begin at** fallback, gesture and wake reference locking, and adoption of a lower angle after optional pause restoration.
 - [x] Let closing past the learned angle restart the animation after automatic pause restoration, without requiring the lid to open farther first.
