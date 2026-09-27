@@ -229,7 +229,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         scheduleSettling()
     }
 
-    /// Prepare the identity frame for closing, or the current fold for waking.
+    /// Prepare the latest measured fold for closing or waking before reveal.
     /// The caller may reveal the window only after the GPU has finished it.
     @MainActor func prepareSnapshot(pixelBuffer: CVPixelBuffer, opening: Bool = false) async throws {
         progress = 0
@@ -251,7 +251,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         // before preparing the hidden first frame; resume ownership at reveal.
         displayLink?.invalidate()
         displayLink = nil
-        let initialFold: Float = opening ? foldRadians : 0
+        let initialFold = foldRadians
         opacity = opening ? 0 : 1
         fadeDuration = 0
         firstPresentationPending = true

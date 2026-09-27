@@ -143,6 +143,13 @@ enum CaptureExclusionPlan: Equatable {
 
 /// One in-memory screenshot per gesture; never starts a recording stream.
 @MainActor final class DesktopCapture: DesktopScreenshotSource {
+    // ScreenCaptureKit owns the IOSurface until its one-shot request completes.
+    // The retained pixel buffer is immutable for Glissform and crosses to the
+    // main actor only after capture returns.
+    private struct CapturedPixels: @unchecked Sendable {
+        let buffer: CVPixelBuffer
+    }
+
     private struct Request: Equatable {
         let displayID: CGDirectDisplayID
         let excludedWindowID: CGWindowID
@@ -228,13 +235,27 @@ enum CaptureExclusionPlan: Equatable {
         let prepared = try await metadata.value { try await Self.prepareMetadata(for: request) }
         try Task.checkCancellation()
         guard token == generation, self.request == request else { throw CancellationError() }
-        let sample = try await SCScreenshotManager.captureSampleBuffer(contentFilter: prepared.filter,
-                                                                      configuration: prepared.configuration)
+        // The one-shot capture may synchronously occupy its calling thread,
+        // especially on the first request. Keep lid delivery and UI work on the
+        // main queue responsive while ScreenCaptureKit obtains the pixels.
+        let capture = Task.detached(priority: .userInitiated) {
+            try Task.checkCancellation()
+            let sample = try await SCScreenshotManager.captureSampleBuffer(contentFilter: prepared.filter,
+                                                                          configuration: prepared.configuration)
+            try Task.checkCancellation()
+            guard sample.isValid, let buffer = sample.imageBuffer else {
+                throw CapturePreparationError.pixelsUnavailable
+            }
+            return CapturedPixels(buffer: buffer)
+        }
+        let captured = try await withTaskCancellationHandler {
+            try await capture.value
+        } onCancel: {
+            capture.cancel()
+        }
         try Task.checkCancellation()
         guard token == generation, self.request == request else { throw CancellationError() }
-        guard sample.isValid, let buffer = sample.imageBuffer else {
-            throw CapturePreparationError.pixelsUnavailable
-        }
+        let buffer = captured.buffer
         guard prepared.pixelSize.matches(buffer) else {
             invalidate()
             throw CapturePreparationError.displaySizeChanged

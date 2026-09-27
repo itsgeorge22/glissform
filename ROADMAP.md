@@ -45,7 +45,7 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 - [ ] Physically verify automatic angle learning, changes to the manual fallback, pause restoration, reversal, sleep/wake, and sensor gaps on the development Mac.
 
 - [x] Implement capture metadata preparation, backing-pixel validation, and overlay-only exclusion with a safe hidden-overlay fallback that preserves known settings windows; retain one screenshot per gesture.
-- [x] Implement acquisition-timed smoothing, higher active polling, display-linked motion and opacity, a prepared flat closing entrance, velocity-aware returns, and bounded cleanup when display callbacks stop.
+- [x] Implement acquisition-timed smoothing, higher active polling, display-linked motion and opacity, a prepared closing entrance at the latest measured angle, velocity-aware returns, and bounded cleanup when display callbacks stop. Keep one-shot screen capture off the main queue so lid delivery continues during capture.
 - [x] Implement a reusable Gaussian blur pyramid, linear-light material rendering, and fixed shadow-gradient dithering; add numeric timing diagnostics and a display-sized synthetic GPU benchmark.
 - [x] Complete local build, motion/capture/Metal/lifecycle/overlay regression checks, capture-metadata validation, and settings-window launch for these changes.
 - [x] Obtain owner approval of the top-bezel contact shadow on the development Mac and pass the local build and full regression suite after its tuning (2026-09-21).
