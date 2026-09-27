@@ -29,6 +29,7 @@ if [[ ! "${XCODE_VERSION%%.*}" =~ ^[0-9]+$ ]] || (( ${XCODE_VERSION%%.*} < 26 ))
     echo "Xcode 26 or later is required; selected version is $XCODE_VERSION." >&2
     exit 1
 fi
+SDK_VERSION="$(xcrun --sdk macosx --show-sdk-version)"
 mkdir -p build
 ICON_BUILD="$(mktemp -d "$PWD/build/icon-assets.XXXXXX")"
 trap 'rm -rf "$ICON_BUILD"' EXIT
@@ -87,12 +88,22 @@ if [[ ! -s "$ICON_BUILD/Resources/Assets.car" ]] || [[ ! -s "$ICON_BUILD/Resourc
     echo "The app icon compiler did not produce both native and legacy icon resources." >&2
     exit 1
 fi
-swift build -c release
+# SwiftPM's package-product linker can stamp the executable with the deployment
+# target as its SDK version. Declare the actual SDK so AppKit uses the current
+# native window-control appearance on newer macOS releases.
+swift build -c release \
+    -Xlinker -platform_version -Xlinker macos -Xlinker 14.0 -Xlinker "$SDK_VERSION"
 APP="$PWD/build/Glissform.app"
 mkdir -p "$APP/Contents/MacOS"
 BIN_DIR="$(swift build -c release --show-bin-path)"
+LINKED_SDK="$(xcrun vtool -show-build "$BIN_DIR/Glissform" | awk '$1 == "sdk" { print $2; exit }')"
+if [[ "$LINKED_SDK" != "$SDK_VERSION" ]]; then
+    echo "Expected macOS SDK $SDK_VERSION in the app executable, found ${LINKED_SDK:-none}." >&2
+    exit 1
+fi
 cp "$BIN_DIR/Glissform" "$APP/Contents/MacOS/Glissform"
 mkdir -p "$APP/Contents/Resources"
+rm -rf "$APP/Contents/Resources/Glissform_Glissform.bundle"
 ditto "$BIN_DIR/Glissform_Glissform.bundle" "$APP/Contents/Resources/Glissform_Glissform.bundle"
 ditto "$ICON_BUILD/Resources" "$APP/Contents/Resources"
 cat > "$APP/Contents/Info.plist" <<PLIST

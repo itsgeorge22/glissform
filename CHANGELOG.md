@@ -4,34 +4,63 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+## 0.1.0-alpha.9 — 2026-09-27
+
+Ninth public alpha: Battery Ripple joins Seamless Close, with a reorganized Settings window, new General controls, and further lid-motion and material refinements. Source release; local builds remain ad-hoc signed and are not notarized.
+
 ### Added
 
-- Add Features and More section titles in the Settings sidebar, with a Found a bug tab that opens a placeholder page reading “Nothing here yet.”
+- Add a General Settings page with saved switches for background running and menu bar icon visibility. Closing Settings while background running is on removes Glissform from the Dock regardless of menu bar icon visibility; opening the app again restores Settings. Turning off background running quits Glissform when Settings closes.
+- Add Launch at login to General using macOS’s main-app login service. The switch reflects the system’s current status and explains when approval or setup fails.
+- Add Features and More section titles in the Settings sidebar, with a Send feedback tab that opens a placeholder page reading “Nothing here yet.”
 - Add Battery Ripple as a second experience: a translucent wave unfurls from the built-in display's lower-left corner when power connects (emerald) or the built-in battery crosses down to 20% while unplugged (red). The events have independent saved Settings and menu-bar switches, with no overall feature switch. Its curling edge and soft internal folds dissolve over 2.15 seconds. It takes no screenshot, needs no new permission, does not take focus or mouse input, and stops on sleep, lock, Space/display change, disable, or quit. Reduce Motion uses a shorter static glow. The owner confirmed one green ripple on one unplug/reconnect trial with the earlier visual design and approved the revised emerald appearance on 2026-09-26. The red ripple and broader interruption and full-screen behavior await physical confirmation.
 
 ### Fixed
 
+- Restore the same menu bar status item when its General switch turns back on, so toggling the icon off and on does not lose its menu bar position.
+- Link the app against the selected macOS SDK so the Settings window uses current native window controls on newer macOS versions while retaining its macOS 14 minimum.
+- Replace the app's copied resource bundle on rebuild so removed icons do not remain in the built app.
 - After automatic angle selection restores the desktop at a paused lid angle, closing past the newly learned starting angle starts a fresh animation without first opening the lid farther.
 - Spread frost-gradient dithering across neighboring rows and columns to reduce horizontal banding in pale areas caused by the repeated 8-bit output pattern.
 - Smooth the projected screenshot's side boundaries as one continuous blurred edge to reduce the parallel dark contours left by separately clipped blur samples.
 
 ### Changed
 
-- Reduce the gap between the Infinite Screen and Battery Ripple sidebar tabs to 4 points.
+- Replace General’s card icons with the supplied checked-window, grid-interface, and user artwork for background running, menu bar access, and login launch.
+- Place General first in the Features group in the Settings sidebar.
+- Use gray sidebar tiles for General and Privacy & About, gray icon tiles and symbols throughout General, and a muted red sidebar tile for Send feedback.
+- Rename the lid-driven desktop feature from **Infinite Screen** to **Seamless Close** in Settings, the menu bar, and current project guidance.
+- Align Settings descriptions around short, one-line explanations; use the same “1-second lid pause” wording for both Seamless Close controls. Update Privacy & About to describe Glissform’s local data use and temporary screen images as a whole.
+- Add a small circular icon-only preview button beside each Battery Ripple switch to play its green or red ripple on demand, including when that event is off.
+- Shorten the still-lid wait for automatic starting-angle detection and pause-to-resume from two seconds to one second.
+- Narrow the starting-angle input by 4 points while retaining space for three-digit values.
+- Give the combined Seamless Close card’s angle section 20-point padding and scale its angle field, number, degree symbol, and step arrows down together.
+- Use a hinge-and-angle icon with a light-blue symbol and tile for automatic starting-angle detection, distinct from Seamless Close’s darker indigo.
+- Combine the Seamless Close switch and manual starting-angle controls in one card, with a full-width divider between the enable row and angle settings.
+- Loosen 24-point settings headline tracking to −0.24 point, about −1% of the font size.
+- Keep sidebar tab labels at medium weight when selected; the row highlight indicates selection.
+- Slightly darken and desaturate the Battery Ripple sidebar icon tile.
+- Give every switch card 12-point top, bottom, and left padding and 24-point padding beside the switch. Use 16-point corners for all Settings detail cards and 12-point corners for their icon tiles.
+- Use the supplied empty-battery, charge-battery, low-battery, monitor, and messages vectors for Battery Ripple, Power connection, Battery at 20%, Seamless Close, and Send feedback in Settings.
+- Reduce the gap between the Seamless Close and Battery Ripple sidebar tabs to 4 points.
 - Place the More group directly below the feature tabs and use title-case sidebar section headings.
 - Keep the Settings window frame the same height as its rounded surface, removing the transparent toolbar-height strip below it. Use a wider, lighter shadow that follows the actual window frame.
-- Organize Settings with a persistent sidebar and separate Infinite Screen, Battery Ripple, and Privacy & About pages. Keep the window size steady while switching pages, retain each feature’s saved controls, and reset page scrolling on navigation.
-- Refine Settings with a native unified toolbar and window controls over a narrower sidebar, compact selected rows, and smaller filled navigation icons. Give sidebar rows equal padding and a radius concentric with their icon tiles, and keep icons at full opacity while pressed. Clip the full-size content to round every window corner, use a fine edge outline. Remove the titlebar separator. Use subtle 12%-opacity icon tiles with coloured symbols inside the pages. Remove both feature previews and place each switch in its own card. Separate Infinite Screen’s manual angle, automatic selection, and pause controls into compact cards, retaining the live lid reading. Remove feature-page privacy notes; Privacy & About keeps the full explanation.
+- Organize Settings with a persistent sidebar and separate Seamless Close, Battery Ripple, and Privacy & About pages. Keep the window size steady while switching pages, retain each feature’s saved controls, and reset page scrolling on navigation.
+- Refine Settings with a native unified toolbar and window controls over a narrower sidebar, compact selected rows, and smaller filled navigation icons. Give sidebar rows equal padding and a radius concentric with their icon tiles, and keep icons at full opacity while pressed. Clip the full-size content to round every window corner, use a fine edge outline. Remove the titlebar separator. Use subtle 12%-opacity icon tiles with coloured symbols inside the pages. Remove both feature preview illustrations and keep the Battery Ripple switches in separate cards. Group Seamless Close’s switch and manual angle in one card; automatic selection and pause remain in their own cards, retaining the live lid reading. Remove feature-page privacy notes; Privacy & About keeps the full explanation.
 - Add a modest, even Core Image Gaussian blur after projection, blended more strongly toward the top, to soften fine texture in bright controls. Preserve the original projected edge near transparency and use the same captured frame and source-space frost. The owner preferred the resulting appearance on the development Mac; frame pacing has not been measured.
 - Sample finer Gaussian blur levels with a wider 5×5 reconstruction kernel to reduce the blocky texture seen in bright controls while keeping the same nominal blur strength and soft side edges. Owner testing found an overall improvement, though fine texture remains visible on bright controls; frame cost has not been measured.
 - On a fast close, request the single screenshot up to three degrees before the selected start angle after confirmed downward movement. Keep it hidden until the threshold is crossed, and discard it if the lid reverses or pauses before the effect begins. Physical validation of the first visible frame remains pending.
 - Prefer the lid sensor's hundredths-of-a-degree report when available, with a whole-degree fallback. Ignore tiny sensor jitter in the motion target while keeping manual reopening controlled by the lid through the final angle; the settings reading still displays whole degrees.
 - Let slow sub-degree lid changes contribute their actual size to motion smoothing, with a quarter-degree lower bound to limit lag. Whole-degree fallback and fast movement keep their existing response.
-- Smooth Infinite Screen's degree-to-degree speed using a short cadence history and gradual response changes. Brief one-degree direction chatter no longer triggers a fast reversal; confirmed reversals brake existing momentum instead of resetting velocity.
+- Smooth Seamless Close's degree-to-degree speed using a short cadence history and gradual response changes. Brief one-degree direction chatter no longer triggers a fast reversal; confirmed reversals brake existing momentum instead of resetting velocity.
 - Keep manual reopening on the same lid-driven smoothing through the final degree, with no separate return trajectory. Continue sensor updates until the image is flat, and preserve direct tracking if the lid recloses before cleanup. Give pause restoration balanced acceleration and a longer, fold-dependent 340–600 ms return with a lower peak speed. Keep the existing perspective, stretch, blur, gradients, shadow, screenshot model, and final fade.
 - Stabilize only the Settings lid-angle number: a one-degree change appears after 250 ms of continuous readings, while a change of two degrees or more appears immediately. Animation, automatic angle selection, and **Use current angle** continue to use raw sensor readings.
 
-The motion refinements remain unreleased. Synthetic checks bound tracking delay, speed variation, reversal continuity, return speed, and cleanup; physical lid, stop, reversal, and sleep/wake acceptance on the development Mac is still required.
+### Validation and limitations
+
+- The release build and automated motion, capture, Metal, lifecycle, and overlay checks passed locally on 2026-09-27. Synthetic checks bound tracking delay, speed variation, reversal continuity, return speed, and cleanup; they do not establish physical smoothness or capture timing.
+- The owner confirmed one green Battery Ripple trigger with an earlier design and approved the revised emerald appearance on the development Mac. The red 20% event, live interruption and full-screen behavior, refined Seamless Close motion, automatic-angle and pause timing, and broader sleep/wake behavior still need physical confirmation. Other Mac models remain unverified.
+- This is a source-only prerelease. No signed, notarized installer or public `.dmg` is available.
 
 ## 0.1.0-alpha.8 — 2026-09-26
 

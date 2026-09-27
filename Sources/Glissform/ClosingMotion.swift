@@ -2,6 +2,7 @@ import Foundation
 
 /// A gesture keeps its original image plane through any direction changes.
 struct ClosingMotion {
+    private static let defaultStillDuration = 1.0
     private(set) var activationAngle: Double = 80
     var startAngle: Double?
     var automaticStartAngle = false {
@@ -19,7 +20,7 @@ struct ClosingMotion {
     private var hasReference = false
     private(set) var active = false
     var resumeAfterPause = false { didSet { clearPauseTracking() } }
-    var pauseDuration: Double = 2 { didSet { clearPauseTracking() } }
+    var pauseDuration: Double = Self.defaultStillDuration { didSet { clearPauseTracking() } }
     private(set) var desktopResumed = false
     private var desktopResumeRearmAngle: Double?
     private var desktopResumeCanRearmByClosing = false
@@ -64,7 +65,7 @@ struct ClosingMotion {
             restingHighestAngle = angle
         }
         restingLastSampleTime = time
-        if time - (restingSince ?? time) >= 2 {
+        if time - (restingSince ?? time) >= Self.defaultStillDuration {
             learnedStartAngle = automaticThreshold(below: angle)
             clearRestingTracking()
         }
@@ -92,7 +93,7 @@ struct ClosingMotion {
             highestAngle = angle
         }
         lastSampleTime = time
-        let duration = pauseDuration.isFinite ? min(10, max(0.5, pauseDuration)) : 2
+        let duration = pauseDuration.isFinite ? min(10, max(0.5, pauseDuration)) : Self.defaultStillDuration
         return time - (stillSince ?? time) >= duration
     }
 

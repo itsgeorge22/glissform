@@ -4,9 +4,10 @@ import OSLog
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private var statusItem: NSStatusItem!
+    private var statusItem: NSStatusItem?
+    private let statusMenu = NSMenu()
     private let statusLine = NSMenuItem(title: "Starting…", action: nil, keyEquivalent: "")
-    private let enableMenuItem = NSMenuItem(title: "Enable Infinite Screen", action: nil, keyEquivalent: "")
+    private let enableMenuItem = NSMenuItem(title: "Enable Seamless Close", action: nil, keyEquivalent: "")
     private let chargingMenuItem = NSMenuItem(title: "Power connection ripple", action: nil, keyEquivalent: "")
     private let lowBatteryMenuItem = NSMenuItem(title: "Battery at 20% ripple", action: nil, keyEquivalent: "")
     private let sensor = LidSensor()
@@ -78,42 +79,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.image = BrandIcon.menuBar
-        statusItem.button?.toolTip = "Glissform"
         UserDefaults.standard.register(defaults: ["animationStartAngle": 100.0, "animationEnabled": true,
                                                   "resumeAfterPause": false,
                                                   "automaticStartAngleEnabled": false,
                                                   "chargingFeedbackEnabled": true,
-                                                  "lowBatteryRippleEnabled": true])
+                                                  "lowBatteryRippleEnabled": true,
+                                                  "runInBackground": true,
+                                                  "showMenuBarIcon": true])
         let storedAngle = UserDefaults.standard.double(forKey: "animationStartAngle")
         let startAngle = storedAngle.isFinite ? min(130, max(20, storedAngle)).rounded() : 100
         let animationEnabled = UserDefaults.standard.bool(forKey: "animationEnabled")
         motion.startAngle = startAngle
         motion.resumeAfterPause = UserDefaults.standard.bool(forKey: "resumeAfterPause")
         motion.automaticStartAngle = UserDefaults.standard.bool(forKey: "automaticStartAngleEnabled")
-        let menu = NSMenu()
         statusLine.isEnabled = false
-        menu.addItem(statusLine)
-        menu.addItem(.separator())
+        statusMenu.addItem(statusLine)
+        statusMenu.addItem(.separator())
         enableMenuItem.target = self
         enableMenuItem.action = #selector(toggleAnimation)
         enableMenuItem.state = animationEnabled ? .on : .off
-        menu.addItem(enableMenuItem)
+        statusMenu.addItem(enableMenuItem)
         chargingMenuItem.target = self
         chargingMenuItem.action = #selector(toggleChargingFeedback)
         chargingMenuItem.state = UserDefaults.standard.bool(forKey: "chargingFeedbackEnabled") ? .on : .off
-        menu.addItem(chargingMenuItem)
+        statusMenu.addItem(chargingMenuItem)
         lowBatteryMenuItem.target = self
         lowBatteryMenuItem.action = #selector(toggleLowBatteryRipple)
         lowBatteryMenuItem.state = UserDefaults.standard.bool(forKey: "lowBatteryRippleEnabled") ? .on : .off
-        menu.addItem(lowBatteryMenuItem)
-        let settings = menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
+        statusMenu.addItem(lowBatteryMenuItem)
+        let settings = statusMenu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
         settings.target = self
-        menu.addItem(.separator())
-        let quit = menu.addItem(withTitle: "Quit Glissform", action: #selector(quitApp), keyEquivalent: "q")
+        statusMenu.addItem(.separator())
+        let quit = statusMenu.addItem(withTitle: "Quit Glissform", action: #selector(quitApp), keyEquivalent: "q")
         quit.target = self
-        statusItem.menu = menu
+        updateMenuBarIcon(visible: UserDefaults.standard.bool(forKey: "showMenuBarIcon"))
         installApplicationMenu()
 
         settingsModel.configure(
@@ -123,7 +122,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             resumeAfterPause: motion.resumeAfterPause,
             automaticStartAngle: motion.automaticStartAngle,
             chargingFeedbackEnabled: UserDefaults.standard.bool(forKey: "chargingFeedbackEnabled"),
-            lowBatteryRippleEnabled: UserDefaults.standard.bool(forKey: "lowBatteryRippleEnabled")
+            lowBatteryRippleEnabled: UserDefaults.standard.bool(forKey: "lowBatteryRippleEnabled"),
+            runInBackground: UserDefaults.standard.bool(forKey: "runInBackground"),
+            showMenuBarIcon: UserDefaults.standard.bool(forKey: "showMenuBarIcon")
         )
         settingsModel.onAnimationEnabledChange = { [weak self] enabled in
             self?.applyAnimationEnabled(enabled)
@@ -149,6 +150,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             UserDefaults.standard.set(enabled, forKey: "lowBatteryRippleEnabled")
             self?.lowBatteryMenuItem.state = enabled ? .on : .off
             if !enabled { self?.chargingFeedback.stop(if: .lowBattery) }
+        }
+        settingsModel.onPreviewBatteryRipple = { [weak self] style in
+            self?.playChargingFeedback(style: style, isPreview: true)
+        }
+        settingsModel.onRunInBackgroundChange = { enabled in
+            UserDefaults.standard.set(enabled, forKey: "runInBackground")
+        }
+        settingsModel.onShowMenuBarIconChange = { [weak self] visible in
+            UserDefaults.standard.set(visible, forKey: "showMenuBarIcon")
+            self?.updateMenuBarIcon(visible: visible)
         }
 
         let center = NSWorkspace.shared.notificationCenter
@@ -229,7 +240,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        false
+        !settingsModel.runInBackground
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        if !quitting { shutdown() }
+    }
+
+    private func updateMenuBarIcon(visible: Bool) {
+        if statusItem == nil {
+            let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+            item.button?.image = BrandIcon.menuBar
+            item.button?.toolTip = "Glissform"
+            item.menu = statusMenu
+            statusItem = item
+        }
+        statusItem?.isVisible = visible
     }
 
     private func setStatus(_ text: String) {
@@ -424,11 +450,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func playChargingFeedback(style: BatteryRippleStyle) {
+    private func playChargingFeedback(style: BatteryRippleStyle, isPreview: Bool = false) {
         guard !quitting, !sleeping, !screenLocked, !sessionInactive, !hasSnapshot,
               !snapshotRequested, !earlyCaptureRequested, !motion.active, !wakeOpening.pending,
-              (style == .connected ? settingsModel.chargingFeedbackEnabled : settingsModel.lowBatteryRippleEnabled),
-              ProcessInfo.processInfo.systemUptime >= chargingSuppressedUntil,
+              (isPreview || (style == .connected ? settingsModel.chargingFeedbackEnabled : settingsModel.lowBatteryRippleEnabled)),
+              (isPreview || ProcessInfo.processInfo.systemUptime >= chargingSuppressedUntil),
               let screen = builtInScreen(),
               let id = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value,
               CGDisplayIsAsleep(id) == 0 else { return }
@@ -476,7 +502,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func prepareGestureSnapshot() {
-        // Keep the separate charging overlay out of Infinite Screen's one capture.
+        // Keep the separate charging overlay out of Seamless Close's one capture.
         chargingFeedback.stop()
         guard let displayID, canUseDesktop() else {
             cancelWake("desktop unavailable")
@@ -839,7 +865,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             setStatus(enabled ? "Ready · Hold the open lid still to set the starting angle"
                               : "Ready · Close past \(Int(settingsModel.startAngle))° to animate")
         } else {
-            setStatus("Infinite Screen is off")
+            setStatus("Seamless Close is off")
         }
     }
 
@@ -852,7 +878,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if enabled {
             setStatus("Ready · Close past \(Int(motion.effectiveStartAngle ?? settingsModel.startAngle))° to animate")
         } else {
-            setStatus("Infinite Screen is off")
+            setStatus("Seamless Close is off")
         }
     }
 
@@ -934,6 +960,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         invalidateCaptureMetadata()
         if settingsWindowController == nil {
             settingsWindowController = SettingsWindowController(model: settingsModel)
+            settingsWindowController?.onClose = { [weak self] in
+                guard let self, !self.settingsModel.runInBackground else { return }
+                DispatchQueue.main.async { [weak self] in self?.quitApp() }
+            }
         }
         settingsModel.refreshPermission()
         settingsWindowController?.present()
@@ -945,6 +975,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func quitApp() {
+        guard !quitting else { return }
         shutdown()
         NSApp.terminate(nil)
     }
@@ -994,7 +1025,8 @@ extension AppDelegate {
 
     /// Real gesture/cancellation paths with synthetic pixels and no capture permission.
     static func lifecycleSelfTest() async throws {
-        let savedSettings = ["animationStartAngle", "animationEnabled", "automaticStartAngleEnabled"].map {
+        let savedSettings = ["animationStartAngle", "animationEnabled", "automaticStartAngleEnabled",
+                             "runInBackground", "showMenuBarIcon"].map {
             ($0, UserDefaults.standard.object(forKey: $0))
         }
         defer {
@@ -1152,6 +1184,42 @@ extension AppDelegate {
             try await waitForCleanup(app)
             try checkCleared(app)
             print("PASS: settings close/reopen during \(visible ? "visible" : "pending") capture, background continuation and reversal cleanup")
+        }
+        do {
+            let (app, _) = try makeGesture()
+            defer {
+                if let item = app.statusItem { NSStatusBar.system.removeStatusItem(item) }
+                app.shutdown()
+                app.window?.close()
+            }
+            app.showSettings()
+            let settings = app.settingsWindowController!.window!
+            app.settingsModel.onShowMenuBarIconChange = { [weak app] visible in
+                app?.updateMenuBarIcon(visible: visible)
+            }
+            app.settingsModel.setShowMenuBarIcon(false)
+            let statusItem = app.statusItem
+            try check(statusItem != nil && statusItem?.isVisible == false,
+                      "Turning the menu bar icon off must hide its status item")
+            app.settingsModel.setShowMenuBarIcon(true)
+            try check(app.statusItem === statusItem && statusItem?.isVisible == true && statusItem?.button?.image != nil,
+                      "Turning the menu bar icon back on must restore the same item and image")
+            app.settingsModel.setShowMenuBarIcon(false)
+            settings.performClose(nil)
+            try check(NSApp.activationPolicy() == .accessory && !app.applicationShouldTerminateAfterLastWindowClosed(NSApp),
+                      "Background running must hide the Dock icon even without a menu bar icon")
+            app.showSettings()
+            try check(settings.isVisible && NSApp.activationPolicy() == .regular,
+                      "Opening the app again must restore Settings and its Dock icon")
+            app.settingsModel.setRunInBackground(false)
+            try check(app.applicationShouldTerminateAfterLastWindowClosed(NSApp),
+                      "Disabling background running must make closing the last Settings window quit")
+            app.settingsModel.setRunInBackground(true)
+            app.settingsModel.setShowMenuBarIcon(true)
+            settings.performClose(nil)
+            try check(NSApp.activationPolicy() == .accessory,
+                      "With menu bar access enabled, background operation must hide the Dock icon")
+            print("PASS: General restores the same menu bar item and preserves access through menu bar or Dock")
         }
         // A Space change must discard both pending and visible snapshots and
         // require a fresh opening above the configured threshold before recapture.

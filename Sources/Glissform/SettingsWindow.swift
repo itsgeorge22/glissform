@@ -1,17 +1,19 @@
 import AppKit
+import ServiceManagement
 import SwiftUI
 
 @MainActor
 final class SettingsModel: ObservableObject {
     enum Page: Hashable {
-        case infiniteScreen, batteryRipple, about, foundBug
+        case infiniteScreen, batteryRipple, general, about, foundBug
 
         var title: String {
             switch self {
-            case .infiniteScreen: return "Infinite Screen"
+            case .infiniteScreen: return "Seamless Close"
             case .batteryRipple: return "Battery Ripple"
+            case .general: return "General"
             case .about: return "Privacy & About"
-            case .foundBug: return "Found a bug"
+            case .foundBug: return "Send feedback"
             }
         }
     }
@@ -37,12 +39,20 @@ final class SettingsModel: ObservableObject {
     var onChargingFeedbackEnabledChange: ((Bool) -> Void)?
     @Published private(set) var lowBatteryRippleEnabled = true
     var onLowBatteryRippleEnabledChange: ((Bool) -> Void)?
+    @Published private(set) var runInBackground = true
+    var onRunInBackgroundChange: ((Bool) -> Void)?
+    @Published private(set) var showMenuBarIcon = true
+    var onShowMenuBarIconChange: ((Bool) -> Void)?
+    @Published private(set) var launchAtLoginEnabled = false
+    @Published private(set) var launchAtLoginMessage: String?
+    var onPreviewBatteryRipple: ((BatteryRippleStyle) -> Void)?
 
     var onOpenPermissions: (() -> Void)?
 
     func configure(animationEnabled: Bool, startAngle: Double, screenCaptureAllowed: Bool,
                    resumeAfterPause: Bool = false, automaticStartAngle: Bool = false,
-                   chargingFeedbackEnabled: Bool = true, lowBatteryRippleEnabled: Bool = true) {
+                   chargingFeedbackEnabled: Bool = true, lowBatteryRippleEnabled: Bool = true,
+                   runInBackground: Bool = true, showMenuBarIcon: Bool = true) {
         self.animationEnabled = animationEnabled
         self.startAngle = startAngle
         self.screenCaptureAllowed = screenCaptureAllowed
@@ -50,6 +60,42 @@ final class SettingsModel: ObservableObject {
         self.automaticStartAngle = automaticStartAngle
         self.chargingFeedbackEnabled = chargingFeedbackEnabled
         self.lowBatteryRippleEnabled = lowBatteryRippleEnabled
+        self.runInBackground = runInBackground
+        self.showMenuBarIcon = showMenuBarIcon
+    }
+
+    func setRunInBackground(_ enabled: Bool) {
+        guard runInBackground != enabled else { return }
+        runInBackground = enabled
+        onRunInBackgroundChange?(enabled)
+    }
+
+    func setShowMenuBarIcon(_ enabled: Bool) {
+        guard showMenuBarIcon != enabled else { return }
+        showMenuBarIcon = enabled
+        onShowMenuBarIconChange?(enabled)
+    }
+
+    func refreshLaunchAtLogin() {
+        let status = SMAppService.mainApp.status
+        launchAtLoginEnabled = status == .enabled
+        launchAtLoginMessage = status == .requiresApproval
+            ? "Allow Glissform in System Settings → General → Login Items & Extensions."
+            : nil
+    }
+
+    func setLaunchAtLogin(_ enabled: Bool) {
+        guard launchAtLoginEnabled != enabled else { return }
+        do {
+            if enabled { try SMAppService.mainApp.register() }
+            else { try SMAppService.mainApp.unregister() }
+            refreshLaunchAtLogin()
+        } catch {
+            refreshLaunchAtLogin()
+            if launchAtLoginMessage == nil {
+                launchAtLoginMessage = "Couldn’t change Launch at login: \(error.localizedDescription)"
+            }
+        }
     }
 
     func setAutomaticStartAngle(_ enabled: Bool) {
@@ -206,7 +252,10 @@ private final class SettingsShadowView: NSView {
 @MainActor
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let shadowWindow: SettingsShadowWindow
+    private let model: SettingsModel
+    var onClose: (() -> Void)?
     init(model: SettingsModel) {
+        self.model = model
         let contentHeight = min(SettingsDesign.Metrics.preferredHeight, (NSScreen.main?.visibleFrame.height ?? 900) - 48)
         let window = SettingsWindow(
             contentRect: NSRect(x: 0, y: 0, width: SettingsDesign.Metrics.windowWidth, height: contentHeight),
@@ -278,9 +327,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         window?.removeChildWindow(shadowWindow)
         shadowWindow.orderOut(nil)
-        // Only the settings window controls Dock presence. The overlay and
-        // menu bar keep running without changing capture or sensor state.
-        NSApp.setActivationPolicy(.accessory)
+        if model.runInBackground {
+            NSApp.setActivationPolicy(.accessory)
+        }
+        onClose?()
     }
 
     func windowDidResize(_ notification: Notification) {
@@ -315,6 +365,7 @@ private struct SettingsRootView: View {
         HStack(spacing: 0) {
             VStack(spacing: 4) {
                 sidebarSectionTitle("Features")
+                navigationRow(.general)
                 navigationRow(.infiniteScreen)
                 navigationRow(.batteryRipple)
                 sidebarSectionTitle("More")
@@ -329,7 +380,7 @@ private struct SettingsRootView: View {
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Settings pages")
             .onMoveCommand { direction in
-                let pages: [SettingsModel.Page] = [.infiniteScreen, .batteryRipple, .about, .foundBug]
+                let pages: [SettingsModel.Page] = [.general, .infiniteScreen, .batteryRipple, .about, .foundBug]
                 let index = pages.firstIndex(of: focusedPage ?? model.selectedPage) ?? 0
                 let next: Int
                 if direction == .down { next = min(index + 1, pages.count - 1) }
@@ -344,6 +395,7 @@ private struct SettingsRootView: View {
                     switch model.selectedPage {
                     case .infiniteScreen: AnimationSettingsView(model: model)
                     case .batteryRipple: BatterySettingsView(model: model)
+                    case .general: GeneralSettingsView(model: model)
                     case .about: AboutSettingsView(model: model)
                     case .foundBug: FoundBugPlaceholderView()
                     }
@@ -365,9 +417,11 @@ private struct SettingsRootView: View {
         .onAppear {
             layout.height = resizeWindow(SettingsDesign.Metrics.preferredHeight)
             model.refreshPermission()
+            model.refreshLaunchAtLogin()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.refreshPermission()
+            model.refreshLaunchAtLogin()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
             layout.height = resizeWindow(SettingsDesign.Metrics.preferredHeight)
@@ -392,18 +446,20 @@ private struct SettingsRootView: View {
             HStack(spacing: 9) {
                 Group {
                     switch page {
-                    case .infiniteScreen: IconlyIcon(.laptop, size: 17)
-                    case .batteryRipple: Image(systemName: "bolt.fill").font(.system(size: 16, weight: .medium))
+                    case .infiniteScreen: FeatureIcon(.infiniteScreen, size: 17)
+                    case .batteryRipple: FeatureIcon(.batteryRipple, size: 17)
+                    case .general: FeatureIcon(.general, size: 17)
                     case .about: IconlyIcon(.shieldDone, size: 17)
-                    case .foundBug: Image(systemName: "ladybug.fill").font(.system(size: 16, weight: .medium))
+                    case .foundBug: FeatureIcon(.sendFeedback, size: 17)
                     }
                 }
                 .foregroundStyle(.white)
                 .frame(width: 28, height: 28)
                 .background {
                     let tint = page == .infiniteScreen ? SettingsDesign.Palette.feature
-                        : page == .batteryRipple ? SettingsDesign.Palette.success
-                        : page == .foundBug ? SettingsDesign.Palette.attention : Color.gray
+                        : page == .batteryRipple ? SettingsDesign.Palette.batterySidebar
+                        : page == .general || page == .about ? SettingsDesign.Palette.neutralSidebar
+                        : SettingsDesign.Palette.feedbackSidebar
                     RoundedRectangle(cornerRadius: SettingsDesign.Metrics.sidebarIconRadius, style: .continuous)
                         .fill(tint.gradient)
                         .overlay(RoundedRectangle(cornerRadius: SettingsDesign.Metrics.sidebarIconRadius)
@@ -411,7 +467,7 @@ private struct SettingsRootView: View {
                 }
                 .accessibilityHidden(true)
                 Text(page.title)
-                    .font(.system(size: 13, weight: model.selectedPage == page ? .semibold : .medium))
+                    .font(.system(size: 13, weight: .medium))
                     .lineLimit(1)
                 Spacer(minLength: 0)
             }
@@ -435,18 +491,20 @@ private struct SettingsFeatureHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
-            Text(title).font(SettingsDesign.Typography.pageTitle).tracking(-0.7)
+            Text(title).font(SettingsDesign.Typography.pageTitle)
+                .tracking(SettingsDesign.Typography.headlineTracking)
             Text(subtitle).font(SettingsDesign.Typography.body).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
 
-private struct FeatureToggleCard<Icon: View>: View {
+private struct FeatureToggleRow<Icon: View>: View {
     let title: String
     let detail: String
     let color: SettingsDesign.Palette.CardIconColor
     @Binding var isEnabled: Bool
+    let preview: (() -> Void)?
     @ViewBuilder let icon: () -> Icon
 
     var body: some View {
@@ -458,12 +516,34 @@ private struct FeatureToggleCard<Icon: View>: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
+            if let preview {
+                Button(action: preview) {
+                    IconlyIcon(.play, size: 16)
+                }
+                .buttonStyle(BatteryPreviewButtonStyle())
+                .accessibilityLabel("Preview \(title) ripple")
+                .help("Preview \(title) ripple")
+            }
             Toggle(title, isOn: $isEnabled)
                 .labelsHidden().toggleStyle(AppleSwitchStyle())
                 .accessibilityLabel("Enable \(title)")
         }
-        .padding(SettingsDesign.Spacing.featureInset)
-        .modifier(SettingsCardSurface())
+    }
+}
+
+private struct FeatureToggleCard<Icon: View>: View {
+    let title: String
+    let detail: String
+    let color: SettingsDesign.Palette.CardIconColor
+    @Binding var isEnabled: Bool
+    let preview: () -> Void
+    @ViewBuilder let icon: () -> Icon
+
+    var body: some View {
+        FeatureToggleRow(title: title, detail: detail, color: color, isEnabled: $isEnabled,
+                         preview: preview, icon: icon)
+            .padding(SettingsDesign.Spacing.switchCardInsets)
+            .modifier(SettingsCardSurface())
     }
 }
 
@@ -489,26 +569,19 @@ private struct AnimationSettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: SettingsDesign.Spacing.cards) {
-            SettingsFeatureHeader(title: "Infinite Screen",
-                subtitle: "Your desktop stays in place as the lid closes.")
+            SettingsFeatureHeader(title: "Seamless Close",
+                subtitle: "Your desktop appears to stay in place as the lid closes.")
                 .padding(.bottom, SettingsDesign.Spacing.detail)
 
-            FeatureToggleCard(title: "Infinite Screen", detail: "Animate the desktop as the lid closes.",
-                              color: .feature,
-                              isEnabled: Binding(get: { model.animationEnabled }, set: { model.setAnimationEnabled($0) })) {
-                IconlyIcon(.laptop, size: 24, isCardIcon: true)
-            }
+            infiniteScreenCard
             if showsAccessCard {
                 ScreenAccessCard(model: model).transition(.opacity)
             }
-            angleControls
-                .padding(SettingsDesign.Spacing.featureInset)
-                .modifier(SettingsCardSurface())
             automaticAngleControls
-                .padding(SettingsDesign.Spacing.featureInset)
+                .padding(SettingsDesign.Spacing.switchCardInsets)
                 .modifier(SettingsCardSurface())
             pauseControls
-                .padding(SettingsDesign.Spacing.featureInset)
+                .padding(SettingsDesign.Spacing.switchCardInsets)
                 .modifier(SettingsCardSurface())
         }
         .padding(SettingsDesign.Spacing.page)
@@ -522,6 +595,26 @@ private struct AnimationSettingsView: View {
             catch { return }
             permission.showConfirmation = false
         }
+    }
+
+    private var infiniteScreenCard: some View {
+        VStack(spacing: 0) {
+            FeatureToggleRow(title: "Seamless Close", detail: "Animates the desktop as the lid closes.",
+                             color: .feature,
+                             isEnabled: Binding(get: { model.animationEnabled }, set: { model.setAnimationEnabled($0) }),
+                             preview: nil) {
+                FeatureIcon(.infiniteScreen)
+            }
+            .padding(SettingsDesign.Spacing.switchCardInsets)
+
+            Rectangle()
+                .fill(SettingsDesign.Palette.cardBorder)
+                .frame(height: 1)
+
+            angleControls
+                .padding(SettingsDesign.Spacing.angleSectionInset)
+        }
+        .modifier(SettingsCardSurface())
     }
 
     private var angleControls: some View {
@@ -582,50 +675,50 @@ private struct AnimationSettingsView: View {
         HStack(spacing: SettingsDesign.Spacing.cards) {
             PauseFeatureIcon().accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Resume desktop after a pause").font(SettingsDesign.Typography.controlTitle)
-                Text("Restore your desktop after a 2-second lid pause below the starting angle.")
+                Text("Resume desktop after pause").font(SettingsDesign.Typography.controlTitle)
+                Text("Restores the desktop after a 1-second lid pause.")
                     .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
-            Toggle("Resume desktop after a pause", isOn: Binding(
+            Toggle("Resume desktop after pause", isOn: Binding(
                 get: { model.resumeAfterPause }, set: { model.setResumeAfterPause($0) }
             ))
             .labelsHidden().toggleStyle(AppleSwitchStyle())
-            .accessibilityLabel("Resume desktop after a pause")
+            .accessibilityLabel("Resume desktop after pause")
         }
     }
 
     private var automaticAngleControls: some View {
         HStack(spacing: SettingsDesign.Spacing.cards) {
-            CardIconTile(color: .feature) {
-                IconlyIcon(.laptop, size: 24, isCardIcon: true)
+            CardIconTile(color: .automaticAngle) {
+                FeatureIcon(.automaticAngle)
             }
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Set starting angle automatically").font(SettingsDesign.Typography.controlTitle)
+                Text("Detect starting angle").font(SettingsDesign.Typography.controlTitle)
                 Text(automaticAngleDescription)
                     .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
-            Toggle("Set starting angle automatically", isOn: Binding(
+            Toggle("Detect starting angle", isOn: Binding(
                 get: { model.automaticStartAngle }, set: { model.setAutomaticStartAngle($0) }
             ))
                 .labelsHidden().toggleStyle(AppleSwitchStyle())
-                .accessibilityLabel("Set starting angle automatically")
+                .accessibilityLabel("Detect starting angle")
                 .accessibilityHint(automaticAngleDescription)
         }
     }
 
     private var automaticAngleDescription: String {
         if model.automaticStartAngle, let angle = model.learnedStartAngle {
-            return "Using \(Int(angle))° instead of Begin at. Hold the lid still for 2 seconds to update it."
+            return "Using \(Int(angle))°. Updates after a 1-second lid pause."
         }
         if model.automaticStartAngle {
-            return "Hold the lid still for 2 seconds to set a new starting angle. Begin at applies until then."
+            return "Waiting for a 1-second lid pause. Begin at applies."
         }
-        return "Set the starting angle after a 2-second lid pause instead of Begin at."
+        return "Detects the angle after a 1-second lid pause."
     }
 
 }
@@ -636,22 +729,78 @@ private struct BatterySettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: SettingsDesign.Spacing.cards) {
             SettingsFeatureHeader(title: "Battery Ripple",
-                subtitle: "A moment of light for power changes.")
+                subtitle: "A soft ripple for charging and low battery.")
                 .padding(.bottom, SettingsDesign.Spacing.detail)
 
-            FeatureToggleCard(title: "Power connection", detail: "Play a green ripple when power connects.",
+            FeatureToggleCard(title: "Power connection", detail: "Shows a green ripple when power connects.",
                               color: .success,
                               isEnabled: Binding(get: { model.chargingFeedbackEnabled },
-                                                 set: { model.setChargingFeedbackEnabled($0) })) {
-                Image(systemName: "bolt.fill").font(.system(size: 23, weight: .medium))
+                                                 set: { model.setChargingFeedbackEnabled($0) }),
+                              preview: { model.onPreviewBatteryRipple?(.connected) }) {
+                FeatureIcon(.powerConnection)
             }
 
-            FeatureToggleCard(title: "Battery at 20%", detail: "Play a red ripple when battery reaches 20%.",
+            FeatureToggleCard(title: "Battery at 20%", detail: "Shows a red ripple when battery reaches 20%.",
                               color: .danger,
                               isEnabled: Binding(get: { model.lowBatteryRippleEnabled },
-                                                 set: { model.setLowBatteryRippleEnabled($0) })) {
-                Image(systemName: "battery.25percent").font(.system(size: 23, weight: .medium))
+                                                 set: { model.setLowBatteryRippleEnabled($0) }),
+                              preview: { model.onPreviewBatteryRipple?(.lowBattery) }) {
+                FeatureIcon(.batteryAt20Percent)
             }
+        }
+        .padding(SettingsDesign.Spacing.page)
+    }
+}
+
+private struct GeneralSettingsView: View {
+    @ObservedObject var model: SettingsModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SettingsDesign.Spacing.cards) {
+            SettingsFeatureHeader(title: "General", subtitle: "Choose how Glissform stays available.")
+                .padding(.bottom, SettingsDesign.Spacing.detail)
+
+            FeatureToggleRow(title: "Run in background",
+                             detail: "Keep effects active after closing Settings.",
+                             color: .neutral,
+                             isEnabled: Binding(get: { model.runInBackground },
+                                                set: { model.setRunInBackground($0) }),
+                             preview: nil) {
+                FeatureIcon(.backgroundRunning)
+            }
+            .padding(SettingsDesign.Spacing.switchCardInsets)
+            .modifier(SettingsCardSurface())
+
+            FeatureToggleRow(title: "Menu bar icon",
+                             detail: "Open Settings and controls from the menu bar.",
+                             color: .neutral,
+                             isEnabled: Binding(get: { model.showMenuBarIcon },
+                                                set: { model.setShowMenuBarIcon($0) }),
+                             preview: nil) {
+                FeatureIcon(.menuBarIcon)
+            }
+            .padding(SettingsDesign.Spacing.switchCardInsets)
+            .modifier(SettingsCardSurface())
+
+            VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
+                FeatureToggleRow(title: "Launch at login",
+                                 detail: "Open Glissform when you sign in.",
+                                 color: .neutral,
+                                 isEnabled: Binding(get: { model.launchAtLoginEnabled },
+                                                    set: { model.setLaunchAtLogin($0) }),
+                                 preview: nil) {
+                    FeatureIcon(.launchAtLogin)
+                }
+                if let message = model.launchAtLoginMessage {
+                    Text(message)
+                        .font(SettingsDesign.Typography.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.leading, SettingsDesign.Metrics.iconSize + SettingsDesign.Spacing.controls)
+                }
+            }
+            .padding(SettingsDesign.Spacing.switchCardInsets)
+            .modifier(SettingsCardSurface())
         }
         .padding(SettingsDesign.Spacing.page)
     }
@@ -681,19 +830,20 @@ private struct AngleEntry: View {
                 TextField("Start angle", text: $draft.text)
                     .labelsHidden().multilineTextAlignment(.trailing)
                     .font(SettingsDesign.Typography.editableValue)
-                    .textFieldStyle(.plain).frame(width: 38)
+                    .textFieldStyle(.plain).frame(width: SettingsDesign.Metrics.angleNumberWidth)
                     .focused($isFocused)
                     .accessibilityLabel("Start angle in degrees")
                     .help("Enter an angle from 20° to 130°, then press Return.")
                     .onSubmit { commit() }
                 Text("°")
                     .font(SettingsDesign.Typography.angleUnit).foregroundStyle(.secondary)
-                    .offset(y: -2)
+                    .offset(y: -1.5)
                     .accessibilityHidden(true)
             }
-            .padding(.trailing, SettingsDesign.Spacing.label).padding(.vertical, SettingsDesign.Spacing.label)
+            .padding(.trailing, SettingsDesign.Spacing.angleFieldTrailingInset)
+            .padding(.vertical, SettingsDesign.Spacing.angleFieldInset)
         }
-        .background(SettingsDesign.Palette.field, in: RoundedRectangle(cornerRadius: SettingsDesign.Radius.control))
+        .background(SettingsDesign.Palette.field, in: RoundedRectangle(cornerRadius: SettingsDesign.Radius.angleField))
         .modifier(ControlHoverFeedback(isActive: isFocused, inset: 0, showsHover: false))
         .onAppear { draft.text = String(Int(model.startAngle)) }
         .onChange(of: model.startAngle) { _, angle in draft.text = String(Int(angle)) }
@@ -705,8 +855,8 @@ private struct AngleEntry: View {
             commit()
             model.setStartAngle(model.startAngle + step)
         } label: {
-            IconlyIcon(.chevronUp, size: 16, rotation: rotation)
-                .offset(y: step > 0 ? 2 : -2)
+            IconlyIcon(.chevronUp, size: SettingsDesign.Metrics.angleChevronSize, rotation: rotation)
+                .offset(y: step > 0 ? 1.5 : -1.5)
                 .frame(width: SettingsDesign.Metrics.arrowWidth, height: SettingsDesign.Metrics.arrowHeight)
                 .contentShape(Rectangle())
         }
@@ -728,7 +878,8 @@ private struct SettingsCardSurface: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(SettingsDesign.Palette.card, in: RoundedRectangle(cornerRadius: SettingsDesign.Radius.card))
-            .overlay(RoundedRectangle(cornerRadius: SettingsDesign.Radius.card).strokeBorder(SettingsDesign.Palette.cardBorder))
+            .overlay(RoundedRectangle(cornerRadius: SettingsDesign.Radius.card)
+                .strokeBorder(SettingsDesign.Palette.cardBorder))
     }
 }
 
@@ -781,8 +932,8 @@ private struct ScreenAccessCard: View {
                 Text(model.screenCaptureAllowed ? "Screen access allowed" : "Screen access required")
                     .font(SettingsDesign.Typography.controlTitle)
                 Text(model.screenCaptureAllowed
-                     ? "One screenshot per gesture, kept in memory. No audio captured."
-                     : "Allow Screen & System Audio Recording to use the lid effect.")
+                     ? "Screen images stay in memory."
+                     : "Allow screen access for desktop effects.")
                     .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -794,7 +945,7 @@ private struct ScreenAccessCard: View {
             .fixedSize()
             .help("Open Screen & System Audio Recording in System Settings to enable or revoke access for Glissform.")
         }
-        .padding(SettingsDesign.Spacing.cardInset)
+        .padding(SettingsDesign.Spacing.featureInset)
         .frame(maxWidth: .infinity, alignment: .leading)
         .modifier(SettingsCardSurface())
         .accessibilityElement(children: .contain)
@@ -804,8 +955,9 @@ private struct ScreenAccessCard: View {
 private struct FoundBugPlaceholderView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Found a bug")
-                .font(SettingsDesign.Typography.pageTitle).tracking(-0.6)
+            Text("Send feedback")
+                .font(SettingsDesign.Typography.pageTitle)
+                .tracking(SettingsDesign.Typography.headlineTracking)
             Text("Nothing here yet.")
                 .font(SettingsDesign.Typography.body)
                 .foregroundStyle(.secondary)
@@ -820,14 +972,16 @@ private struct AboutSettingsView: View {
     var body: some View {
             VStack(alignment: .leading, spacing: SettingsDesign.Spacing.groups) {
                 Text("Privacy & About")
-                    .font(SettingsDesign.Typography.pageTitle).tracking(-0.6)
+                    .font(SettingsDesign.Typography.pageTitle)
+                    .tracking(SettingsDesign.Typography.headlineTracking)
 
                 HStack(spacing: SettingsDesign.Spacing.label) {
                     Image(nsImage: NSApp.applicationIconImage)
                         .resizable().frame(width: 68, height: 68).accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
                         Text("Glissform")
-                            .font(SettingsDesign.Typography.aboutTitle).tracking(-0.5)
+                            .font(SettingsDesign.Typography.aboutTitle)
+                            .tracking(SettingsDesign.Typography.headlineTracking)
                         Text("\(Bundle.main.object(forInfoDictionaryKey: "GlissformVersion") as? String ?? "Development")")
                             .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
                     }
@@ -843,10 +997,10 @@ private struct AboutSettingsView: View {
 
     private var privacyCard: some View {
         VStack(alignment: .leading, spacing: SettingsDesign.Spacing.cardInset) {
-            Text("Your screen stays yours.").font(SettingsDesign.Typography.sectionTitle)
-            privacyDetail("One gesture. One screenshot.", text: "Infinite Screen captures only when its effect begins. Battery Ripple captures none.", symbol: .copy)
-            privacyDetail("Only in memory.", text: "Reused after lid-close sleep, then released. Never saved or uploaded.", symbol: .memory)
-            privacyDetail("Quiet by design.", text: "No audio capture, analytics, or network requests.", symbol: .lock)
+            Text("Private by design.").font(SettingsDesign.Typography.sectionTitle)
+            privacyDetail("Only what’s needed.", text: "Uses lid angle, power status, and temporary screen images.", symbol: .copy)
+            privacyDetail("Kept in memory.", text: "Screen images are released after use, never saved or sent.", symbol: .memory)
+            privacyDetail("No tracking.", text: "No audio capture, analytics, or network requests.", symbol: .lock)
         }
         .padding(SettingsDesign.Spacing.cardInset)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -915,6 +1069,40 @@ private struct FeedbackButtonBody: View {
             .onHover { hover.isHovered = $0 }
             .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.hoverDuration), value: isHovered)
             .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.pressedDuration), value: isPressed)
+    }
+}
+
+private struct BatteryPreviewButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        BatteryPreviewButtonBody(configuration: configuration)
+    }
+}
+
+private struct BatteryPreviewButtonBody: View {
+    let configuration: ButtonStyleConfiguration
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @StateObject private var hover = HoverState()
+
+    var body: some View {
+        let highlighted = configuration.isPressed || hover.isHovered
+        configuration.label
+            .foregroundStyle(.primary)
+            .frame(width: 30, height: 30)
+            .background {
+                Circle()
+                    .fill(Color.primary.opacity(configuration.isPressed ? SettingsDesign.Feedback.pressedFill
+                                                 : (hover.isHovered ? SettingsDesign.Feedback.hoverFill
+                                                    : SettingsDesign.Feedback.idleFill)))
+            }
+            .overlay {
+                Circle()
+                    .strokeBorder(Color.primary.opacity(highlighted ? SettingsDesign.Feedback.hoverBorder : 0), lineWidth: 1)
+                    .allowsHitTesting(false)
+            }
+            .contentShape(Circle())
+            .onHover { hover.isHovered = $0 }
+            .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.hoverDuration), value: hover.isHovered)
+            .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.pressedDuration), value: configuration.isPressed)
     }
 }
 

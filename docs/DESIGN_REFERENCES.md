@@ -1,6 +1,6 @@
 # Settings reference study
 
-This study informed the unreleased settings redesign on 2026-09-26. It compares visible app interfaces from official product pages and documentation; Alcove's settings were inspected through a third-party screenshot gallery. Published screenshots may represent different app versions. The comparison concerns composition and materials, not implementation technology or popularity rankings.
+This study informed the settings redesign released in alpha.9. It compares visible app interfaces from official product pages and documentation; Alcove's settings were inspected through a third-party screenshot gallery. Published screenshots may represent different app versions. The comparison concerns composition and materials, not implementation technology or popularity rankings.
 
 | Reference | Visible pattern | Application to Glissform |
 | --- | --- | --- |
@@ -17,6 +17,6 @@ This study informed the unreleased settings redesign on 2026-09-26. It compares 
 
 ## Glissform's direction
 
-The shared idea is light responding to a familiar physical action. The current settings layout keeps native window controls in the sidebar, compact tabs with quiet selection, saturated sidebar icon tiles, and subtler page tiles. Separate neutral cards make the feature switches and Infinite Screen controls easy to scan. The existing capsule switches retain the app's character.
+The shared idea is light responding to a familiar physical action. The current settings layout keeps native window controls in the sidebar, compact tabs with quiet selection, saturated sidebar icon tiles, and subtler page tiles. Separate neutral cards make the feature switches and Seamless Close controls easy to scan. The existing capsule switches retain the app's character.
 
 The implementation uses Glissform artwork and licensed Iconly interface icons. Reference screenshots are research material and are not bundled in the app. Final appearance must be judged in the running app, including native titlebar placement and accessibility appearances.

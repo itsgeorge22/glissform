@@ -2,28 +2,26 @@
 
 Subtle animations and quality-of-life improvements for everyday interactions on your Mac.
 
-**Infinite Screen is the first available feature:** your desktop appears to stay in place as you close your MacBook lid, with perspective, frost, and shadow responding to the movement. Glissform is designed to grow into a collection of useful experiences.
+**Seamless Close is the first available feature:** your desktop appears to stay in place as you close your MacBook lid, with perspective, frost, and shadow responding to the movement. Glissform is designed to grow into a collection of useful experiences.
 
 [Report a bug](https://github.com/itsgeorge22/glissform/issues/new?template=bug_report.yml) · [Suggest a feature](https://github.com/itsgeorge22/glissform/issues/new?template=feature_request.yml) · [Roadmap](ROADMAP.md)
 
 ## Project status
 
-**In development — not yet available for public download.** The current development version is 0.1.0-alpha.8.
+**In development — not yet available for public download.** The current source prerelease is 0.1.0-alpha.9.
 
 The app will be available once a `.dmg` is ready and published on GitHub. Download links and installation instructions will be added then.
 
-The main branch also contains the unreleased **Battery Ripple** experience. It is not part of the published alpha.8 source tag.
-
-See the [changelog](CHANGELOG.md) for released changes and any upcoming work.
+Alpha.9 includes **Battery Ripple** and the renamed **Seamless Close** feature. Earlier alpha releases called it **Infinite Screen**. See the [changelog](CHANGELOG.md) for version-specific changes and ongoing limitations.
 
 ## Current features
 
 - Experience a lid-driven desktop animation with full-angle perspective, progressive frost, and shadow.
 - Reverse the effect by reopening the lid, including experimental opening after lid-close sleep using the same screenshot.
-- Choose the starting angle manually or let a two-second lid pause set it automatically, one degree below the held angle; optionally restore desktop access after a pause.
-- Keep Glissform running from the menu bar when its settings window is closed.
+- Choose the starting angle manually or let a one-second lid pause set it automatically, one degree below the held angle; optionally restore desktop access after a pause.
+- Keep Glissform running after its Settings window closes, with menu bar access by default.
 
-On unreleased main, Battery Ripple plays a green wave when power connects or a red wave when the built-in battery falls to 20%. The two events have independent saved switches; there is no overall Battery Ripple switch. A compact sidebar groups Infinite Screen and Battery Ripple under Features, with Privacy & About and a Found a bug placeholder under More. Infinite Screen keeps its live lid reading and separate angle, automatic-selection, and pause cards. Battery Ripple uses no screenshot or additional permission.
+Battery Ripple plays a green wave when power connects or a red wave when the built-in battery falls to 20%. The two events have independent saved switches and preview buttons; there is no overall Battery Ripple switch. A compact sidebar groups General, Seamless Close, and Battery Ripple in that order under Features, with Privacy & About and a Send feedback placeholder under More. General controls whether Glissform keeps running after Settings closes, whether its menu bar icon appears, and whether macOS launches it at login. When background running is on, closing Settings removes Glissform from the Dock even if its menu bar icon is hidden; opening the app again restores Settings. Seamless Close keeps its switch, live lid reading, and manual angle together in one card, with separate automatic-selection and pause cards. Battery Ripple uses no screenshot or additional permission.
 
 ## Compatibility
 
@@ -32,7 +30,7 @@ On unreleased main, Battery Ripple plays a green wave when power connects or a r
 | macOS | 14 or later is the deployment minimum; this is not a guarantee of compatibility on every version. |
 | Hardware | A Metal-capable MacBook with a compatible lid-angle sensor. |
 | Tested hardware | MacBook Air M5 15-inch (Mac17,4), the development machine. Other models are unverified. |
-| Permission | Infinite Screen needs Screen Recording access for individual desktop screenshots. Battery Ripple does not. |
+| Permission | Seamless Close needs Screen Recording access for individual desktop screenshots. Battery Ripple does not. |
 
 The lid sensor uses an undocumented protocol. Glissform tries fractional angle readings and falls back to whole degrees when unavailable. If you try Glissform on another configuration, [share a compatibility report](https://github.com/itsgeorge22/glissform/issues/new?template=compatibility_report.yml), whether it works or fails. Community reports help build coverage; they are not hardware certification.
 
@@ -64,6 +62,6 @@ Developer build and verification steps are documented in [Contributing](CONTRIBU
 
 ## Credits and licensing
 
-The [LidAngleSensor project](https://github.com/samhenrigold/LidAngleSensor) and [Clamshell](https://github.com/danielradosa/clamshell) were consulted for the HID reports. Glissform's sensor implementation and visual effect were written independently. Interface icons are by [Iconly](https://iconly.pro), used under the owner's paid license; see [provenance](docs/ICONLY.md). See [app artwork](Artwork/README.md) for the native icon sources.
+The [LidAngleSensor project](https://github.com/samhenrigold/LidAngleSensor) and [Clamshell](https://github.com/danielradosa/clamshell) were consulted for the HID reports. Glissform's sensor implementation and visual effect were written independently. Some interface icons are by [Iconly](https://iconly.pro), used under the owner's paid license; see [provenance](docs/ICONLY.md). See [app artwork](Artwork/README.md) for the native icon sources.
 
 **No open-source license has been selected.** Public source availability does not itself grant an open-source license. Third-party assets retain their own terms.

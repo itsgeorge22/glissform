@@ -370,15 +370,22 @@ import Foundation
         print("PASS: lower pause-return peak speed across shallow and deep folds")
 
         // Pause-to-resume uses a monotonic sample clock, not time since capture.
-        func pausingMotion(duration: Double = 2, enabled: Bool = true) -> ClosingMotion {
+        func pausingMotion(duration: Double? = nil, enabled: Bool = true) -> ClosingMotion {
             var state = ClosingMotion()
             state.startAngle = 95
             state.resumeAfterPause = enabled
-            state.pauseDuration = duration
+            if let duration { state.pauseDuration = duration }
             _ = state.update(angle: 100, time: -0.05)
             return state
         }
-        for duration in [0.5, 2.0, 10.0] {
+        var defaultPause = pausingMotion()
+        precondition(defaultPause.pauseDuration == 1, "The app's pause wait must default to one second")
+        for frame in 0...19 { _ = defaultPause.update(angle: 80, time: Double(frame) / 20) }
+        precondition(defaultPause.active && !defaultPause.desktopResumed,
+                     "The default pause must not expire before one second")
+        precondition(defaultPause.update(angle: 80, time: 1) == 0 && defaultPause.desktopResumed,
+                     "The default pause must expire at one second")
+        for duration in [0.5, 1.0, 2.0, 10.0] {
             var state = pausingMotion(duration: duration)
             for frame in 0..<Int(duration * 20) {
                 _ = state.update(angle: 80, time: Double(frame) / 20)
@@ -476,12 +483,17 @@ import Foundation
         var automatic = ClosingMotion()
         automatic.startAngle = 95
         automatic.automaticStartAngle = true
-        _ = automatic.update(angle: 110, time: 0)
-        _ = automatic.update(angle: 111, time: 1)
+        for frame in 0...19 {
+            _ = automatic.update(angle: frame.isMultiple(of: 2) ? 110 : 111,
+                                 time: Double(frame) / 20)
+        }
         precondition(automatic.learnedStartAngle == nil, "A short or jittering rest must retain the manual fallback")
+        _ = automatic.update(angle: 110, time: 1)
+        precondition(automatic.learnedStartAngle == 109,
+                     "Automatic selection must learn after one second of fresh readings")
         for frame in 21...62 { _ = automatic.update(angle: 110, time: Double(frame) / 20) }
         precondition(automatic.learnedStartAngle == 109 && automatic.effectiveStartAngle == 109,
-                     "A two-second open-lid rest must start one degree below the held angle")
+                     "A one-second open-lid rest must start one degree below the held angle")
         precondition(automatic.update(angle: 109, time: 3.15) == 0 && !automatic.active)
         precondition(automatic.update(angle: 108, time: 3.17) > 0 && automatic.activationAngle == 109)
         automatic.startAngle = 120

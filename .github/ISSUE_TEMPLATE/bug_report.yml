@@ -36,8 +36,8 @@ body:
   attributes:
     label: Affected area
     options:
-    - Infinite Screen
-    - Charging Ripple (unreleased source builds)
+    - Seamless Close (Infinite Screen before alpha.9)
+    - Battery Ripple
     - Settings or preview
     - Installation or permissions
     - Other / unsure

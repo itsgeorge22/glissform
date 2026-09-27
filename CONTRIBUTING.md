@@ -1,14 +1,14 @@
 # Contributing to Glissform
 
-Glissform is an early-alpha macOS app for subtle animations and quality-of-life improvements. Infinite Screen is its first feature; the product is designed to grow beyond it. Small, focused bug reports and proposed changes are useful; discuss major feature work before implementing it. No open-source license has been selected yet.
+Glissform is an early-alpha macOS app for subtle animations and quality-of-life improvements. Seamless Close is its first feature; the product is designed to grow beyond it. Small, focused bug reports and proposed changes are useful; discuss major feature work before implementing it. No open-source license has been selected yet.
 
 ## Report an issue
 
 Use the [submission chooser](https://github.com/itsgeorge22/glissform/issues/new/choose) for a bug report, feature suggestion, or compatibility report. Successful compatibility reports are welcome too. Search existing issues before submitting a duplicate; add your configuration and reproduction details to an existing report when appropriate.
 
-Include the affected feature, Mac model, macOS version, Glissform version, steps to reproduce, and expected versus actual behaviour. For Infinite Screen, include the chosen start angle, external displays, full-screen apps, and whether the Mac slept. Remove private desktop content from any media you choose to share.
+Include the affected feature, Mac model, macOS version, Glissform version, steps to reproduce, and expected versus actual behaviour. For Seamless Close, include the chosen start angle, external displays, full-screen apps, and whether the Mac slept. Remove private desktop content from any media you choose to share.
 
-For Charging Ripple in an unreleased source build, distinguish the manual preview from connecting power, and mention any repeated or missing effect. This experience is not included in the published alpha.8 source tag.
+For Battery Ripple, distinguish the manual preview from connecting power, and mention any repeated or missing effect. The red 20% trigger and broader live interruption behavior still need physical confirmation.
 
 ## Propose a change
 
