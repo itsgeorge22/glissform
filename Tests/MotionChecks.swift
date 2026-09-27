@@ -151,6 +151,150 @@ import Foundation
         }
         print("PASS: acquisition-timed 30/60 Hz inputs across independent 60/120 Hz display phases")
 
+        // Hundredth-degree reports allow steadier, closer tracking than sparse
+        // whole-degree updates. Include stationary-scale noise rather than a
+        // perfectly linear sensor, and bound both delay and speed variation.
+        for pollRate in [30.0, 60.0] {
+            for speed in [2.0, 5.0, 20.0, 30.0] {
+                var fine = MotionSmoothing()
+                fine.reset(at: 0)
+                var nextSample = 0
+                var delay = 0.0
+                var delayCount = 0
+                var squaredSpeedError = 0.0
+                var speedCount = 0
+                var previousAngle = 0.0
+                for frame in 1...360 {
+                    let time = Double(frame) / 120
+                    while Double(nextSample) / pollRate <= time + 0.0000001 {
+                        let acquiredAt = Double(nextSample) / pollRate
+                        let noise = 0.015 * sin(Double(nextSample) * 1.7)
+                        let reported = ((acquiredAt * speed + noise) * 100).rounded() / 100
+                        fine.ingest(target: Float(reported * .pi / 180), at: acquiredAt)
+                        nextSample += 1
+                    }
+                    let rendered = fine.step(at: time)
+                    precondition(rendered >= 0 && rendered <= fine.target + 0.000001,
+                                 "Fine tracking must stay within observed lid motion")
+                    let angle = Double(rendered) * 180 / .pi
+                    if time > 0.5 {
+                        delay += abs(angle - speed * time) / speed
+                        delayCount += 1
+                    }
+                    if time > 1 {
+                        squaredSpeedError += pow((angle - previousAngle) * 120 - speed, 2)
+                        speedCount += 1
+                    }
+                    previousAngle = angle
+                }
+                let meanDelay = delay / Double(delayCount)
+                let ripple = sqrt(squaredSpeedError / Double(speedCount)) / speed
+                precondition(meanDelay < (speed == 2 ? 0.120 : 0.105),
+                             "Fractional motion must track without excessive lag at \(speed)°/s")
+                precondition(ripple < (speed == 2 ? 0.15 : speed == 5 ? 0.07 : 0.04),
+                             "Faster tracking must remain visually even at \(speed)°/s")
+            }
+        }
+        var fineStop = MotionSmoothing()
+        fineStop.reset(at: 0)
+        var fineAtTurn = 0.0
+        var fineAfterTurn = 0.0
+        for sample in 1...84 {
+            let time = Double(sample) / 60
+            let physical = 2 * min(time, 1)
+            let noise = time > 1 ? 0.02 * sin(Double(sample) * 1.7) : 0
+            fineStop.ingest(target: Float((physical + noise) * .pi / 180), at: time)
+            let angle = Double(fineStop.step(at: time)) * 180 / .pi
+            if sample == 60 { fineAtTurn = angle }
+            if sample == 84 { fineAfterTurn = angle }
+            precondition(fineStop.value <= fineStop.target + 0.000001,
+                         "A stopped lid must never be extrapolated past its last reading")
+        }
+        precondition(fineAtTurn < 2 && abs(fineAfterTurn - 2) < 0.08,
+                     "Fine tracking must settle promptly without following stationary sensor noise")
+        var fineReverse = MotionSmoothing()
+        fineReverse.reset(at: 0)
+        var reversingAt130 = 0.0
+        var reversingAt200 = 0.0
+        for sample in 1...72 {
+            let time = Double(sample) / 60
+            let physical = time <= 1 ? 2 * time : 2 - 2 * (time - 1)
+            fineReverse.ingest(target: Float(physical * .pi / 180), at: time)
+            let angle = Double(fineReverse.step(at: time)) * 180 / .pi
+            if sample == 68 { reversingAt130 = angle }
+            if sample == 72 { reversingAt200 = angle }
+        }
+        precondition(reversingAt200 < reversingAt130,
+                     "Slow fractional reversal must brake and change direction without a long tail")
+        print("PASS: noisy fractional tracking, prompt stop and slow reversal without extrapolation")
+
+        // The development Mac's real fast close supplied new angles about
+        // every 100 ms despite 60 Hz polling. Keep motion travelling between
+        // those reports without the old accelerate/settle pulse.
+        let fastClose: [(Double, Double)] = [
+            (0.000, 110.46), (0.100, 103.68), (0.200, 96.52),
+            (0.300, 90.18), (0.400, 82.30), (0.500, 72.89),
+            (0.600, 60.72), (0.700, 51.52), (0.784, 43.44),
+            (0.884, 36.51), (0.983, 31.04), (1.083, 25.66),
+            (1.183, 19.87), (1.283, 17.95), (1.383, 18.01)
+        ]
+        var sparseClose = MotionSmoothing()
+        sparseClose.reset(at: 0)
+        var report = 0
+        var fastSpeeds: [Double] = []
+        for frame in 0...90 {
+            let time = Double(frame) / 60
+            while report < fastClose.count && fastClose[report].0 <= time + 0.0000001 {
+                sparseClose.ingest(target: Float(max(0, 105 - fastClose[report].1) * .pi / 180),
+                                   at: fastClose[report].0)
+                report += 1
+            }
+            _ = sparseClose.step(at: time)
+            if time > 0.25 && time < 0.8 { fastSpeeds.append(sparseClose.velocity * 180 / .pi) }
+        }
+        let averageSpeed = fastSpeeds.reduce(0, +) / Double(fastSpeeds.count)
+        let speedVariation = sqrt(fastSpeeds.reduce(0) { $0 + pow($1 - averageSpeed, 2) }
+                                  / Double(fastSpeeds.count))
+        precondition(speedVariation < 28 && averageSpeed > 80,
+                     "Measured fast-close replay must advance evenly without excessive lag")
+
+        var suddenStop = MotionSmoothing()
+        suddenStop.reset(at: 0)
+        var peak = 0.0
+        for frame in 0...84 {
+            let time = Double(frame) / 60
+            if frame.isMultiple(of: 6) {
+                let angle = min(100, Double(frame) / 6 * 10)
+                suddenStop.ingest(target: Float(angle * .pi / 180), at: time)
+            }
+            peak = max(peak, Double(suddenStop.step(at: time)) * 180 / .pi)
+        }
+        precondition(peak < 101 && abs(Double(suddenStop.value) * 180 / .pi - 100) < 0.05,
+                     "Fast sparse tracking must brake near an abrupt stop and settle")
+        suddenStop.ingest(target: 0, at: 1.5)
+        for frame in 91...150 { _ = suddenStop.step(at: Double(frame) / 60) }
+        precondition(suddenStop.value == 0 && suddenStop.velocity == 0,
+                     "Returning to the flat endpoint must not predict through zero")
+        var sparse60 = MotionSmoothing()
+        var sparse120 = MotionSmoothing()
+        sparse60.reset(at: 0)
+        sparse120.reset(at: 0)
+        for frame in 0...180 {
+            let time = Double(frame) / 120
+            if frame.isMultiple(of: 12) {
+                let angle = min(100, Double(frame / 12) * 10) * Double.pi / 180
+                sparse60.ingest(target: Float(angle), at: time)
+                sparse120.ingest(target: Float(angle), at: time)
+            }
+            let finer = sparse120.step(at: time)
+            if frame.isMultiple(of: 2) {
+                let coarser = sparse60.step(at: time)
+                precondition(abs(finer - coarser) < 0.000001,
+                             "Sparse continuation must not depend on display query frequency")
+            }
+        }
+        print("PASS: measured 10 Hz fast close moves evenly; abrupt 100°/s stop remains bounded")
+
         // Render ahead frequently on one copy and only after delayed delivery on
         // the other. Once the same observations have arrived, both must describe
         // the same motion; callback frequency cannot alter cadence or momentum.

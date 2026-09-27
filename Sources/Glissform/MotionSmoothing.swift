@@ -1,6 +1,7 @@
 import Foundation
 
-/// Smooths lid readings without extrapolating sensor motion.
+/// Smooths lid readings. Fast, sparse changes carry a short, damped continuation
+/// between reports; slow motion stays within the last observed angle.
 /// Sensor samples advance an analytic trajectory; display queries never change
 /// its cadence or history, even when rendering runs ahead to a presentation time.
 struct MotionSmoothing {
@@ -16,6 +17,11 @@ struct MotionSmoothing {
     private var degreeInterval = 1.0 / 30
     private var hasCadence = false
     private var intervals: [Double] = []
+    private var fineMotionStreak = 0
+    private var sparseVelocity = 0.0
+    private var predictionSlope = 0.0
+    private let predictionHorizon = 0.100
+    private let maximumPrediction = 6.0 * Double.pi / 180
     private var pendingReversal: (target: Float, since: Double)?
     private var compatibilityTime: Double = 0
     private var lastPresentationTime: Double?
@@ -34,6 +40,9 @@ struct MotionSmoothing {
         degreeInterval = 1.0 / 30
         hasCadence = false
         intervals.removeAll(keepingCapacity: true)
+        fineMotionStreak = 0
+        sparseVelocity = 0
+        predictionSlope = 0
         pendingReversal = nil
         compatibilityTime = sampleTime ?? 0
         lastPresentationTime = nil
@@ -43,7 +52,10 @@ struct MotionSmoothing {
         guard nextTarget.isFinite, time.isFinite,
               sampleTime.map({ time >= $0 }) ?? true else { return }
         if let sampleTime {
-            if time - sampleTime > 0.100 { pendingReversal = nil }
+            if time - sampleTime > 0.100 {
+                pendingReversal = nil
+                fineMotionStreak = 0
+            }
             let state = response(from: sampleValue, velocity: sampleVelocity,
                                  elapsed: time - sampleTime)
             sampleValue = state.value
@@ -53,11 +65,21 @@ struct MotionSmoothing {
         let change = nextTarget - target
         guard change != 0 else {
             pendingReversal = nil
+            if predictionSlope != 0 && time - (targetChangeTime ?? time) >= 0.080 {
+                predictionSlope = 0
+                sparseVelocity = 0
+                timeConstant = 0.035
+            }
             return
         }
         guard nextTarget == 0 || abs(change) >= noiseFloor else {
             // Fractional HID reports fluctuate by a few hundredths of a degree
             // even when the lid is still. Keep the last meaningful target.
+            if predictionSlope != 0 && time - (targetChangeTime ?? time) >= 0.080 {
+                predictionSlope = 0
+                sparseVelocity = 0
+                timeConstant = 0.035
+            }
             return
         }
         let nextDirection: Float = change > 0 ? 1 : -1
@@ -73,10 +95,38 @@ struct MotionSmoothing {
             if time - (pendingReversal?.since ?? time) < 0.050 { return }
         }
         pendingReversal = nil
+        let elapsedSinceChange = time - (targetChangeTime ?? time)
+        let changeDegrees = Double(abs(change)) * 180 / .pi
+        let sparse = nextTarget != 0 && changeDegrees >= 2 && elapsedSinceChange >= 0.065
+            && elapsedSinceChange <= 0.160
+        if sparse {
+            let measuredVelocity = Double(change) / elapsedSinceChange
+            sparseVelocity = reversing || sparseVelocity == 0 ? measuredVelocity
+                : 0.6 * measuredVelocity + 0.4 * sparseVelocity
+            // Half of the measured speed fills part of the ~100 ms gap. A
+            // 45 ms damped response absorbs report corrections and keeps
+            // abrupt-stop overshoot small even at roughly 100 degrees/s.
+            predictionSlope = max(-maximumPrediction / predictionHorizon,
+                                  min(maximumPrediction / predictionHorizon,
+                                      0.5 * sparseVelocity))
+            predictionSlope = max(predictionSlope, -Double(nextTarget) / predictionHorizon)
+        } else {
+            sparseVelocity = 0
+            predictionSlope = 0
+        }
+        // Several timely sub-degree reports establish real fine motion. A
+        // single fractional wobble, a whole-degree fallback, or a reversal
+        // must keep the original response rather than suddenly accelerating.
+        if !reversing && direction != 0 && changeDegrees < 0.75
+            && elapsedSinceChange >= 0.010 && elapsedSinceChange <= 0.085 {
+            fineMotionStreak = min(4, fineMotionStreak + 1)
+        } else {
+            fineMotionStreak = changeDegrees < 0.75 && !reversing ? 1 : 0
+        }
         // Fractional readings can be much smaller than one degree. Preserve
         // their measured cadence, but cap the response to a quarter-degree
         // step so very slow motion does not acquire excessive lag.
-        let degrees = max(0.25, Double(abs(change)) * 180 / .pi)
+        let degrees = max(0.25, changeDegrees)
         let interval = min(0.5, max(0.000001, time - (targetChangeTime ?? (time - 1.0 / 30))) / degrees)
         // Degree cadence belongs to the acquisition clock, not to queue delivery
         // or the display callback. Repeated samples retain the last change time.
@@ -94,7 +144,9 @@ struct MotionSmoothing {
             degreeInterval = intervals.reduce(0, +) / Double(intervals.count)
         }
         let movingResponse = 0.035 * pow(min(1, degreeInterval * 30), 0.7)
-        let desiredResponse = min(0.118, max(0.024, movingResponse, degreeInterval * 0.43))
+        let baselineResponse = min(0.118, max(0.024, movingResponse, degreeInterval * 0.43))
+        let fineConfidence = min(1, Double(max(0, fineMotionStreak - 1)) / 3)
+        let desiredResponse = baselineResponse + (min(baselineResponse, 0.035) - baselineResponse) * fineConfidence
         if direction == 0 {
             timeConstant = abs(change) > 0.1 ? 0.0125 : 0.035
         } else if reversing {
@@ -102,18 +154,22 @@ struct MotionSmoothing {
             // reversal remains responsive without the old 12.5 ms kick.
             timeConstant = min(timeConstant, 0.045)
         } else {
-            let elapsed = max(0, time - (targetChangeTime ?? time))
-            timeConstant += (desiredResponse - timeConstant) * (1 - exp(-elapsed / 0.12))
+            let responseTime = fineConfidence > 0 ? 0.060 : 0.12
+            timeConstant += (desiredResponse - timeConstant) * (1 - exp(-elapsedSinceChange / responseTime))
         }
-        timeConstant = DampedMotion.timeConstant(timeConstant, from: Double(sampleValue),
-                                                velocity: sampleVelocity, to: Double(nextTarget))
+        if sparse {
+            timeConstant = reversing ? 0.035 : 0.045
+        } else {
+            timeConstant = DampedMotion.timeConstant(timeConstant, from: Double(sampleValue),
+                                                    velocity: sampleVelocity, to: Double(nextTarget))
+        }
         direction = nextDirection
         target = nextTarget
         targetChangeTime = time
     }
 
-    /// Evaluates the accepted target's settling trajectory. Future display
-    /// queries never extrapolate a new sensor target or change its history.
+    /// Evaluates the sample-anchored trajectory. Future display queries do
+    /// not change sensor history or the estimated velocity.
     mutating func step(at time: Double) -> Float {
         guard time.isFinite, let sampleTime, time >= sampleTime,
               lastPresentationTime.map({ time >= $0 }) ?? true else { return value }
@@ -135,6 +191,26 @@ struct MotionSmoothing {
     private func response(from origin: Float, velocity initialVelocity: Double,
                           elapsed: Double) -> (value: Float, velocity: Double) {
         guard elapsed > 0 else { return (origin, initialVelocity) }
+        if predictionSlope != 0, let sampleTime, let targetChangeTime {
+            let age = max(0, sampleTime - targetChangeTime)
+            let ramp = min(elapsed, max(0, predictionHorizon - age))
+            if ramp > 0 {
+                let goal = Double(target) + predictionSlope * age
+                let state = DampedMotion.rampResponse(from: Double(origin), velocity: initialVelocity,
+                                                      to: goal, slope: predictionSlope,
+                                                      timeConstant: timeConstant, elapsed: ramp)
+                if ramp == elapsed { return (Float(state.value), state.velocity) }
+                let held = Double(target) + predictionSlope * predictionHorizon
+                let finish = DampedMotion.response(from: state.value, velocity: state.velocity,
+                                                   to: held, timeConstant: timeConstant,
+                                                   elapsed: elapsed - ramp)
+                return (Float(finish.value), finish.velocity)
+            }
+            let held = Double(target) + predictionSlope * predictionHorizon
+            let state = DampedMotion.response(from: Double(origin), velocity: initialVelocity,
+                                              to: held, timeConstant: timeConstant, elapsed: elapsed)
+            return (Float(state.value), state.velocity)
+        }
         let state = DampedMotion.response(from: Double(origin), velocity: initialVelocity,
                                           to: Double(target), timeConstant: timeConstant, elapsed: elapsed)
         return (Float(state.value), state.velocity)
@@ -145,6 +221,21 @@ struct MotionSmoothing {
 /// Keep incoming velocity; choose damping that will brake before the destination
 /// instead of clipping a moving trajectory when it crosses the target.
 enum DampedMotion {
+    /// Exact critically damped response to a target moving at a fixed speed.
+    static func rampResponse(from origin: Double, velocity: Double, to target: Double,
+                             slope: Double, timeConstant: Double,
+                             elapsed: Double) -> (value: Double, velocity: Double) {
+        guard elapsed > 0 else { return (origin, velocity) }
+        let tau = max(0.000001, timeConstant)
+        let decay = exp(-elapsed / tau)
+        let offset = origin - target + 2 * tau * slope
+        let coefficient = velocity - slope + offset / tau
+        let position = target + slope * (elapsed - 2 * tau)
+            + (offset + coefficient * elapsed) * decay
+        let speed = slope + (coefficient - (offset + coefficient * elapsed) / tau) * decay
+        return (position, speed)
+    }
+
     static func timeConstant(_ proposed: Double, from origin: Double,
                              velocity: Double, to target: Double) -> Double {
         let error = origin - target

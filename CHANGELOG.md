@@ -12,6 +12,7 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 ### Changed
 
 - Use smooth, coordinated geometry for Seamless Close's image content and upper edge, replacing the early/late rotation handoff. Restore a stronger response in the first degrees while keeping the later fold active below a 60° lid angle and limiting deep vertical stretch. Spread blur buildup through the full gesture while reducing its final strength by about 20% at the top and 30% at the hinge. Keep lid-driven timing and the single-screenshot behavior. The owner approved the revised closing feel on the development Mac on 2026-09-28; broader gesture and material checks remain pending.
+- Let consecutive fractional lid readings shorten Seamless Close's smoothing delay during steady, slow movement. For fast closes with roughly 100 ms gaps between meaningful readings, carry a short, damped motion estimate through each gap instead of repeatedly accelerating and settling. Whole-degree slow motion retains its earlier response. The measured fast-close replay reduced speed variation, while synthetic abrupt-stop and reversal checks remain bounded; the change still needs physical lid comparison.
 
 ## 0.1.0-alpha.9 — 2026-09-27
 
