@@ -7,6 +7,11 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 ### Added
 
 - Show planned Lock Screen support in Seamless Close settings with a non-interactive outlined Soon chip. The locked-screen animation is not implemented yet.
+- Add a saved Blur switch to Seamless Close, on by default. Turning it off skips both blur passes while keeping perspective and shadow, including during the current gesture.
+
+### Changed
+
+- Use one continuous bounded projection for Seamless Close's image content and upper-edge width, replacing the early/late rotation handoff. Their visible shapes now change together through the full close, including below a 60° lid angle, while deep vertical stretch remains limited. Spread blur buildup through the full gesture while reducing its final strength by about 20% at the top and 30% at the hinge. Keep lid-driven timing and the single-screenshot behavior. Physical appearance awaits owner review.
 
 ## 0.1.0-alpha.9 — 2026-09-27
 

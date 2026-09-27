@@ -81,6 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         UserDefaults.standard.register(defaults: ["animationStartAngle": 100.0, "animationEnabled": true,
                                                   "resumeAfterPause": false,
+                                                  "seamlessCloseBlurEnabled": true,
                                                   "automaticStartAngleEnabled": false,
                                                   "chargingFeedbackEnabled": true,
                                                   "lowBatteryRippleEnabled": true,
@@ -121,6 +122,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             screenCaptureAllowed: CGPreflightScreenCaptureAccess(),
             resumeAfterPause: motion.resumeAfterPause,
             automaticStartAngle: motion.automaticStartAngle,
+            blurEnabled: UserDefaults.standard.bool(forKey: "seamlessCloseBlurEnabled"),
             chargingFeedbackEnabled: UserDefaults.standard.bool(forKey: "chargingFeedbackEnabled"),
             lowBatteryRippleEnabled: UserDefaults.standard.bool(forKey: "lowBatteryRippleEnabled"),
             runInBackground: UserDefaults.standard.bool(forKey: "runInBackground"),
@@ -139,6 +141,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             self.motion.resumeAfterPause = enabled
             UserDefaults.standard.set(enabled, forKey: "resumeAfterPause")
+        }
+        settingsModel.onBlurEnabledChange = { [weak self] enabled in
+            self?.applyBlurEnabled(enabled)
         }
         settingsModel.onOpenPermissions = { [weak self] in self?.openPermissions() }
         settingsModel.onChargingFeedbackEnabledChange = { [weak self] enabled in
@@ -428,6 +433,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             retryAfter = Date().addingTimeInterval(10)
             return
         }
+        effect.blurEnabled = settingsModel.blurEnabled
         overlay.contentView = view
         overlay.alphaValue = 0
         overlay.orderFrontRegardless()
@@ -855,6 +861,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setStatus("Ready · Close past \(Int(angle))° to animate")
     }
 
+    private func applyBlurEnabled(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: "seamlessCloseBlurEnabled")
+        renderer?.blurEnabled = enabled
+    }
+
     private func applyAutomaticStartAngle(_ enabled: Bool) {
         cancelWake("automatic starting angle changed")
         endGesture()
@@ -1026,6 +1037,7 @@ extension AppDelegate {
     /// Real gesture/cancellation paths with synthetic pixels and no capture permission.
     static func lifecycleSelfTest() async throws {
         let savedSettings = ["animationStartAngle", "animationEnabled", "automaticStartAngleEnabled",
+                             "seamlessCloseBlurEnabled",
                              "runInBackground", "showMenuBarIcon"].map {
             ($0, UserDefaults.standard.object(forKey: $0))
         }
@@ -1112,6 +1124,30 @@ extension AppDelegate {
                 }
                 try await Task.sleep(nanoseconds: 10_000_000)
             }
+        }
+        do {
+            let (app, source) = try makeGesture()
+            defer { app.shutdown(); app.window?.close() }
+            app.settingsModel.onBlurEnabledChange = { [weak app] enabled in
+                app?.applyBlurEnabled(enabled)
+            }
+            try await waitForCapture(source)
+            let captureTask = app.snapshotTask
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await captureTask?.value
+            try check(app.hasSnapshot && source.count == 1, "Blur switch test needs one active screenshot")
+            app.settingsModel.setBlurEnabled(false)
+            try check(!app.settingsModel.blurEnabled && app.renderer?.blurEnabled == false
+                      && !UserDefaults.standard.bool(forKey: "seamlessCloseBlurEnabled")
+                      && app.hasSnapshot && source.count == 1,
+                      "Turning Blur off must save the setting and keep the current gesture")
+            app.settingsModel.setBlurEnabled(true)
+            try check(app.settingsModel.blurEnabled && app.renderer?.blurEnabled == true
+                      && UserDefaults.standard.bool(forKey: "seamlessCloseBlurEnabled")
+                      && app.hasSnapshot && source.count == 1,
+                      "Turning Blur on must reuse the current screenshot")
+            print("PASS: saved Blur switch changes an active gesture without recapture")
         }
         do {
             let (app, source) = try makeGesture(startGesture: false)

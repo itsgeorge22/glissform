@@ -16,7 +16,7 @@ Alpha.9 includes **Battery Ripple** and the renamed **Seamless Close** feature. 
 
 ## Current features
 
-- Experience a lid-driven desktop animation with full-angle perspective, progressive frost, and shadow.
+- Experience a lid-driven desktop animation with a continuous perspective fold, an upper edge that narrows throughout closure, optional blur, and shadow.
 - Reverse the effect by reopening the lid, including experimental opening after lid-close sleep using the same screenshot.
 - Choose the starting angle manually or let a one-second lid pause set it automatically, one degree below the held angle; optionally restore desktop access after a pause.
 - Keep Glissform running after its Settings window closes, with menu bar access by default.

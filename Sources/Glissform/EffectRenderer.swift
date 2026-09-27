@@ -123,6 +123,11 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         displayLink?.isPaused = false
     }
     private var blurScale: Float = 1 // Set to zero only for geometric GPU validation.
+    var blurEnabled = true {
+        didSet {
+            if blurEnabled != oldValue { scheduleSettling() }
+        }
+    }
     private var ditherScale: Float = 1 // Disable only for the dark-gradient comparison.
 
     /// The reference desktop is a fixed plane at the angle where closure starts.
@@ -459,14 +464,14 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         let visibleAngle = displayedFold ?? foldRadians
         let fraction = min(1, max(0, visibleAngle / max(0.001, fullClosureRadians)))
         let visibleProgress = fraction * fraction * (3 - 2 * fraction)
-        let frostAmount = (1 - exp(-3 * visibleProgress)) / (1 - exp(-3))
+        let frostAmount = pow(visibleProgress, 0.7)
         let target = descriptor.colorAttachments[0].texture
         // A modest even Gaussian avoids the radius bands seen with a strong
         // masked variable blur. Its blend strength still follows the height.
-        let screenBlurRadius = min(Float(target?.height ?? 0) * 0.008, 24) * frostAmount
+        let screenBlurRadius = min(Float(target?.height ?? 0) * 0.008, 24) * frostAmount * 0.8
         var blurSlot: ProjectionSlot?
         var blurImage: CIImage?
-        if sampledTexture != nil, visibleAngle > 0, opacity > 0, blurScale > 0,
+        if sampledTexture != nil, visibleAngle > 0, opacity > 0, blurEnabled, blurScale > 0,
            screenBlurRadius >= 0.5, let target, target.usage.contains(.shaderWrite),
            let slot = acquireProjectionSlot(width: target.width, height: target.height),
            let mask = screenBlurMask,
@@ -523,10 +528,13 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             encoder.setFragmentTexture(texture, index: 0)
             var uniforms = SIMD4<Float>(visibleProgress, Float(texture.width), Float(texture.height), visibleAngle)
             encoder.setFragmentBytes(&uniforms, length: MemoryLayout<SIMD4<Float>>.stride, index: 0)
-            var frost = blurScale
+            var frost = blurEnabled ? blurScale : 0
             encoder.setFragmentBytes(&frost, length: MemoryLayout<Float>.stride, index: 1)
             var eye = SIMD2<Float>(ScreenProjection.eyeDistance, ScreenProjection.eyeHeight)
             encoder.setFragmentBytes(&eye, length: MemoryLayout<SIMD2<Float>>.stride, index: 2)
+            var imageShape = SIMD2<Float>(ScreenProjection.imageRadians(for: visibleAngle),
+                                          ScreenProjection.topWidth(for: visibleAngle))
+            encoder.setFragmentBytes(&imageShape, length: MemoryLayout<SIMD2<Float>>.stride, index: 5)
             var dither = ditherScale
             encoder.setFragmentBytes(&dither, length: MemoryLayout<Float>.stride, index: 4)
             var alpha = opacity
@@ -558,7 +566,9 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             let gradient = CIFilter.smoothLinearGradient()
             gradient.point0 = CGPoint(x: 0, y: 0)
             gradient.point1 = CGPoint(x: 0, y: height)
-            gradient.color0 = CIColor(red: 0.65, green: 0.65, blue: 0.65)
+            // Alongside the 20% smaller radius, this gives the hinge region
+            // about 30% less finishing blur than before; the top gets 20% less.
+            gradient.color0 = CIColor(red: 0.57, green: 0.57, blue: 0.57)
             gradient.color1 = CIColor(red: 1, green: 1, blue: 1)
             screenBlurMask = gradient.outputImage?.cropped(to: CGRect(x: 0, y: 0, width: width, height: height))
         }
@@ -629,14 +639,18 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             renderer.pauseSnapshot()
         }
         try FileManager.default.createDirectory(at: outputURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        // The sharp intermediate frames test the actual shader independently of
-        // the frosting. They must match rays through a rotating physical panel.
+        // Sharp intermediate frames test the image projection independently of
+        // the frosting, including the softened geometry at deep folds.
         let cases: [(Float, Float, Double, String)] = [(0, 1, 85, "clear"), (0.5, 1, 85, "zeroAngle"),
             (0.2, 0, 85, "projection16"), (0.5, 0, 85, "projection40"),
+            (0.5, 1, 85, "blurOff40"),
+            (0.5625, 0, 105, "projection45from105"),
+            (1.125, 0, 105, "projection90from105"),
             (1.125, 0, 100, "projection90"), (1.5, 0, 130, "projection120"),
             (0.25, 1, 85, "frost20"), (0.5, 1, 85, "frost40"), (0.65, 1, 85, "frost52"),
             (1, 1, 85, "frost80"), (1.0125, 1, 85, "fullShadow")]
         var sharpBottomEdgeEnergy: Double?
+        var sharpProjectionPixels: [UInt8]?
         for (amount, frost, reference, label) in cases {
             if label == "zeroAngle" {
                 let preparedTexture = renderer.filteredTexture
@@ -650,6 +664,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             }
             renderer.progress = amount
             renderer.blurScale = frost
+            renderer.blurEnabled = label != "blurOff40"
             renderer.setLidAngle(label == "zeroAngle" ? reference : reference - Double(amount) * 80,
                                  referenceAngle: reference)
             let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm_srgb, width: width, height: height, mipmapped: false)
@@ -669,6 +684,10 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             rendered.withUnsafeMutableBytes {
                 destination.getBytes($0.baseAddress!, bytesPerRow: width * 4,
                                      from: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0)
+            }
+            if label == "projection40" { sharpProjectionPixels = rendered }
+            if label == "blurOff40", rendered != sharpProjectionPixels {
+                throw failure("Disabling blur must retain the sharp projection and shadow")
             }
             if label == "projection40" || label == "frost40" {
                 // Compare identical projection/shadow with and without frost.
@@ -701,12 +720,18 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
                 }
             }
             if frost == 0 {
-                let theta = Double(amount) * 80 * .pi / 180
+                let physicalAngle = Float(amount) * 80 * .pi / 180
+                let theta = Double(ScreenProjection.imageRadians(for: physicalAngle))
                 for (x, y) in [(17, 19), (911, 23), (29, 563), (901, 557), (340, 230), (620, 390)] {
                     // Independent ray/plane intersection in screen-height units.
-                    let surface = SIMD3<Double>((Double(x) + 0.5) / Double(width) - 0.5,
-                                                (1 - (Double(y) + 0.5) / Double(height)) * cos(theta),
-                                                (1 - (Double(y) + 0.5) / Double(height)) * sin(theta))
+                    let heightFromHinge = 1 - (Double(y) + 0.5) / Double(height)
+                    let topWidth = Double(ScreenProjection.topWidth(for: physicalAngle))
+                    let geometricWidth = 1 - heightFromHinge * sin(theta) / 4
+                    let visibleWidth = 1 - heightFromHinge * (1 - topWidth)
+                    let panelX = ((Double(x) + 0.5) / Double(width) - 0.5) * geometricWidth / visibleWidth
+                    let surface = SIMD3<Double>(panelX,
+                                                heightFromHinge * cos(theta),
+                                                heightFromHinge * sin(theta))
                     let eye = SIMD3<Double>(0, 1.10, 4.0)
                     let direction = surface - eye
                     let pointOnReference = eye + direction * (-eye.z / direction.z)
@@ -725,7 +750,6 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
                                 expected += linear * weight
                             }
                         } }
-                        let heightFromHinge = 1 - (Double(y) + 0.5) / Double(height)
                         func smoothstep(_ low: Double, _ high: Double, _ value: Double) -> Double {
                             let t = min(1, max(0, (value - low) / (high - low)))
                             return t * t * (3 - 2 * t)
@@ -771,7 +795,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             let target = label == "frost52" ? outputURL : outputURL.deletingPathExtension().appendingPathExtension("\(label).png")
             try png.write(to: target)
         }
-        print("PASS: stationary-plane GPU projection at 16°/40°/90°/120°, orientation, opacity, retained-frame identity, top shadow, bottom-edge blur, frost at 20°/40°/52°/80°")
+        print("PASS: bounded GPU projection at 16°/40°/90°/120° and 45°/90° from one start angle, blur-off sharpness, orientation, opacity, retained-frame identity, top shadow, bottom-edge blur, frost at 20°/40°/52°/80°")
         try checkMaterial(renderer: renderer)
         renderer.update(pixelBuffer: buffer)
         if benchmark {
@@ -950,7 +974,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             throw failure("Gaussian filtering must average black and white in linear light: \(averaged)")
         }
         // Fine angle sweeps cross multiple mip transitions without sample jumps.
-        for degrees: Float in [1, 3, 6, 12, 24, 40, 60] {
+        for degrees: Float in [1, 3, 6, 12, 24, 25, 40, 45, 60, 70] {
             let before = try render(degrees: degrees - 0.001)
             let after = try render(degrees: degrees + 0.001)
             for y in stride(from: 128, to: 896, by: 32) {
@@ -1169,23 +1193,28 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
     fragment float4 hingeFragment(Vertex in [[stage_in]], texture2d<float> desktop [[texture(0)]],
                                    constant float4 &uniforms [[buffer(0)]], constant float &frost [[buffer(1)]],
                                    constant float2 &eye [[buffer(2)]], constant float &opacity [[buffer(3)]],
-                                   constant float &ditherScale [[buffer(4)]]) {
+                                   constant float &ditherScale [[buffer(4)]],
+                                   constant float2 &imageShape [[buffer(5)]]) {
         constexpr sampler sampling(coord::normalized, address::clamp_to_edge, filter::linear, mip_filter::linear);
         float theta = max(0.0f, uniforms.w);
         // Only the displayed angle controls effect strength; a raw sensor
         // threshold must never switch the shader on or off during a handoff.
         if (theta == 0.0f) return layerColor(desktop.sample(sampling, in.uv, level(0)).rgb, opacity);
         float heightFromHinge = 1.0f - in.uv.y;
-        // Rotate each physical display pixel towards a fixed viewer, then trace
-        // its viewing ray back to the ORIGINAL upright image plane (z = 0).
-        // This is a projective window into stationary content, not a UV zoom.
-        // At the hinge z=0 so source and screen coincide at every lid angle.
+        // Trace to the original image plane. Retain a positive image response
+        // through the full fold while limiting late vertical enlargement.
+        // Top width and the vertical source position share one bounded
+        // perspective response. Width changes linearly through the screen
+        // height so the sides and vertical lines stay straight.
+        // Tracking, frost and shadow continue to use the physical angle.
         float eyeDistance = eye.x;
         float eyeHeight = eye.y;
-        float depth = heightFromHinge * sin(theta);
-        float planeHeight = heightFromHinge * cos(theta);
+        float imageAngle = imageShape.x;
+        float depth = heightFromHinge * sin(imageAngle);
+        float planeHeight = heightFromHinge * cos(imageAngle);
         float rayScale = eyeDistance / (eyeDistance - depth);
-        float2 uv = float2(0.5f + (in.uv.x - 0.5f) * rayScale,
+        float visibleWidth = 1.0f - heightFromHinge * (1.0f - imageShape.y);
+        float2 uv = float2(0.5f + (in.uv.x - 0.5f) / visibleWidth,
                           1.0f - (eyeHeight + (planeHeight - eyeHeight) * rayScale));
         // Closing progressively diffuses the whole stretched image, including
         // the hinge. Add more diffusion toward the top, furthest from the plane.
@@ -1193,10 +1222,11 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         // increasing even when a gesture rotates past 90 degrees, and reverse
         // continuously on reopening. The prepared zero-angle frame stays sharp.
         float verticalBlur = smoothstep(0.0f, 1.0f, heightFromHinge);
-        // Diffusion establishes the frosted material early, then keeps growing
-        // gently. Large colored shapes survive after text and icon detail merge.
-        float frostAmount = (1.0f - exp(-3.0f * uniforms.x)) / (1.0f - exp(-3.0f));
-        float radius = frostAmount * uniforms.z * mix(0.015f, 0.090f, verticalBlur) * frost;
+        // Keep defocus moving through the late fold rather than approaching its
+        // final strength around the middle of the gesture.
+        float frostAmount = pow(uniforms.x, 0.7f);
+        float radius = frostAmount * uniforms.z * mix(0.015f, 0.090f, verticalBlur)
+                     * mix(0.70f, 0.80f, verticalBlur) * frost;
         // A Gaussian pyramid is prepared once per screenshot. Keep only one
         // quarter of the target variance in its mip level, then reconstruct the
         // rest with a wider 5x5 binomial kernel. Bright controls exposed cells

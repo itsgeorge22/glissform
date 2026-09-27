@@ -276,6 +276,56 @@ import Foundation
             }
         }
         print("PASS: one-to-one physical rotation throughout 20–130 degree trigger range")
+        let radians = Float.pi / 180
+        var previousImageAngle: Float = -1
+        var previousTopWidth: Float = 1
+        for degree in 0...130 {
+            let physicalAngle = Float(degree) * radians
+            let imageAngle = ScreenProjection.imageRadians(for: physicalAngle)
+            let topWidth = ScreenProjection.topWidth(for: physicalAngle)
+            precondition(imageAngle > previousImageAngle,
+                         "Image projection must keep moving through full closure")
+            if degree > 0 {
+                precondition(topWidth < previousTopWidth,
+                             "Upper edge and image content must move together through closure")
+            }
+            if degree >= 45 {
+                precondition(previousTopWidth - topWidth > 0.0035,
+                             "Late geometry must keep changing visibly per lid degree")
+            }
+            let depth = sin(imageAngle)
+            let projectedTop = (4 * cos(imageAngle) - 1.1 * depth) / (4 - depth)
+            precondition(abs(topWidth - projectedTop) < 0.00001,
+                         "Top edge and image source height must use the same projection")
+            previousImageAngle = imageAngle
+            previousTopWidth = topWidth
+        }
+        let sampledHeight = ScreenProjection.topWidth(for: 130 * radians)
+        precondition(sampledHeight > 0.43 && sampledHeight < 0.45,
+                     "Deep closure must sample enough image height to avoid excessive stretch")
+        precondition(ScreenProjection.topWidth(for: 45 * radians) > 0.82 &&
+                     ScreenProjection.topWidth(for: 90 * radians) > 0.59,
+                     "Mid and late folds must retain the reduced vertical stretch")
+        for reference in [20.0, 85, 100, 105, 130] {
+            var previousWidth = ScreenProjection.topWidth(for: 0)
+            precondition(abs(previousWidth - 1) < 0.00001)
+            for lid in stride(from: reference - 1, through: 4, by: -1) {
+                let fold = ScreenProjection.foldRadians(lidAngle: lid, referenceAngle: reference)
+                let width = ScreenProjection.topWidth(for: fold)
+                precondition(width < previousWidth,
+                             "Every supported start angle must retain visible geometry motion")
+                previousWidth = width
+            }
+            precondition(previousWidth >= sampledHeight,
+                         "A shorter fold must not narrow farther than the maximum fold")
+        }
+        let widthAt60 = ScreenProjection.topWidth(for: ScreenProjection.foldRadians(lidAngle: 60, referenceAngle: 105))
+        let widthAt4 = ScreenProjection.topWidth(for: ScreenProjection.foldRadians(lidAngle: 4, referenceAngle: 105))
+        precondition(widthAt60 - widthAt4 > 0.27,
+                     "Upper edge must continue tightening visibly below a 60° lid angle")
+        precondition(widthAt4 > 0.545 && widthAt4 < 0.555,
+                     "Default-length closure must retain its intended final width")
+        print("PASS: one continuous geometry response, bounded vertical stretch and late top narrowing")
         var handoff = HandoffTransition()
         handoff.begin(from: 0)
         precondition(handoff.step(toward: 1, elapsed: 0) == 0, "Entrance starts at the unchanged image")

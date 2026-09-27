@@ -35,6 +35,8 @@ final class SettingsModel: ObservableObject {
     var onAutomaticStartAngleChange: ((Bool) -> Void)?
     @Published private(set) var resumeAfterPause = false
     var onResumeAfterPauseChange: ((Bool) -> Void)?
+    @Published private(set) var blurEnabled = true
+    var onBlurEnabledChange: ((Bool) -> Void)?
     @Published private(set) var chargingFeedbackEnabled = true
     var onChargingFeedbackEnabledChange: ((Bool) -> Void)?
     @Published private(set) var lowBatteryRippleEnabled = true
@@ -51,6 +53,7 @@ final class SettingsModel: ObservableObject {
 
     func configure(animationEnabled: Bool, startAngle: Double, screenCaptureAllowed: Bool,
                    resumeAfterPause: Bool = false, automaticStartAngle: Bool = false,
+                   blurEnabled: Bool = true,
                    chargingFeedbackEnabled: Bool = true, lowBatteryRippleEnabled: Bool = true,
                    runInBackground: Bool = true, showMenuBarIcon: Bool = true) {
         self.animationEnabled = animationEnabled
@@ -58,6 +61,7 @@ final class SettingsModel: ObservableObject {
         self.screenCaptureAllowed = screenCaptureAllowed
         self.resumeAfterPause = resumeAfterPause
         self.automaticStartAngle = automaticStartAngle
+        self.blurEnabled = blurEnabled
         self.chargingFeedbackEnabled = chargingFeedbackEnabled
         self.lowBatteryRippleEnabled = lowBatteryRippleEnabled
         self.runInBackground = runInBackground
@@ -113,6 +117,12 @@ final class SettingsModel: ObservableObject {
         guard resumeAfterPause != enabled else { return }
         resumeAfterPause = enabled
         onResumeAfterPauseChange?(enabled)
+    }
+
+    func setBlurEnabled(_ enabled: Bool) {
+        guard blurEnabled != enabled else { return }
+        blurEnabled = enabled
+        onBlurEnabledChange?(enabled)
     }
 
     func setChargingFeedbackEnabled(_ enabled: Bool) {
@@ -583,6 +593,9 @@ private struct AnimationSettingsView: View {
             pauseControls
                 .padding(SettingsDesign.Spacing.switchCardInsets)
                 .modifier(SettingsCardSurface())
+            blurControls
+                .padding(SettingsDesign.Spacing.switchCardInsets)
+                .modifier(SettingsCardSurface())
             lockScreenSupport
                 .padding(SettingsDesign.Spacing.switchCardInsets)
                 .modifier(SettingsCardSurface())
@@ -689,6 +702,28 @@ private struct AnimationSettingsView: View {
             ))
             .labelsHidden().toggleStyle(AppleSwitchStyle())
             .accessibilityLabel("Resume desktop after pause")
+        }
+    }
+
+    private var blurControls: some View {
+        HStack(spacing: SettingsDesign.Spacing.cards) {
+            CardIconTile(color: .feature) {
+                Image(systemName: "circle.dotted")
+                    .font(.system(size: 24, weight: .medium))
+            }
+            .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Blur").font(SettingsDesign.Typography.controlTitle)
+                Text("Softens the desktop as the lid closes.")
+                    .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Toggle("Blur", isOn: Binding(
+                get: { model.blurEnabled }, set: { model.setBlurEnabled($0) }
+            ))
+            .labelsHidden().toggleStyle(AppleSwitchStyle())
+            .accessibilityLabel("Blur")
         }
     }
 

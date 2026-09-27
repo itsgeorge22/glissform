@@ -8,7 +8,7 @@ Glissform is a small passion project. The owner's intended price is $1.90, with 
 
 ## Current — 0.1.0-alpha.9
 
-The first feature, Seamless Close, implements screenshot-based closing animation with full-angle hinge compensation, steadier adaptive smoothing, progressive full-image frost and shadow, awake reversal, cached post-sleep opening, native settings with a configurable starting angle, optional desktop restoration after a fixed one-second still-lid pause, menu bar controls, and lifecycle cleanup. On 2026-09-21, the owner confirmed correct smoothness, speed, abrupt lid stops, reversals, and opening after sleep without locking on the development Mac. Locked wake is outside that confirmation. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
+The first feature, Seamless Close, implements screenshot-based closing animation with continuous hinge perspective and upper-edge narrowing through the full gesture, steadier adaptive smoothing, optional full-image blur and shadow, awake reversal, cached post-sleep opening, native settings with a configurable starting angle, optional desktop restoration after a fixed one-second still-lid pause, menu bar controls, and lifecycle cleanup. On 2026-09-21, the owner confirmed correct smoothness, speed, abrupt lid stops, reversals, and opening after sleep without locking on the development Mac. The new animation geometry and blur levels, and locked wake, are outside that confirmation. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
 
 ## Current priority — Space-change verification
 
@@ -34,6 +34,10 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 - [ ] Continue improving existing features alongside new work; expansion is not dependent on making Seamless Close the entire product.
 
 ## Alpha.9 foundations and Seamless Close follow-up
+
+- [x] Add a saved Blur switch to Seamless Close that disables both blur passes without changing the projection, shadow, or one-screenshot gesture.
+
+- [ ] Physically compare the unified lower-stretch projection, continuously narrowing upper edge, and later-building lighter blur against alpha.9 on the development Mac, including a slow close below a 60° lid angle, a deep pause, and reopening; tune or revert them based on the owner's visual judgment.
 
 - [x] Add **Detect starting angle** and implement one-second resting-angle selection one degree below the held angle, **Begin at** fallback, gesture and wake reference locking, and adoption of a lower angle after optional pause restoration.
 - [x] Let closing past the learned angle restart the animation after automatic pause restoration, without requiring the lid to open farther first.
