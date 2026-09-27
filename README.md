@@ -10,7 +10,7 @@ Subtle animations and quality-of-life improvements for everyday interactions on 
 
 **In development — not yet available for public download.** The current source prerelease is 0.1.0-alpha.9.
 
-The app will be available once a `.dmg` is ready and published on GitHub. Download links and installation instructions will be added then.
+The app will be available once a `.dmg` is ready and published on GitHub. Download links and installation instructions will be added then. Seamless Close settings preview planned Lock Screen support with a Soon label; animation while the Mac is locked is not available yet.
 
 Alpha.9 includes **Battery Ripple** and the renamed **Seamless Close** feature. Earlier alpha releases called it **Infinite Screen**. See the [changelog](CHANGELOG.md) for version-specific changes and ongoing limitations.
 

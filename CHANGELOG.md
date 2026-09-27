@@ -4,6 +4,10 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+### Added
+
+- Show planned Lock Screen support in Seamless Close settings with a non-interactive outlined Soon chip. The locked-screen animation is not implemented yet.
+
 ## 0.1.0-alpha.9 — 2026-09-27
 
 Ninth public alpha: Battery Ripple joins Seamless Close, with a reorganized Settings window, new General controls, and further lid-motion and material refinements. Source release; local builds remain ad-hoc signed and are not notarized.

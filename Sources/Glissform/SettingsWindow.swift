@@ -583,6 +583,9 @@ private struct AnimationSettingsView: View {
             pauseControls
                 .padding(SettingsDesign.Spacing.switchCardInsets)
                 .modifier(SettingsCardSurface())
+            lockScreenSupport
+                .padding(SettingsDesign.Spacing.switchCardInsets)
+                .modifier(SettingsCardSurface())
         }
         .padding(SettingsDesign.Spacing.page)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: showsAccessCard)
@@ -686,6 +689,29 @@ private struct AnimationSettingsView: View {
             ))
             .labelsHidden().toggleStyle(AppleSwitchStyle())
             .accessibilityLabel("Resume desktop after pause")
+        }
+    }
+
+    private var lockScreenSupport: some View {
+        HStack(spacing: SettingsDesign.Spacing.cards) {
+            CardIconTile(color: .feature) {
+                IconlyIcon(.lock, size: 24)
+            }
+            .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Lock Screen support").font(SettingsDesign.Typography.controlTitle)
+                Text("Play the animation while your Mac is locked.")
+                    .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Text("Soon")
+                .font(SettingsDesign.Typography.action)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.45)))
+                .accessibilityLabel("Coming soon")
         }
     }
 

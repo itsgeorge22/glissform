@@ -17,6 +17,8 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 
 ## Product development
 
+- [ ] Develop Lock Screen support for Seamless Close before beta so its animation can play while the Mac is locked. The Settings card currently says Soon; no locked-screen animation is active yet.
+
 - [x] Implement Battery Ripple with independent power-connection and 20%-battery switches, using public power-source notifications and a reduced-motion fallback. Included in the alpha.9 source prerelease.
 - [x] Replace the original concentric connection rings with a fluid emerald light wave, a curling silhouette, and translucent folds; reuse the geometry in red for the 20% battery event. The owner approved the revised emerald appearance on 2026-09-26; the red variant awaits physical approval.
 - [ ] Complete physical Battery Ripple checks for both triggers with settings closed, full-screen apps, sleep/wake, lock, and Reduce Motion. On 2026-09-26, the owner confirmed one green ripple on one unplug/reconnect trial with the earlier visual design. The 20% event has only synthetic checks so far.
@@ -95,9 +97,10 @@ Keep this a practical release check for a small passion project:
 - Fix the known full-screen Space-switching bug and confirm everyday animation still works on the development Mac.
 - Run the existing build and regression checks on the intended release build.
 - Check that normal desktop access returns when the effect stops or the app quits, and that sleep and the lock screen behave normally.
+- Complete and physically validate Lock Screen support for Seamless Close before beta; the Soon card alone does not satisfy this gate.
 - Provide a usable installation and permission flow, with honest tested-hardware and known-limitation notes.
 
-The broader investigations below and above are follow-up work, not a requirement to complete every roadmap item before beta. Additional features are not required for launch; improve the app incrementally after release.
+The broader investigations below and above are follow-up work, not a requirement to complete every roadmap item before beta. Other additional features are not required for launch; improve the app incrementally after release.
 
 ## Release candidate and stable — 1.0.0-rc.1 → 1.0.0
 
