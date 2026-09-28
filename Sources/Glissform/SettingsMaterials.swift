@@ -15,6 +15,57 @@ struct SettingsWindowMaterial: NSViewRepresentable {
     func updateNSView(_ view: NSVisualEffectView, context: Context) {}
 }
 
+/// Keep AppKit's system cursor active throughout a SwiftUI control hover.
+struct SettingsActionCursor: ViewModifier {
+    var isActionEnabled: Bool?
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var pushedForEnabled: Bool?
+
+    private var actionEnabled: Bool { isActionEnabled ?? isEnabled }
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                if !actionEnabled {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onContinuousHover { phase in updateHover(phase, enabled: false) }
+                }
+            }
+            .onContinuousHover { phase in
+                if actionEnabled { updateHover(phase, enabled: true) }
+            }
+            .onChange(of: actionEnabled) { _, enabled in
+                if pushedForEnabled != nil { applyCursor(enabled: enabled) }
+            }
+            .onDisappear { restoreCursor() }
+    }
+
+    private func updateHover(_ phase: HoverPhase, enabled: Bool) {
+        switch phase {
+        case .active: applyCursor(enabled: enabled)
+        case .ended: restoreCursor()
+        }
+    }
+
+    private func applyCursor(enabled: Bool) {
+        let cursor = enabled ? NSCursor.pointingHand : NSCursor.operationNotAllowed
+        if pushedForEnabled != enabled {
+            if pushedForEnabled != nil { NSCursor.pop() }
+            cursor.push()
+            pushedForEnabled = enabled
+        } else {
+            cursor.set()
+        }
+    }
+
+    private func restoreCursor() {
+        guard pushedForEnabled != nil else { return }
+        NSCursor.pop()
+        pushedForEnabled = nil
+    }
+}
+
 struct SettingsNavigationButtonStyle: ButtonStyle {
     let selected: Bool
 

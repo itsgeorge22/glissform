@@ -59,12 +59,13 @@ enum SettingsDesign {
         static let attention = Color(red: 1, green: 159 / 255, blue: 10 / 255)
         static let danger = Color(red: 1, green: 69 / 255, blue: 58 / 255)
         enum CardIconColor {
-            case feature, automaticAngle, success, attention, danger, neutral
+            case feature, automaticAngle, blur, success, attention, danger, neutral
 
             var tile: Color {
                 switch self {
                 case .feature: return Palette.feature
-                case .automaticAngle: return Color(red: 0x70 / 255, green: 0xB9 / 255, blue: 0xEE / 255)
+                case .automaticAngle: return Color(red: 0xAD / 255, green: 0x91 / 255, blue: 0xDC / 255)
+                case .blur: return Color(red: 0x70 / 255, green: 0xB9 / 255, blue: 0xEE / 255)
                 case .success: return Palette.success
                 case .attention: return Palette.attention
                 case .danger: return Palette.danger
@@ -75,12 +76,14 @@ enum SettingsDesign {
             func symbol(in scheme: ColorScheme) -> Color {
                 switch (self, scheme) {
                 case (.feature, .light): return Color(red: 0x43 / 255, green: 0x5C / 255, blue: 0xCD / 255)
-                case (.automaticAngle, .light): return Color(red: 0x3B / 255, green: 0x94 / 255, blue: 0xD0 / 255)
+                case (.automaticAngle, .light): return Color(red: 0x86 / 255, green: 0x63 / 255, blue: 0xC7 / 255)
+                case (.blur, .light): return Color(red: 0x3B / 255, green: 0x94 / 255, blue: 0xD0 / 255)
                 case (.success, .light): return Color(red: 0x2A / 255, green: 0xB8 / 255, blue: 0x4D / 255)
                 case (.attention, .light): return Color(red: 0xE0 / 255, green: 0x8C / 255, blue: 0x09 / 255)
                 case (.danger, .light): return Color(red: 0xDF / 255, green: 0x38 / 255, blue: 0x35 / 255)
                 case (.feature, _): return Color(red: 0x66 / 255, green: 0x7C / 255, blue: 0xE7 / 255)
-                case (.automaticAngle, _): return Color(red: 0x8C / 255, green: 0xCE / 255, blue: 0xFF / 255)
+                case (.automaticAngle, _): return Color(red: 0xC2 / 255, green: 0xA6 / 255, blue: 0xED / 255)
+                case (.blur, _): return Color(red: 0x8C / 255, green: 0xCE / 255, blue: 0xFF / 255)
                 case (.success, _): return Palette.success
                 case (.attention, _): return Palette.attention
                 case (.danger, _): return Palette.danger
@@ -97,6 +100,11 @@ enum SettingsDesign {
         static let pressedFill = 0.18
         static let hoverBorder = 0.18
         static let pressedBorder = 0.30
+        static let fieldHoverFill = 0.035
+        static let fieldHoverBorder = 0.12
+        static let previewHoverFill = 0.08
+        static let previewPressedFill = 0.13
+        static let previewPressedBorder = 0.20
         static let hoverDuration = 0.12
         static let pressedDuration = 0.08
         static let switchDuration = 0.16

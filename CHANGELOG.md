@@ -6,6 +6,8 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ### Added
 
+- Preview a compact update-available card at the bottom of the Settings sidebar, with the download icon, a sample version subtitle, and an Update button that responds visually but does not run an update yet.
+- Show an Automatic updates card in General with the supplied download icon and an outlined Soon tag. This is a visual placeholder; the app does not check for or install updates.
 - Add three selectable gray image placeholders beneath the Blur switch for High, Regular, and Subtle strength. Regular is initially outlined in the system accent color, matching enabled switches, with a 4-point gap around its placeholder; choosing a strength does not change the effect yet.
 - Add a saved **Detect above** angle to Seamless Close's automatic-selection card. Automatic detection learns only after the lid rests strictly above this angle; **Begin at** remains the fallback until then, even when the detection threshold is below the manual angle. Set it to 0° to disable the threshold. Changing the threshold while automatic detection is on clears the learned angle and any active snapshot; while it is off, a manual gesture continues. The default is 20°.
 - Add independent, saved 0.5–10 second wait controls for automatic starting-angle detection and desktop restoration after a pause. Both default to one second; changing a wait restarts its pending timer.
@@ -14,6 +16,9 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ### Changed
 
+- Use the native pointing-hand cursor for active Settings controls, including the visual-only Update button; show the system operation-not-allowed cursor for disabled buttons, switches, and step arrows. Text entry, sliders, and Soon tags retain their usual cursors. Raise the unreleased app's minimum system version to macOS 15.
+- Add a softer hover to angle and wait-time fields. Arrow highlights sit flush against the field's left edge without their own rounded corners; the field clips them to its outer shape. Blur strength hover darkens only the placeholder image, while its selection outline stays unchanged. Battery Ripple preview buttons use the same subtle neutral hover as the fields and a slightly darker pressed state. Give the sidebar Update preview hover and pressed states without adding update behavior.
+- Give Lock Screen support a neutral gray icon and tile, move Blur to the former light-blue detection color, and give Detect starting angle a muted violet icon and tile.
 - Use the supplied raindrop icon for **Blur** and scan-object icon for **Detect starting angle**.
 - Separate the starting-angle and desktop-resume switch rows from their wait controls with full-width dividers. Give all three Seamless Close control sections 24-point padding while keeping 24-point trailing padding on switch rows. Use the angle field's paired arrow controls for both wait times, with a title and explanatory subtitle beside each.
 - Keep Seamless Close's finishing blur appearance while removing a redundant full-screen alpha erosion and blend. On the development Mac, instrumented closing passes showed fewer late render callbacks with Blur on; the owner found the appearance unchanged but did not notice a clear difference in feel. The motion curve, Blur switch, and one-screenshot capture remain the same.

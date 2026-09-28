@@ -26,6 +26,11 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 - [x] Add sidebar navigation with separate Seamless Close, Battery Ripple, and Privacy & About pages, plus a Send feedback placeholder grouped under More.
 - [x] Add General as the first page under Features with saved background-running and menu bar icon controls. Background running removes the Dock icon on Settings close even when the menu bar icon is hidden; opening the app again restores Settings.
 - [x] Add a Launch at login control to General, backed by the system login-item status with approval feedback.
+- [x] Add a non-interactive Automatic updates card to General as a visual placeholder.
+- [x] Preview an update-available card at the bottom of the Settings sidebar with a visual-only Update button.
+- [x] Apply the native pointing-hand cursor to active Settings controls and the Update preview, use the system unavailable cursor for disabled actions, and raise the unreleased app's minimum deployment target to macOS 15.
+- [ ] Design and implement an optional update experience before adding an Automatic updates control.
+- [ ] Connect the sidebar Update button to an actual app update after a downloadable installer and update flow are ready; remove the preview state before public distribution.
 - [x] Refine the compact settings composition with native toolbar controls over a narrower sidebar, concentric navigation rows and icons, subtle page icon tiles, a combined Seamless Close switch-and-angle card, and distinct automatic-selection and pause cards. Remove both feature preview illustrations and feature-page privacy footers.
 - [x] Add compact play buttons beside the two Battery Ripple event switches so either color can be previewed on demand.
 - [x] Build and run the full regression suite for the card and sidebar revision (2026-09-26). Inspect all three pages in the running app's Light appearance for the earlier separate-card layout, including compact rows, icon tiles, and removal of previews. Live Dark and earlier-macOS checks remain pending.

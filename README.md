@@ -10,7 +10,7 @@ Subtle animations and quality-of-life improvements for everyday interactions on 
 
 **In development — not yet available for public download.** The current source prerelease is 0.1.0-alpha.9.
 
-The app will be available once a `.dmg` is ready and published on GitHub. Download links and installation instructions will be added then. Seamless Close settings preview planned Lock Screen support with a Soon label; animation while the Mac is locked is not available yet.
+The app will be available once a `.dmg` is ready and published on GitHub. Download links and installation instructions will be added then. Seamless Close settings preview planned Lock Screen support with a Soon label; animation while the Mac is locked is not available yet. General shows an Automatic updates card with a Soon label, and the sidebar previews an update-available card with a visual-only Update button. The app does not check for or install updates.
 
 Alpha.9 includes **Battery Ripple** and the renamed **Seamless Close** feature. Earlier alpha releases called it **Infinite Screen**. See the [changelog](CHANGELOG.md) for version-specific changes and ongoing limitations.
 
@@ -27,7 +27,7 @@ Battery Ripple plays a green wave when power connects or a red wave when the bui
 
 | Requirement | Current status |
 | --- | --- |
-| macOS | 14 or later is the deployment minimum; this is not a guarantee of compatibility on every version. |
+| macOS | 15 or later is the deployment minimum; this is not a guarantee of compatibility on every version. |
 | Hardware | A Metal-capable MacBook with a compatible lid-angle sensor. |
 | Tested hardware | MacBook Air M5 15-inch (Mac17,4), the development machine. Other models are unverified. |
 | Permission | Seamless Close needs Screen Recording access for individual desktop screenshots. Battery Ripple does not. |

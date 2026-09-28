@@ -80,7 +80,7 @@ xcrun actool "$PWD/Artwork/Glissform.icon" \
     --compile "$ICON_BUILD/Resources" \
     --app-icon Glissform \
     --platform macosx \
-    --minimum-deployment-target 14.0 \
+    --minimum-deployment-target 15.0 \
     --output-partial-info-plist "$ICON_BUILD/Info.plist" \
     --output-format human-readable-text \
     --notices --warnings
@@ -92,7 +92,7 @@ fi
 # target as its SDK version. Declare the actual SDK so AppKit uses the current
 # native window-control appearance on newer macOS releases.
 swift build -c release \
-    -Xlinker -platform_version -Xlinker macos -Xlinker 14.0 -Xlinker "$SDK_VERSION"
+    -Xlinker -platform_version -Xlinker macos -Xlinker 15.0 -Xlinker "$SDK_VERSION"
 APP="$PWD/build/Glissform.app"
 mkdir -p "$APP/Contents/MacOS"
 BIN_DIR="$(swift build -c release --show-bin-path)"
@@ -119,7 +119,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <key>CFBundleShortVersionString</key><string>$APP_SHORT_VERSION</string>
 <key>GlissformVersion</key><string>$APP_VERSION</string>
 <key>CFBundleVersion</key><string>$APP_BUILD</string>
-<key>LSMinimumSystemVersion</key><string>14.0</string>
+<key>LSMinimumSystemVersion</key><string>15.0</string>
 <key>LSUIElement</key><false/>
 <key>NSHighResolutionCapable</key><true/>
 <key>NSScreenCaptureUsageDescription</key><string>Glissform animates your desktop as the lid closes. Screen images stay in memory and are never saved or transmitted.</string>

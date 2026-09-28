@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "Glissform",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS("15.0")],
     products: [.executable(name: "Glissform", targets: ["Glissform"])],
     targets: [
         .executableTarget(name: "Glissform", resources: [

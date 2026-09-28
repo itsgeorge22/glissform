@@ -416,6 +416,7 @@ private struct SettingsRootView: View {
                 navigationRow(.about)
                 navigationRow(.foundBug)
                 Spacer(minLength: 0)
+                sidebarUpdateCard
             }
             .padding(.horizontal, 12)
             .padding(.top, 58).padding(.bottom, 16)
@@ -481,6 +482,40 @@ private struct SettingsRootView: View {
             .accessibilityAddTraits(.isHeader)
     }
 
+    private var sidebarUpdateCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 8) {
+                FeatureIcon(.automaticUpdates, size: 16)
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 28, height: 28)
+                    .background(Color.accentColor.opacity(0.12),
+                                in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Update available")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text("0.1.0-alpha.9")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Button("Update") {}
+                .buttonStyle(SidebarUpdateButtonStyle())
+                .modifier(SettingsActionCursor())
+                .accessibilityLabel("Update preview")
+                .accessibilityHint("Visual preview only. No update is installed.")
+                .help("Visual preview only. Updating is not available yet.")
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.75),
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .strokeBorder(Color.primary.opacity(0.065)))
+        .padding(.horizontal, SettingsDesign.Metrics.sidebarRowInset)
+    }
+
     private func navigationRow(_ page: SettingsModel.Page) -> some View {
         Button {
             focusedPage = page
@@ -520,12 +555,45 @@ private struct SettingsRootView: View {
             .contentShape(RoundedRectangle(cornerRadius: SettingsDesign.Metrics.sidebarRowRadius))
         }
         .buttonStyle(SettingsNavigationButtonStyle(selected: model.selectedPage == page))
+        .modifier(SettingsActionCursor())
         .focused($focusedPage, equals: page)
         .focusEffectDisabled()
         .accessibilityAddTraits(model.selectedPage == page ? .isSelected : [])
         .accessibilityLabel(page.title)
     }
 
+}
+
+private struct SidebarUpdateButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        SidebarUpdateButtonBody(configuration: configuration)
+    }
+}
+
+private struct SidebarUpdateButtonBody: View {
+    let configuration: ButtonStyleConfiguration
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var hovered = false
+
+    var body: some View {
+        configuration.label
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 27)
+            .background(Color.accentColor,
+                        in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(configuration.isPressed ? Color.black.opacity(0.14)
+                          : Color.white.opacity(hovered ? 0.10 : 0))
+                    .allowsHitTesting(false)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .onHover { hovered = $0 }
+            .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.hoverDuration), value: hovered)
+            .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.pressedDuration), value: configuration.isPressed)
+    }
 }
 
 private struct SettingsFeatureHeader: View {
@@ -564,6 +632,7 @@ private struct FeatureToggleRow<Icon: View>: View {
                     IconlyIcon(.play, size: 16)
                 }
                 .buttonStyle(BatteryPreviewButtonStyle())
+                .modifier(SettingsActionCursor())
                 .accessibilityLabel("Preview \(title) ripple")
                 .help("Preview \(title) ripple")
             }
@@ -606,6 +675,7 @@ private struct AnimationSettingsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var permission = PermissionPresentationState()
     @State private var selectedBlurStrength: BlurStrength = .regular
+    @State private var hoveredBlurStrength: BlurStrength?
 
     private var showsAccessCard: Bool { !model.screenCaptureAllowed || permission.showConfirmation }
 
@@ -694,11 +764,13 @@ private struct AnimationSettingsView: View {
                         .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                AngleEntry(title: "Start angle", angle: model.startAngle, setAngle: model.setStartAngle)
+                AngleEntry(title: "Start angle", angle: model.startAngle,
+                           isDisabled: automaticAngleIsActive, setAngle: model.setStartAngle)
             }
             VStack(spacing: SettingsDesign.Spacing.detail) {
                 AngleSlider(value: angleBinding, isFallback: automaticAngleIsActive)
                     .frame(height: 22)
+                    .disabled(automaticAngleIsActive)
                     .accessibilityLabel("Animation start angle")
                     .accessibilityValue("\(Int(model.startAngle)) degrees")
                 HStack {
@@ -707,11 +779,15 @@ private struct AnimationSettingsView: View {
                     Button("Use current angle") {
                         if let angle = model.currentAngle { model.setStartAngle(angle) }
                     }
-                    .buttonStyle(FeedbackButtonStyle(kind: .link)).disabled(!canUseCurrentAngle)
+                    .buttonStyle(FeedbackButtonStyle(kind: .link))
+                    .disabled(!canUseCurrentAngle || automaticAngleIsActive)
+                    .modifier(SettingsActionCursor(isActionEnabled: canUseCurrentAngle && !automaticAngleIsActive))
                     .help("Use the current lid angle. Open a little farther, then close to begin.")
                     Text("·").foregroundStyle(.tertiary)
                     Button("Reset") { model.setStartAngle(100) }
-                        .buttonStyle(FeedbackButtonStyle(kind: .link)).disabled(model.startAngle == 100)
+                        .buttonStyle(FeedbackButtonStyle(kind: .link))
+                        .disabled(model.startAngle == 100 || automaticAngleIsActive)
+                        .modifier(SettingsActionCursor(isActionEnabled: model.startAngle != 100 && !automaticAngleIsActive))
                         .help("Restore the default start angle of 100°")
                         .accessibilityLabel("Reset start angle to 100 degrees")
                     Spacer()
@@ -720,7 +796,6 @@ private struct AnimationSettingsView: View {
                 .font(SettingsDesign.Typography.caption)
             }
         }
-        .disabled(automaticAngleIsActive)
         .opacity(automaticAngleIsActive ? 0.72 : 1)
     }
 
@@ -758,7 +833,7 @@ private struct AnimationSettingsView: View {
     private var blurControls: some View {
         VStack(spacing: 0) {
             HStack(spacing: SettingsDesign.Spacing.cards) {
-                CardIconTile(color: .feature) {
+                CardIconTile(color: .blur) {
                     FeatureIcon(.blur)
                 }
                 .accessibilityHidden(true)
@@ -788,7 +863,7 @@ private struct AnimationSettingsView: View {
                     } label: {
                         VStack(spacing: SettingsDesign.Spacing.label) {
                             RoundedRectangle(cornerRadius: SettingsDesign.Radius.control)
-                                .fill(Color.gray.opacity(0.24))
+                                .fill(Color.gray.opacity(hoveredBlurStrength == strength ? 0.30 : 0.24))
                                 .aspectRatio(1.6, contentMode: .fit)
                                 .padding(4)
                                 .overlay {
@@ -805,6 +880,10 @@ private struct AnimationSettingsView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .onHover { hoveredBlurStrength = $0 ? strength : nil }
+                    .modifier(SettingsActionCursor())
+                    .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.hoverDuration),
+                               value: hoveredBlurStrength == strength)
                     .accessibilityLabel("\(strength.rawValue) blur strength")
                     .accessibilityValue(selectedBlurStrength == strength ? "Selected" : "Not selected")
                     .help("Placeholder only. Blur strength does not change yet.")
@@ -816,7 +895,7 @@ private struct AnimationSettingsView: View {
 
     private var lockScreenSupport: some View {
         HStack(spacing: SettingsDesign.Spacing.cards) {
-            CardIconTile(color: .feature) {
+            CardIconTile(color: .neutral) {
                 IconlyIcon(.lock, size: 24)
             }
             .accessibilityHidden(true)
@@ -827,13 +906,7 @@ private struct AnimationSettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
-            Text("Soon")
-                .font(SettingsDesign.Typography.action)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.45)))
-                .accessibilityLabel("Coming soon")
+            SoonTag()
         }
     }
 
@@ -1002,8 +1075,38 @@ private struct GeneralSettingsView: View {
             }
             .padding(SettingsDesign.Spacing.switchCardInsets)
             .modifier(SettingsCardSurface())
+
+            HStack(spacing: SettingsDesign.Spacing.controls) {
+                CardIconTile(color: .neutral) {
+                    FeatureIcon(.automaticUpdates)
+                }
+                .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Automatic updates").font(SettingsDesign.Typography.controlTitle)
+                    Text("Keep Glissform up to date automatically.")
+                        .font(SettingsDesign.Typography.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                SoonTag()
+            }
+            .padding(SettingsDesign.Spacing.switchCardInsets)
+            .modifier(SettingsCardSurface())
         }
         .padding(SettingsDesign.Spacing.page)
+    }
+}
+
+private struct SoonTag: View {
+    var body: some View {
+        Text("Soon")
+            .font(SettingsDesign.Typography.action)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.45)))
+            .accessibilityLabel("Coming soon")
     }
 }
 
@@ -1017,6 +1120,7 @@ private struct AngleEntry: View {
     let title: String
     let angle: Double
     var allowsZero = false
+    var isDisabled = false
     let setAngle: (Double) -> Void
     @StateObject private var draft = AngleDraft()
     @FocusState private var isFocused: Bool
@@ -1025,15 +1129,15 @@ private struct AngleEntry: View {
         HStack(spacing: SettingsDesign.Spacing.detail) {
             VStack(spacing: 0) {
                 FieldStepArrow(rotation: 0, label: "Increase \(title.lowercased())",
-                               help: "Increase \(title.lowercased()) by 1°", step: 1) {
+                               help: "Increase \(title.lowercased()) by 1°", step: 1,
+                               isDisabled: isDisabled || angle >= 130) {
                     stepAngle(1)
                 }
-                    .disabled(angle >= 130)
                 FieldStepArrow(rotation: 180, label: "Decrease \(title.lowercased())",
-                               help: "Decrease \(title.lowercased()) by 1°", step: -1) {
+                               help: "Decrease \(title.lowercased()) by 1°", step: -1,
+                               isDisabled: isDisabled || angle <= (allowsZero ? 0 : 20)) {
                     stepAngle(-1)
                 }
-                    .disabled(angle <= (allowsZero ? 0 : 20))
             }
 
             HStack(alignment: .firstTextBaseline, spacing: 1) {
@@ -1042,6 +1146,7 @@ private struct AngleEntry: View {
                     .font(SettingsDesign.Typography.editableValue)
                     .textFieldStyle(.plain).frame(width: SettingsDesign.Metrics.angleNumberWidth)
                     .focused($isFocused)
+                    .disabled(isDisabled)
                     .accessibilityLabel("\(title) in degrees")
                     .help(allowsZero
                           ? "Enter 0° to disable the threshold, or an angle from 20° to 130°, then press Return."
@@ -1056,7 +1161,8 @@ private struct AngleEntry: View {
             .padding(.vertical, SettingsDesign.Spacing.angleFieldInset)
         }
         .background(SettingsDesign.Palette.field, in: RoundedRectangle(cornerRadius: SettingsDesign.Radius.angleField))
-        .modifier(ControlHoverFeedback(isActive: isFocused, inset: 0, showsHover: false))
+        .clipShape(RoundedRectangle(cornerRadius: SettingsDesign.Radius.angleField))
+        .modifier(ControlHoverFeedback(isActive: isFocused, inset: 0, isDisabled: isDisabled))
         .onAppear { draft.text = String(Int(angle)) }
         .onChange(of: angle) { _, newAngle in draft.text = String(Int(newAngle)) }
         .onChange(of: isFocused) { _, focused in if !focused { commit() } }
@@ -1104,15 +1210,15 @@ private struct WaitTimeEntry: View {
         HStack(spacing: SettingsDesign.Spacing.detail) {
             VStack(spacing: 0) {
                 FieldStepArrow(rotation: 0, label: "Increase \(title.lowercased())",
-                               help: "Increase \(title.lowercased()) by 0.5 seconds", step: 1) {
+                               help: "Increase \(title.lowercased()) by 0.5 seconds", step: 1,
+                               isDisabled: duration >= 10) {
                     setDuration(duration + 0.5)
                 }
-                .disabled(duration >= 10)
                 FieldStepArrow(rotation: 180, label: "Decrease \(title.lowercased())",
-                               help: "Decrease \(title.lowercased()) by 0.5 seconds", step: -1) {
+                               help: "Decrease \(title.lowercased()) by 0.5 seconds", step: -1,
+                               isDisabled: duration <= 0.5) {
                     setDuration(duration - 0.5)
                 }
-                .disabled(duration <= 0.5)
             }
             HStack(alignment: .firstTextBaseline, spacing: 1) {
                 Text(numberText)
@@ -1131,6 +1237,8 @@ private struct WaitTimeEntry: View {
         }
         .background(SettingsDesign.Palette.field,
                     in: RoundedRectangle(cornerRadius: SettingsDesign.Radius.angleField))
+        .clipShape(RoundedRectangle(cornerRadius: SettingsDesign.Radius.angleField))
+        .modifier(ControlHoverFeedback(inset: 0))
     }
 }
 
@@ -1139,6 +1247,7 @@ private struct FieldStepArrow: View {
     let label: String
     let help: String
     let step: Double
+    let isDisabled: Bool
     let action: () -> Void
 
     var body: some View {
@@ -1150,6 +1259,8 @@ private struct FieldStepArrow: View {
         }
         .buttonStyle(AngleArrowStyle())
         .buttonRepeatBehavior(.enabled)
+        .disabled(isDisabled)
+        .modifier(SettingsActionCursor(isActionEnabled: !isDisabled))
         .accessibilityLabel(label)
         .help(help)
     }
@@ -1223,6 +1334,7 @@ private struct ScreenAccessCard: View {
                 model.onOpenPermissions?()
             }
             .buttonStyle(FeedbackButtonStyle(kind: .filled)).controlSize(.small)
+            .modifier(SettingsActionCursor())
             .fixedSize()
             .help("Open Screen & System Audio Recording in System Settings to enable or revoke access for Glissform.")
         }
@@ -1361,29 +1473,33 @@ private struct BatteryPreviewButtonStyle: ButtonStyle {
 
 private struct BatteryPreviewButtonBody: View {
     let configuration: ButtonStyleConfiguration
+    @Environment(\.isEnabled) private var isEnabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var hover = HoverState()
 
     var body: some View {
-        let highlighted = configuration.isPressed || hover.isHovered
+        let pressed = isEnabled && configuration.isPressed
+        let hovered = isEnabled && hover.isHovered
         configuration.label
-            .foregroundStyle(.primary)
+            .foregroundStyle(Color.primary)
             .frame(width: 30, height: 30)
             .background {
                 Circle()
-                    .fill(Color.primary.opacity(configuration.isPressed ? SettingsDesign.Feedback.pressedFill
-                                                 : (hover.isHovered ? SettingsDesign.Feedback.hoverFill
-                                                    : SettingsDesign.Feedback.idleFill)))
+                    .fill(pressed ? Color.primary.opacity(SettingsDesign.Feedback.previewPressedFill)
+                          : hovered ? Color.primary.opacity(SettingsDesign.Feedback.previewHoverFill)
+                          : Color.primary.opacity(SettingsDesign.Feedback.idleFill))
             }
             .overlay {
                 Circle()
-                    .strokeBorder(Color.primary.opacity(highlighted ? SettingsDesign.Feedback.hoverBorder : 0), lineWidth: 1)
+                    .strokeBorder(Color.primary.opacity(pressed ? SettingsDesign.Feedback.previewPressedBorder
+                                                        : hovered ? SettingsDesign.Feedback.fieldHoverBorder : 0), lineWidth: 1)
                     .allowsHitTesting(false)
             }
+            .opacity(isEnabled ? 1 : SettingsDesign.Feedback.disabledOpacity)
             .contentShape(Circle())
             .onHover { hover.isHovered = $0 }
-            .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.hoverDuration), value: hover.isHovered)
-            .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.pressedDuration), value: configuration.isPressed)
+            .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.hoverDuration), value: hovered)
+            .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.pressedDuration), value: pressed)
     }
 }
 
@@ -1391,24 +1507,24 @@ private struct BatteryPreviewButtonBody: View {
 private struct ControlHoverFeedback: ViewModifier {
     var isActive = false
     var inset: CGFloat = 4
-    var showsHover = true
+    var isDisabled = false
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var hover = HoverState()
 
     func body(content: Content) -> some View {
-        let highlighted = showsHover && isEnabled && hover.isHovered
-        let active = isEnabled && isActive
+        let highlighted = isEnabled && !isDisabled && hover.isHovered
+        let active = isEnabled && !isDisabled && isActive
         content
             .background {
-                RoundedRectangle(cornerRadius: SettingsDesign.Radius.control)
-                    .fill(Color.primary.opacity(highlighted ? SettingsDesign.Feedback.hoverFill : 0))
+                RoundedRectangle(cornerRadius: SettingsDesign.Radius.angleField)
+                    .fill(Color.primary.opacity(highlighted ? SettingsDesign.Feedback.fieldHoverFill : 0))
                     .padding(-inset)
                     .allowsHitTesting(false)
             }
             .overlay {
-                RoundedRectangle(cornerRadius: SettingsDesign.Radius.control)
-                    .strokeBorder(active ? SettingsDesign.Palette.focus : Color.primary.opacity(highlighted ? SettingsDesign.Feedback.hoverBorder : 0), lineWidth: 1)
+                RoundedRectangle(cornerRadius: SettingsDesign.Radius.angleField)
+                    .strokeBorder(active ? SettingsDesign.Palette.focus : Color.primary.opacity(highlighted ? SettingsDesign.Feedback.fieldHoverBorder : 0), lineWidth: 1)
                     .padding(-inset)
                     .allowsHitTesting(false)
             }
@@ -1438,8 +1554,12 @@ private struct AngleArrowFeedback: View {
     var body: some View {
         configuration.label
             .foregroundStyle(highlighted || pressed ? Color.primary : Color.secondary)
-            .background(Color.primary.opacity(pressed ? SettingsDesign.Feedback.pressedFill : (highlighted ? SettingsDesign.Feedback.hoverFill : 0)),
-                        in: RoundedRectangle(cornerRadius: SettingsDesign.Radius.small))
+            .background {
+                Rectangle()
+                    .fill(Color.primary.opacity(pressed ? SettingsDesign.Feedback.pressedFill
+                                                  : highlighted ? SettingsDesign.Feedback.hoverFill : 0))
+                    .allowsHitTesting(false)
+            }
             .opacity(isEnabled ? 1 : SettingsDesign.Feedback.disabledOpacity)
             .onHover { hover.isHovered = $0 }
             .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.hoverDuration), value: highlighted)
@@ -1455,6 +1575,7 @@ private struct AppleSwitchStyle: ToggleStyle {
             configuration.label
         }
         .buttonStyle(SwitchFeedbackStyle(isOn: configuration.isOn))
+        .modifier(SettingsActionCursor())
         .accessibilityRepresentation {
             Toggle(isOn: configuration.$isOn) { configuration.label }.toggleStyle(.switch)
         }
