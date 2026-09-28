@@ -8,11 +8,11 @@ Subtle animations and quality-of-life improvements for everyday interactions on 
 
 ## Project status
 
-**In development — not yet available for public download.** The last tagged source prerelease was 0.1.0-alpha.9; the source repository is now private. Version 0.1.0-beta.1 is being prepared locally.
+**Public beta available:** [Download Glissform 0.1.0-beta.1](https://glissform.app/downloads/Glissform-0.1.0-beta.1.dmg) from [glissform.app](https://glissform.app/). The source repository is private.
 
-The app will be available once a `.dmg` is ready and published at [glissform.app](https://glissform.app/). Download links and installation instructions will be added then. Seamless Close settings preview planned Lock Screen support with a Soon label; animation while the Mac is locked is not available yet. The local beta candidate includes signed update checks and a General switch for automatic installation. No public `.dmg` or update feed has been published yet.
+Open the DMG and drag Glissform into Applications. The beta is not Apple notarized, so macOS may block first launch; after a blocked attempt, use **System Settings → Privacy & Security → Open Anyway** if you trust the download. See [Apple's instructions](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac). Seamless Close needs Screen Recording permission. Future beta updates are checked through the app; Automatic updates controls whether they download and install automatically. The public DMG and signed update feed are live, while an upgrade against that public feed has not yet been physically verified. Lock Screen animation is not available; Settings shows it as a planned feature.
 
-Alpha.9 includes **Battery Ripple** and the renamed **Seamless Close** feature. Earlier alpha releases called it **Infinite Screen**. See the [changelog](CHANGELOG.md) for version-specific changes and ongoing limitations.
+Beta.1 adds signed updates and configurable Seamless Close blur strength. Earlier alpha releases introduced **Battery Ripple** and renamed **Infinite Screen** to **Seamless Close**. See the [changelog](CHANGELOG.md) for version-specific changes and ongoing limitations.
 
 ## Current features
 

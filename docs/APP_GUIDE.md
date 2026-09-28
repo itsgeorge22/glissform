@@ -4,9 +4,9 @@ Glissform brings subtle animations and quality-of-life improvements to everyday 
 
 **Seamless Close is its first available feature:** your desktop appears to stay in place as you close your MacBook lid, with perspective, blur, and shadow responding to the movement. Glissform’s scope extends beyond this effect; additional experiences will be introduced as they are designed and validated.
 
-**Latest published source prerelease: 0.1.0-alpha.9. The app is not yet available for public download.** Version 0.1.0-beta.1 is being prepared locally; a `.dmg` and installation instructions will be published at [glissform.app](https://glissform.app/) when ready. Development testing uses a MacBook Air M5 15-inch; wider compatibility is still being evaluated.
+**Public beta: 0.1.0-beta.1.** The [versioned DMG and installation instructions](https://glissform.app/) are available on the project website. The app uses a signed update feed there; an upgrade through the public feed still needs physical verification. Development testing uses a MacBook Air M5 15-inch; wider compatibility is still being evaluated.
 
-The local beta candidate includes the capture, motion, material, and Space-change improvements described below. Repeatable physical acceptance remains pending where noted.
+Beta.1 includes the capture, motion, material, and Space-change improvements described below. Repeatable physical acceptance remains pending where noted.
 
 Alpha.9 adds Battery Ripple as a second experience, along with the refreshed sidebar and General controls described below. Earlier alpha releases used the name Infinite Screen for Seamless Close.
 

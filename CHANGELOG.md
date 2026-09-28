@@ -4,6 +4,8 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+- Publish the beta.1 download page at glissform.app after the versioned DMG and signed update feed went live. The public DMG download matched its published SHA-256 checksum; public-feed upgrade testing remains pending.
+
 ## 0.1.0-beta.1 — 2026-09-28
 
 First beta: the signed update path, configurable Seamless Close blur and timing, and further Settings and motion refinements.

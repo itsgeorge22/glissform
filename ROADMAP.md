@@ -6,7 +6,7 @@ New experiences should feel native, have a clear purpose, stay lightweight, and 
 
 Glissform is a small passion project. The owner's intended price is $1.90, with occasional improvements and new features after launch. Keep release preparation proportional to that scope; broad hardware certification, formal performance studies, and a fixed tester cohort are not prerequisites.
 
-## Last tagged source prerelease — 0.1.0-alpha.9
+## Public beta — 0.1.0-beta.1
 
 The first feature, Seamless Close, implements screenshot-based closing animation with continuous hinge perspective and upper-edge narrowing through the full gesture, steadier adaptive smoothing, optional full-image blur and shadow, awake reversal, cached post-sleep opening, native settings with a configurable starting angle, optional desktop restoration after an adjustable still-lid pause, menu bar controls, and lifecycle cleanup. On 2026-09-21, the owner confirmed correct smoothness, speed, abrupt lid stops, reversals, and opening after sleep without locking on the development Mac. On 2026-09-28, the owner confirmed the revised geometry and Blur on/off during everyday gestures, plus the requested Space and sleep/wake checks. Locked-screen animation remains unavailable. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
 
@@ -28,9 +28,10 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 - [x] Apply the native pointing-hand cursor to active Settings controls, use the system unavailable cursor for disabled actions, and raise the unreleased app's minimum deployment target to macOS 15.
 - [x] Connect the sidebar Update card to signed update detection and Sparkle's install flow; show it only when Automatic updates is off and a newer installable release is found.
 - [x] Complete an isolated installed-app trial with a signed local feed and DMG: manual mode showed the existing card and installed through its Update button; automatic mode kept the card hidden and installed on quit. A tampered feed was rejected.
-- [x] Provision glissform.app on the release VPS with HTTPS and a restricted release-upload account. The public DMG and signed feed are not published yet.
+- [x] Provision glissform.app on the release VPS with HTTPS and a restricted release-upload account. Publish the beta.1 DMG, checksum, signed feed, and download page.
 - [x] Set the release workflow's dedicated VPS deploy secret in the private GitHub repository.
-- [ ] Check the first public DMG download, macOS first-open path, Screen Recording permission after update, and both update modes against the published feed before calling public beta distribution verified.
+- [x] Check the first public beta.1 DMG download against its published SHA-256 checksum.
+- [ ] Check macOS first-open from the public download, Screen Recording permission after update, and both update modes against the published feed before calling public beta distribution verified. The owner confirmed first launch and Seamless Close from the locally packaged beta DMG on the development Mac.
 - [x] Refine the compact settings composition with native toolbar controls over a narrower sidebar, concentric navigation rows and icons, subtle page icon tiles, a combined Seamless Close switch-and-angle card, and distinct automatic-selection and pause cards. Remove both feature preview illustrations and feature-page privacy footers.
 - [x] Add compact play buttons beside the two Battery Ripple event switches so either color can be previewed on demand.
 - [x] Build and run the full regression suite for the card and sidebar revision (2026-09-26). Inspect all three pages in the running app's Light appearance for the earlier separate-card layout, including compact rows, icon tiles, and removal of previews. Live Dark and earlier-macOS checks remain pending.
