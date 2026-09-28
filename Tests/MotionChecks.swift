@@ -625,6 +625,10 @@ import Foundation
         interruptedPause.pauseDuration = 2
         _ = interruptedPause.update(angle: 82, time: 5.3)
         precondition(interruptedPause.active, "Changing the delay starts a fresh wait")
+        precondition(ClosingMotion.validStillDuration(.nan) == 1
+                     && ClosingMotion.validStillDuration(0.1) == 0.5
+                     && ClosingMotion.validStillDuration(20) == 10,
+                     "Saved wait times must stay within the supported range")
         print("PASS: pause durations, default off, jitter, slow movement, reversal, sensor gaps, restoration latch and rearming")
         var motion = ClosingMotion()
         for angle in [110.0, 109, 110, 111, 110] {
@@ -709,6 +713,106 @@ import Foundation
         automatic.automaticStartAngle = false
         precondition(automatic.learnedStartAngle == nil && automatic.effectiveStartAngle == 120,
                      "Turning automatic selection off must restore the manual angle")
+
+        var customDetection = ClosingMotion()
+        customDetection.startAngle = 95
+        customDetection.automaticStartAngle = true
+        customDetection.automaticAngleDuration = 2
+        for frame in 0...30 { _ = customDetection.update(angle: 110, time: Double(frame) / 20) }
+        precondition(customDetection.learnedStartAngle == nil,
+                     "Automatic detection must wait for its selected duration")
+        customDetection.automaticAngleDuration = 0.5
+        for frame in 31...39 { _ = customDetection.update(angle: 110, time: Double(frame) / 20) }
+        precondition(customDetection.learnedStartAngle == nil,
+                     "Changing the detection time must restart its pending wait")
+        _ = customDetection.update(angle: 110, time: 2.1)
+        precondition(customDetection.learnedStartAngle == 109 && customDetection.pauseDuration == 1,
+                     "The new detection time must apply independently from the resume time")
+
+        var lowerThreshold = ClosingMotion()
+        lowerThreshold.startAngle = 100
+        lowerThreshold.automaticDetectionThreshold = 80
+        lowerThreshold.automaticStartAngle = true
+        for frame in 0...19 { _ = lowerThreshold.update(angle: 90, time: Double(frame) / 20) }
+        precondition(lowerThreshold.effectiveStartAngle == 100,
+                     "Begin at must remain the fallback before detection completes")
+        _ = lowerThreshold.update(angle: 90, time: 1)
+        precondition(lowerThreshold.learnedStartAngle == 89 && lowerThreshold.effectiveStartAngle == 89,
+                     "A held lid above the threshold must learn even below Begin at")
+        lowerThreshold.automaticDetectionThreshold = 100
+        precondition(lowerThreshold.learnedStartAngle == nil && lowerThreshold.effectiveStartAngle == 100,
+                     "Changing the threshold must restore the manual fallback")
+        for frame in 21...45 { _ = lowerThreshold.update(angle: 90, time: Double(frame) / 20) }
+        precondition(lowerThreshold.learnedStartAngle == nil,
+                     "A lid below the new threshold must not relearn")
+        lowerThreshold.automaticDetectionThreshold = 0
+        for frame in 46...66 { _ = lowerThreshold.update(angle: 90, time: Double(frame) / 20) }
+        precondition(lowerThreshold.learnedStartAngle == 89,
+                     "Setting Detect above to zero must allow learning below the previous threshold")
+
+        var higherThreshold = ClosingMotion()
+        higherThreshold.startAngle = 100
+        higherThreshold.automaticDetectionThreshold = 120
+        higherThreshold.automaticStartAngle = true
+        for frame in 0...25 { _ = higherThreshold.update(angle: 110, time: Double(frame) / 20) }
+        precondition(higherThreshold.effectiveStartAngle == 100,
+                     "Begin at must control the band below a higher detection threshold")
+        for frame in 26...47 { _ = higherThreshold.update(angle: 125, time: Double(frame) / 20) }
+        precondition(higherThreshold.learnedStartAngle == 124,
+                     "Holding above a higher threshold must learn the new angle")
+        precondition(ClosingMotion.validDetectionThreshold(.nan) == 20
+                     && ClosingMotion.validDetectionThreshold(0) == 0
+                     && ClosingMotion.validDetectionThreshold(5) == 20
+                     && ClosingMotion.validDetectionThreshold(150) == 130,
+                     "Saved detection thresholds must accept zero or stay within the supported range")
+        var manualDuringThresholdEdit = ClosingMotion()
+        manualDuringThresholdEdit.startAngle = 100
+        _ = manualDuringThresholdEdit.update(angle: 110, time: 0)
+        _ = manualDuringThresholdEdit.update(angle: 90, time: 0.05)
+        precondition(manualDuringThresholdEdit.active, "The manual gesture must be active before editing")
+        manualDuringThresholdEdit.automaticDetectionThreshold = 80
+        precondition(manualDuringThresholdEdit.active && manualDuringThresholdEdit.effectiveStartAngle == 100,
+                     "Editing the inactive automatic threshold must preserve a manual gesture")
+
+        var belowThresholdPause = ClosingMotion()
+        belowThresholdPause.startAngle = 100
+        belowThresholdPause.automaticDetectionThreshold = 80
+        belowThresholdPause.automaticStartAngle = true
+        belowThresholdPause.resumeAfterPause = true
+        _ = belowThresholdPause.update(angle: 110, time: 0)
+        _ = belowThresholdPause.update(angle: 80, time: 0.05)
+        for frame in 2...21 { _ = belowThresholdPause.update(angle: 80, time: Double(frame) / 20) }
+        precondition(belowThresholdPause.desktopResumed && belowThresholdPause.learnedStartAngle == nil
+                     && belowThresholdPause.effectiveStartAngle == 100,
+                     "A pause below Detect above may restore the desktop but must not learn an angle")
+        precondition(belowThresholdPause.update(angle: 79, time: 1.1) == 0
+                     && belowThresholdPause.desktopResumed,
+                     "A below-threshold pause must not rearm by closing past an unlearned angle")
+
+        var learnedThenPausedBelow = ClosingMotion()
+        learnedThenPausedBelow.startAngle = 100
+        learnedThenPausedBelow.automaticDetectionThreshold = 80
+        learnedThenPausedBelow.automaticStartAngle = true
+        learnedThenPausedBelow.resumeAfterPause = true
+        for frame in 0...20 { _ = learnedThenPausedBelow.update(angle: 110, time: Double(frame) / 20) }
+        precondition(learnedThenPausedBelow.learnedStartAngle == 109,
+                     "This pause case must start from a valid learned angle")
+        for frame in 21...41 { _ = learnedThenPausedBelow.update(angle: 70, time: Double(frame) / 20) }
+        _ = learnedThenPausedBelow.update(angle: 70, time: 2.1)
+        precondition(learnedThenPausedBelow.desktopResumed && learnedThenPausedBelow.learnedStartAngle == nil
+                     && learnedThenPausedBelow.effectiveStartAngle == 100,
+                     "A pause below Detect above must restore Begin at instead of retaining a learned angle")
+
+        var disabledThresholdPause = ClosingMotion()
+        disabledThresholdPause.startAngle = 100
+        disabledThresholdPause.automaticDetectionThreshold = 0
+        disabledThresholdPause.automaticStartAngle = true
+        disabledThresholdPause.resumeAfterPause = true
+        for frame in 0...20 { _ = disabledThresholdPause.update(angle: 110, time: Double(frame) / 20) }
+        for frame in 21...41 { _ = disabledThresholdPause.update(angle: 70, time: Double(frame) / 20) }
+        _ = disabledThresholdPause.update(angle: 70, time: 2.1)
+        precondition(disabledThresholdPause.desktopResumed && disabledThresholdPause.learnedStartAngle == 69,
+                     "A zero threshold must let pause restoration learn within the supported angle range")
 
         var lowRest = ClosingMotion()
         lowRest.startAngle = 95

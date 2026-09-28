@@ -8,7 +8,7 @@ Glissform is a small passion project. The owner's intended price is $1.90, with 
 
 ## Current — 0.1.0-alpha.9
 
-The first feature, Seamless Close, implements screenshot-based closing animation with continuous hinge perspective and upper-edge narrowing through the full gesture, steadier adaptive smoothing, optional full-image blur and shadow, awake reversal, cached post-sleep opening, native settings with a configurable starting angle, optional desktop restoration after a fixed one-second still-lid pause, menu bar controls, and lifecycle cleanup. On 2026-09-21, the owner confirmed correct smoothness, speed, abrupt lid stops, reversals, and opening after sleep without locking on the development Mac. The new animation geometry and blur levels, and locked wake, are outside that confirmation. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
+The first feature, Seamless Close, implements screenshot-based closing animation with continuous hinge perspective and upper-edge narrowing through the full gesture, steadier adaptive smoothing, optional full-image blur and shadow, awake reversal, cached post-sleep opening, native settings with a configurable starting angle, optional desktop restoration after an adjustable still-lid pause, menu bar controls, and lifecycle cleanup. On 2026-09-21, the owner confirmed correct smoothness, speed, abrupt lid stops, reversals, and opening after sleep without locking on the development Mac. The new animation geometry and blur levels, and locked wake, are outside that confirmation. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
 
 ## Current priority — Space-change verification
 
@@ -36,11 +36,13 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 ## Alpha.9 foundations and Seamless Close follow-up
 
 - [x] Add a saved Blur switch to Seamless Close that disables both blur passes without changing the projection, shadow, or one-screenshot gesture.
+- [x] Add a selectable High, Regular, and Subtle placeholder row below Blur without changing rendering.
+- [ ] Replace blur placeholders with representative images and connect the selected strength to rendering after visual approval.
 
 - [x] Owner approved the revised Seamless Close closing feel on the development Mac on 2026-09-28, including its stronger start and continuing later movement.
 - [ ] Physically check a deep pause, reopening, and Blur on/off with the revised geometry on the development Mac; broader gesture and material acceptance remains separate from the approved closing feel.
 
-- [x] Add **Detect starting angle** and implement one-second resting-angle selection one degree below the held angle, **Begin at** fallback, gesture and wake reference locking, and adoption of a lower angle after optional pause restoration.
+- [x] Add **Detect starting angle** and implement resting-angle selection one degree below the held angle, **Begin at** fallback, gesture and wake reference locking, and adoption of a lower angle after eligible pause restoration. Its saved wait is independently adjustable from 0.5 to 10 seconds, defaulting to one second. A saved 20–130° detection threshold gates learning independently of **Begin at** and restores that fallback after a pause at or below the threshold; 0° disables the threshold.
 - [x] Let closing past the learned angle restart the animation after automatic pause restoration, without requiring the lid to open farther first.
 - [ ] Physically verify automatic angle learning, changes to the manual fallback, pause restoration, reversal, sleep/wake, and sensor gaps on the development Mac.
 
@@ -75,7 +77,7 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 
 - [x] Show missing screen access on the main page, briefly confirm detected grants, and keep persistent access status and management in Privacy & About.
 
-- [x] Add optional desktop restoration after a fixed one-second still-lid pause, with a persisted toggle and gesture/cancellation regression checks.
+- [x] Add optional desktop restoration after a still-lid pause, with a persisted toggle and gesture/cancellation regression checks. Its saved wait is independently adjustable from 0.5 to 10 seconds, defaulting to one second.
 - [ ] Physically validate pause-to-resume timing and jitter tolerance during slow movement, lower-angle work, and sleep transitions.
 
 - [x] Correct full-angle hinge compensation, smooth quantized-input tracking speed, reduce entrance delay, and tune progressive full-image frost toward the supplied Duo references; add synthetic desktop material previews alongside projection, tracking and lifecycle regression checks.

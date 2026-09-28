@@ -11,7 +11,7 @@ enum SettingsDesign {
         static let cards: CGFloat = 12
         static let cardInset: CGFloat = 16
         static let featureInset: CGFloat = 12
-        static let angleSectionInset: CGFloat = 20
+        static let controlSectionInset: CGFloat = 24
         static let angleFieldInset: CGFloat = 7
         static let angleFieldTrailingInset: CGFloat = 4
         static let switchCardInsets = EdgeInsets(top: featureInset, leading: featureInset,

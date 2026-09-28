@@ -6,15 +6,24 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ### Added
 
+- Add three selectable gray image placeholders beneath the Blur switch for High, Regular, and Subtle strength. Regular is initially outlined in the system accent color, matching enabled switches, with a 4-point gap around its placeholder; choosing a strength does not change the effect yet.
+- Add a saved **Detect above** angle to Seamless Close's automatic-selection card. Automatic detection learns only after the lid rests strictly above this angle; **Begin at** remains the fallback until then, even when the detection threshold is below the manual angle. Set it to 0° to disable the threshold. Changing the threshold while automatic detection is on clears the learned angle and any active snapshot; while it is off, a manual gesture continues. The default is 20°.
+- Add independent, saved 0.5–10 second wait controls for automatic starting-angle detection and desktop restoration after a pause. Both default to one second; changing a wait restarts its pending timer.
 - Show planned Lock Screen support in Seamless Close settings with a non-interactive outlined Soon chip. The locked-screen animation is not implemented yet.
 - Add a saved Blur switch to Seamless Close, on by default. Turning it off skips both blur passes while keeping perspective and shadow, including during the current gesture.
 
 ### Changed
 
+- Use the supplied raindrop icon for **Blur** and scan-object icon for **Detect starting angle**.
+- Separate the starting-angle and desktop-resume switch rows from their wait controls with full-width dividers. Give all three Seamless Close control sections 24-point padding while keeping 24-point trailing padding on switch rows. Use the angle field's paired arrow controls for both wait times, with a title and explanatory subtitle beside each.
 - Keep Seamless Close's finishing blur appearance while removing a redundant full-screen alpha erosion and blend. On the development Mac, instrumented closing passes showed fewer late render callbacks with Blur on; the owner found the appearance unchanged but did not notice a clear difference in feel. The motion curve, Blur switch, and one-screenshot capture remain the same.
 - Start Seamless Close from a prepared frame at the latest measured lid angle instead of showing a flat screenshot first. Run the one-shot screen capture away from the main queue so lid readings continue during capture. The owner found the entrance sooner and more natural on the development Mac; remaining capture and presentation delay still varies. The screenshot count and privacy behavior are unchanged.
 - Use smooth, coordinated geometry for Seamless Close's image content and upper edge, replacing the early/late rotation handoff. Restore a stronger response in the first degrees while keeping the later fold active below a 60° lid angle and limiting deep vertical stretch. Spread blur buildup through the full gesture while reducing its final strength by about 20% at the top and 30% at the hinge. Keep lid-driven timing and the single-screenshot behavior. The owner approved the revised closing feel on the development Mac on 2026-09-28; broader gesture and material checks remain pending.
 - Let consecutive fractional lid readings shorten Seamless Close's smoothing delay during steady, slow movement. For fast closes with roughly 100 ms gaps between meaningful readings, carry a short, damped motion estimate through each gap instead of repeatedly accelerating and settling. Whole-degree slow motion retains its earlier response. The measured fast-close replay reduced speed variation, while synthetic abrupt-stop and reversal checks remain bounded; the change still needs physical lid comparison.
+
+### Fixed
+
+- Apply **Detect above** during pause restoration too. A still lid at or below the threshold restores the desktop without learning or rearming from that angle, and clears any previous learned angle so **Begin at** takes over.
 
 ## 0.1.0-alpha.9 — 2026-09-27
 

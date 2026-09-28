@@ -81,6 +81,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         UserDefaults.standard.register(defaults: ["animationStartAngle": 100.0, "animationEnabled": true,
                                                   "resumeAfterPause": false,
+                                                  "seamlessClosePauseDuration": 1.0,
+                                                  "seamlessCloseAutomaticAngleDuration": 1.0,
+                                                  "seamlessCloseDetectionThreshold": 20.0,
                                                   "seamlessCloseBlurEnabled": true,
                                                   "automaticStartAngleEnabled": false,
                                                   "chargingFeedbackEnabled": true,
@@ -92,6 +95,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let animationEnabled = UserDefaults.standard.bool(forKey: "animationEnabled")
         motion.startAngle = startAngle
         motion.resumeAfterPause = UserDefaults.standard.bool(forKey: "resumeAfterPause")
+        motion.pauseDuration = ClosingMotion.validStillDuration(UserDefaults.standard.double(forKey: "seamlessClosePauseDuration"))
+        motion.automaticAngleDuration = ClosingMotion.validStillDuration(UserDefaults.standard.double(forKey: "seamlessCloseAutomaticAngleDuration"))
+        motion.automaticDetectionThreshold = ClosingMotion.validDetectionThreshold(UserDefaults.standard.double(forKey: "seamlessCloseDetectionThreshold"))
         motion.automaticStartAngle = UserDefaults.standard.bool(forKey: "automaticStartAngleEnabled")
         statusLine.isEnabled = false
         statusMenu.addItem(statusLine)
@@ -122,6 +128,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             screenCaptureAllowed: CGPreflightScreenCaptureAccess(),
             resumeAfterPause: motion.resumeAfterPause,
             automaticStartAngle: motion.automaticStartAngle,
+            pauseDuration: motion.pauseDuration,
+            automaticAngleDuration: motion.automaticAngleDuration,
+            automaticDetectionThreshold: motion.automaticDetectionThreshold,
             blurEnabled: UserDefaults.standard.bool(forKey: "seamlessCloseBlurEnabled"),
             chargingFeedbackEnabled: UserDefaults.standard.bool(forKey: "chargingFeedbackEnabled"),
             lowBatteryRippleEnabled: UserDefaults.standard.bool(forKey: "lowBatteryRippleEnabled"),
@@ -141,6 +150,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             self.motion.resumeAfterPause = enabled
             UserDefaults.standard.set(enabled, forKey: "resumeAfterPause")
+        }
+        settingsModel.onPauseDurationChange = { [weak self] duration in
+            self?.motion.pauseDuration = duration
+            UserDefaults.standard.set(duration, forKey: "seamlessClosePauseDuration")
+        }
+        settingsModel.onAutomaticAngleDurationChange = { [weak self] duration in
+            self?.motion.automaticAngleDuration = duration
+            UserDefaults.standard.set(duration, forKey: "seamlessCloseAutomaticAngleDuration")
+        }
+        settingsModel.onAutomaticDetectionThresholdChange = { [weak self] angle in
+            self?.applyAutomaticDetectionThreshold(angle)
         }
         settingsModel.onBlurEnabledChange = { [weak self] enabled in
             self?.applyBlurEnabled(enabled)
@@ -873,8 +893,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsModel.updateLearnedStartAngle(nil)
         UserDefaults.standard.set(enabled, forKey: "automaticStartAngleEnabled")
         if settingsModel.animationEnabled {
-            setStatus(enabled ? "Ready · Hold the open lid still to set the starting angle"
+            setStatus(enabled ? (motion.automaticDetectionThreshold == 0
+                                 ? "Ready · Hold the lid still to set the starting angle"
+                                 : "Ready · Hold above \(Int(motion.automaticDetectionThreshold))° to set the starting angle")
                               : "Ready · Close past \(Int(settingsModel.startAngle))° to animate")
+        } else {
+            setStatus("Seamless Close is off")
+        }
+    }
+
+    private func applyAutomaticDetectionThreshold(_ angle: Double) {
+        if motion.automaticStartAngle {
+            cancelWake("automatic detection threshold changed")
+            endGesture()
+        }
+        motion.automaticDetectionThreshold = angle
+        settingsModel.updateLearnedStartAngle(nil)
+        UserDefaults.standard.set(angle, forKey: "seamlessCloseDetectionThreshold")
+        guard motion.automaticStartAngle else { return }
+        if settingsModel.animationEnabled {
+            setStatus(angle == 0
+                      ? "Ready · Hold the lid still to detect a starting angle"
+                      : "Ready · Hold the lid above \(Int(angle))° to detect a starting angle")
         } else {
             setStatus("Seamless Close is off")
         }
@@ -1037,6 +1077,7 @@ extension AppDelegate {
     /// Real gesture/cancellation paths with synthetic pixels and no capture permission.
     static func lifecycleSelfTest() async throws {
         let savedSettings = ["animationStartAngle", "animationEnabled", "automaticStartAngleEnabled",
+                             "seamlessCloseDetectionThreshold",
                              "seamlessCloseBlurEnabled",
                              "runInBackground", "showMenuBarIcon"].map {
             ($0, UserDefaults.standard.object(forKey: $0))
@@ -1159,6 +1200,9 @@ extension AppDelegate {
             app.settingsModel.onAutomaticStartAngleChange = { [weak app] enabled in
                 app?.applyAutomaticStartAngle(enabled)
             }
+            app.settingsModel.onAutomaticDetectionThresholdChange = { [weak app] angle in
+                app?.applyAutomaticDetectionThreshold(angle)
+            }
             for frame in 0...40 { app.handleLidReading(110, time: Double(frame) / 20) }
             try check(app.motion.learnedStartAngle == 109 && app.settingsModel.learnedStartAngle == 109,
                       "The live settings model must show the automatically learned angle")
@@ -1173,11 +1217,83 @@ extension AppDelegate {
             try check(app.hasSnapshot && app.motion.active && app.motion.activationAngle == 109
                       && app.motion.effectiveStartAngle == 109,
                       "Editing the manual fallback must not cancel an automatically anchored capture")
+            app.settingsModel.setAutomaticDetectionThreshold(120)
+            try checkCleared(app)
+            try check(app.motion.learnedStartAngle == nil && app.motion.effectiveStartAngle == 120
+                      && app.settingsModel.learnedStartAngle == nil
+                      && UserDefaults.standard.double(forKey: "seamlessCloseDetectionThreshold") == 120,
+                      "Changing detection threshold must save it, restore Begin at, and clear the old gesture")
             app.settingsModel.setAutomaticStartAngle(false)
             try checkCleared(app)
             try check(app.motion.effectiveStartAngle == 120 && app.settingsModel.learnedStartAngle == nil,
                       "Turning automatic selection off must restore the manual trigger and clear capture")
-            print("PASS: live automatic learning, manual edit without capture restart, toggle-off cleanup")
+            print("PASS: live automatic learning, manual fallback, threshold cleanup and toggle-off cleanup")
+        }
+        do {
+            let (app, source) = try makeGesture(startGesture: false)
+            defer { app.shutdown(); app.window?.close() }
+            app.motion.automaticDetectionThreshold = 80
+            app.motion.automaticStartAngle = true
+            app.settingsModel.configure(animationEnabled: true, startAngle: 100,
+                                        screenCaptureAllowed: true, automaticStartAngle: true,
+                                        automaticDetectionThreshold: 80)
+            for frame in 0...20 { app.handleLidReading(90, time: Double(frame) / 20) }
+            try check(app.motion.learnedStartAngle == 89 && app.settingsModel.learnedStartAngle == 89,
+                      "The live app must learn above Detect above even below Begin at")
+            app.handleLidReading(88, time: 1.05)
+            try await waitForCapture(source)
+            let captureTask = app.snapshotTask
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await captureTask?.value
+            try check(app.hasSnapshot && app.motion.active && app.motion.activationAngle == 89,
+                      "The below-manual learned angle must start a real gesture")
+            print("PASS: below-manual automatic threshold starts one real capture")
+        }
+        do {
+            let (app, source) = try makeGesture(startGesture: false)
+            defer { app.shutdown(); app.window?.close() }
+            app.motion.automaticDetectionThreshold = 80
+            app.motion.automaticStartAngle = true
+            app.motion.resumeAfterPause = true
+            app.motion.pauseDuration = 0.5
+            app.settingsModel.configure(animationEnabled: true, startAngle: 100,
+                                        screenCaptureAllowed: true, resumeAfterPause: true,
+                                        automaticStartAngle: true, pauseDuration: 0.5,
+                                        automaticDetectionThreshold: 80)
+            for frame in 0...20 { app.handleLidReading(110, time: Double(frame) / 20) }
+            try check(app.motion.learnedStartAngle == 109, "An eligible open lid must learn before closing")
+            app.handleLidReading(70, time: 1.05)
+            try await waitForCapture(source)
+            let captureTask = app.snapshotTask
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await captureTask?.value
+            for frame in 0...11 { app.handleLidReading(70, time: 2 + Double(frame) * 0.05) }
+            try check(app.motion.desktopResumed && app.motion.learnedStartAngle == nil
+                      && app.motion.effectiveStartAngle == 100 && app.settingsModel.learnedStartAngle == nil,
+                      "A below-threshold pause must keep desktop restoration but return to Begin at")
+            try await waitForCleanup(app)
+            try checkCleared(app)
+            print("PASS: below-threshold pause restores desktop and clears the automatic angle")
+        }
+        do {
+            let (app, source) = try makeGesture()
+            defer { app.shutdown(); app.window?.close() }
+            app.settingsModel.onAutomaticDetectionThresholdChange = { [weak app] angle in
+                app?.applyAutomaticDetectionThreshold(angle)
+            }
+            try await waitForCapture(source)
+            let captureTask = app.snapshotTask
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await captureTask?.value
+            try check(app.hasSnapshot && app.motion.active, "The manual threshold test needs an active snapshot")
+            app.settingsModel.setAutomaticDetectionThreshold(80)
+            try check(app.hasSnapshot && app.motion.active && app.motion.effectiveStartAngle == 100
+                      && source.count == 1,
+                      "Editing Detect above while automatic detection is off must preserve the manual gesture")
+            print("PASS: inactive detection threshold edit preserves the manual gesture")
         }
         // Closing settings must preserve both an in-flight capture and a visible
         // gesture. Reopening must reuse the window and restore foreground access.

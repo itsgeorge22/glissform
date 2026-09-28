@@ -21,6 +21,10 @@ final class SettingsModel: ObservableObject {
     @Published private(set) var animationEnabled = true
     @Published private(set) var startAngle = 100.0
     @Published private(set) var automaticStartAngle = false
+    @Published private(set) var automaticDetectionThreshold = 20.0
+    var onAutomaticDetectionThresholdChange: ((Double) -> Void)?
+    @Published private(set) var automaticAngleDuration = 1.0
+    var onAutomaticAngleDurationChange: ((Double) -> Void)?
     @Published private(set) var learnedStartAngle: Double?
     var effectiveStartAngle: Double { automaticStartAngle ? (learnedStartAngle ?? startAngle) : startAngle }
     private(set) var currentAngle: Double?
@@ -34,7 +38,9 @@ final class SettingsModel: ObservableObject {
     var onStartAngleChange: ((Double) -> Void)?
     var onAutomaticStartAngleChange: ((Bool) -> Void)?
     @Published private(set) var resumeAfterPause = false
+    @Published private(set) var pauseDuration = 1.0
     var onResumeAfterPauseChange: ((Bool) -> Void)?
+    var onPauseDurationChange: ((Double) -> Void)?
     @Published private(set) var blurEnabled = true
     var onBlurEnabledChange: ((Bool) -> Void)?
     @Published private(set) var chargingFeedbackEnabled = true
@@ -53,6 +59,8 @@ final class SettingsModel: ObservableObject {
 
     func configure(animationEnabled: Bool, startAngle: Double, screenCaptureAllowed: Bool,
                    resumeAfterPause: Bool = false, automaticStartAngle: Bool = false,
+                   pauseDuration: Double = 1, automaticAngleDuration: Double = 1,
+                   automaticDetectionThreshold: Double = 20,
                    blurEnabled: Bool = true,
                    chargingFeedbackEnabled: Bool = true, lowBatteryRippleEnabled: Bool = true,
                    runInBackground: Bool = true, showMenuBarIcon: Bool = true) {
@@ -61,6 +69,9 @@ final class SettingsModel: ObservableObject {
         self.screenCaptureAllowed = screenCaptureAllowed
         self.resumeAfterPause = resumeAfterPause
         self.automaticStartAngle = automaticStartAngle
+        self.automaticDetectionThreshold = ClosingMotion.validDetectionThreshold(automaticDetectionThreshold)
+        self.pauseDuration = ClosingMotion.validStillDuration(pauseDuration)
+        self.automaticAngleDuration = ClosingMotion.validStillDuration(automaticAngleDuration)
         self.blurEnabled = blurEnabled
         self.chargingFeedbackEnabled = chargingFeedbackEnabled
         self.lowBatteryRippleEnabled = lowBatteryRippleEnabled
@@ -117,6 +128,28 @@ final class SettingsModel: ObservableObject {
         guard resumeAfterPause != enabled else { return }
         resumeAfterPause = enabled
         onResumeAfterPauseChange?(enabled)
+    }
+
+    func setPauseDuration(_ duration: Double) {
+        let value = ClosingMotion.validStillDuration(duration)
+        guard pauseDuration != value else { return }
+        pauseDuration = value
+        onPauseDurationChange?(value)
+    }
+
+    func setAutomaticAngleDuration(_ duration: Double) {
+        let value = ClosingMotion.validStillDuration(duration)
+        guard automaticAngleDuration != value else { return }
+        automaticAngleDuration = value
+        onAutomaticAngleDurationChange?(value)
+    }
+
+    func setAutomaticDetectionThreshold(_ angle: Double) {
+        let value = ClosingMotion.validDetectionThreshold(angle)
+        guard automaticDetectionThreshold != value else { return }
+        automaticDetectionThreshold = value
+        learnedStartAngle = nil
+        onAutomaticDetectionThresholdChange?(value)
     }
 
     func setBlurEnabled(_ enabled: Bool) {
@@ -563,9 +596,16 @@ private final class PermissionPresentationState: ObservableObject {
 }
 
 private struct AnimationSettingsView: View {
+    private enum BlurStrength: String, CaseIterable {
+        case high = "High"
+        case regular = "Regular"
+        case subtle = "Subtle"
+    }
+
     @ObservedObject var model: SettingsModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var permission = PermissionPresentationState()
+    @State private var selectedBlurStrength: BlurStrength = .regular
 
     private var showsAccessCard: Bool { !model.screenCaptureAllowed || permission.showConfirmation }
 
@@ -588,13 +628,10 @@ private struct AnimationSettingsView: View {
                 ScreenAccessCard(model: model).transition(.opacity)
             }
             automaticAngleControls
-                .padding(SettingsDesign.Spacing.switchCardInsets)
                 .modifier(SettingsCardSurface())
             pauseControls
-                .padding(SettingsDesign.Spacing.switchCardInsets)
                 .modifier(SettingsCardSurface())
             blurControls
-                .padding(SettingsDesign.Spacing.switchCardInsets)
                 .modifier(SettingsCardSurface())
             lockScreenSupport
                 .padding(SettingsDesign.Spacing.switchCardInsets)
@@ -628,7 +665,7 @@ private struct AnimationSettingsView: View {
                 .frame(height: 1)
 
             angleControls
-                .padding(SettingsDesign.Spacing.angleSectionInset)
+                .padding(SettingsDesign.Spacing.controlSectionInset)
         }
         .modifier(SettingsCardSurface())
     }
@@ -657,7 +694,7 @@ private struct AnimationSettingsView: View {
                         .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                AngleEntry(model: model)
+                AngleEntry(title: "Start angle", angle: model.startAngle, setAngle: model.setStartAngle)
             }
             VStack(spacing: SettingsDesign.Spacing.detail) {
                 AngleSlider(value: angleBinding, isFallback: automaticAngleIsActive)
@@ -688,42 +725,92 @@ private struct AnimationSettingsView: View {
     }
 
     private var pauseControls: some View {
-        HStack(spacing: SettingsDesign.Spacing.cards) {
-            PauseFeatureIcon().accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Resume desktop after pause").font(SettingsDesign.Typography.controlTitle)
-                Text("Restores the desktop after a 1-second lid pause.")
-                    .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+        VStack(spacing: 0) {
+            HStack(spacing: SettingsDesign.Spacing.cards) {
+                PauseFeatureIcon().accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Resume desktop after pause").font(SettingsDesign.Typography.controlTitle)
+                    Text("Restores the desktop when the lid stays still.")
+                        .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Toggle("Resume desktop after pause", isOn: Binding(
+                    get: { model.resumeAfterPause }, set: { model.setResumeAfterPause($0) }
+                ))
+                .labelsHidden().toggleStyle(AppleSwitchStyle())
+                .accessibilityLabel("Resume desktop after pause")
             }
-            Spacer(minLength: 0)
-            Toggle("Resume desktop after pause", isOn: Binding(
-                get: { model.resumeAfterPause }, set: { model.setResumeAfterPause($0) }
-            ))
-            .labelsHidden().toggleStyle(AppleSwitchStyle())
-            .accessibilityLabel("Resume desktop after pause")
+            .padding(SettingsDesign.Spacing.switchCardInsets)
+
+            Rectangle()
+                .fill(SettingsDesign.Palette.cardBorder)
+                .frame(height: 1)
+
+            waitTimeControl(title: "Resume wait time",
+                            detail: "How long the lid stays still before restoring the desktop.",
+                            duration: model.pauseDuration,
+                            setDuration: model.setPauseDuration)
+                .padding(SettingsDesign.Spacing.controlSectionInset)
         }
     }
 
     private var blurControls: some View {
-        HStack(spacing: SettingsDesign.Spacing.cards) {
-            CardIconTile(color: .feature) {
-                Image(systemName: "circle.dotted")
-                    .font(.system(size: 24, weight: .medium))
+        VStack(spacing: 0) {
+            HStack(spacing: SettingsDesign.Spacing.cards) {
+                CardIconTile(color: .feature) {
+                    FeatureIcon(.blur)
+                }
+                .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Blur").font(SettingsDesign.Typography.controlTitle)
+                    Text("Softens the desktop as the lid closes.")
+                        .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Toggle("Blur", isOn: Binding(
+                    get: { model.blurEnabled }, set: { model.setBlurEnabled($0) }
+                ))
+                .labelsHidden().toggleStyle(AppleSwitchStyle())
+                .accessibilityLabel("Blur")
             }
-            .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Blur").font(SettingsDesign.Typography.controlTitle)
-                Text("Softens the desktop as the lid closes.")
-                    .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            .padding(SettingsDesign.Spacing.switchCardInsets)
+
+            Rectangle()
+                .fill(SettingsDesign.Palette.cardBorder)
+                .frame(height: 1)
+
+            HStack(spacing: SettingsDesign.Spacing.cards) {
+                ForEach(BlurStrength.allCases, id: \.self) { strength in
+                    Button {
+                        selectedBlurStrength = strength
+                    } label: {
+                        VStack(spacing: SettingsDesign.Spacing.label) {
+                            RoundedRectangle(cornerRadius: SettingsDesign.Radius.control)
+                                .fill(Color.gray.opacity(0.24))
+                                .aspectRatio(1.6, contentMode: .fit)
+                                .padding(4)
+                                .overlay {
+                                    if selectedBlurStrength == strength {
+                                        RoundedRectangle(cornerRadius: SettingsDesign.Radius.icon)
+                                            .strokeBorder(Color.accentColor, lineWidth: 2)
+                                    }
+                                }
+                            Text(strength.rawValue)
+                                .font(SettingsDesign.Typography.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(strength.rawValue) blur strength")
+                    .accessibilityValue(selectedBlurStrength == strength ? "Selected" : "Not selected")
+                    .help("Placeholder only. Blur strength does not change yet.")
+                }
             }
-            Spacer(minLength: 0)
-            Toggle("Blur", isOn: Binding(
-                get: { model.blurEnabled }, set: { model.setBlurEnabled($0) }
-            ))
-            .labelsHidden().toggleStyle(AppleSwitchStyle())
-            .accessibilityLabel("Blur")
+            .padding(SettingsDesign.Spacing.controlSectionInset)
         }
     }
 
@@ -751,35 +838,88 @@ private struct AnimationSettingsView: View {
     }
 
     private var automaticAngleControls: some View {
-        HStack(spacing: SettingsDesign.Spacing.cards) {
-            CardIconTile(color: .automaticAngle) {
-                FeatureIcon(.automaticAngle)
+        VStack(spacing: 0) {
+            HStack(spacing: SettingsDesign.Spacing.cards) {
+                CardIconTile(color: .automaticAngle) {
+                    FeatureIcon(.automaticAngle)
+                }
+                .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Detect starting angle").font(SettingsDesign.Typography.controlTitle)
+                    Text(automaticAngleDescription)
+                        .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Toggle("Detect starting angle", isOn: Binding(
+                    get: { model.automaticStartAngle }, set: { model.setAutomaticStartAngle($0) }
+                ))
+                    .labelsHidden().toggleStyle(AppleSwitchStyle())
+                    .accessibilityLabel("Detect starting angle")
+                    .accessibilityHint(automaticAngleDescription)
             }
-            .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Detect starting angle").font(SettingsDesign.Typography.controlTitle)
-                Text(automaticAngleDescription)
-                    .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            .padding(SettingsDesign.Spacing.switchCardInsets)
+
+            Rectangle()
+                .fill(SettingsDesign.Palette.cardBorder)
+                .frame(height: 1)
+
+            waitTimeControl(title: "Detection wait time",
+                            detail: "How long the lid stays still before choosing the angle.",
+                            duration: model.automaticAngleDuration,
+                            setDuration: model.setAutomaticAngleDuration)
+                .padding(SettingsDesign.Spacing.controlSectionInset)
+
+            Rectangle()
+                .fill(SettingsDesign.Palette.cardBorder)
+                .frame(height: 1)
+
+            HStack(spacing: SettingsDesign.Spacing.cards) {
+                VStack(alignment: .leading, spacing: SettingsDesign.Spacing.detail) {
+                    Text("Detect above").font(SettingsDesign.Typography.controlTitle)
+                    Text("Learn an angle when the lid is above this value. Set to 0 to disable.")
+                        .font(SettingsDesign.Typography.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                AngleEntry(title: "Detection threshold", angle: model.automaticDetectionThreshold,
+                           allowsZero: true,
+                           setAngle: model.setAutomaticDetectionThreshold)
             }
-            Spacer(minLength: 0)
-            Toggle("Detect starting angle", isOn: Binding(
-                get: { model.automaticStartAngle }, set: { model.setAutomaticStartAngle($0) }
-            ))
-                .labelsHidden().toggleStyle(AppleSwitchStyle())
-                .accessibilityLabel("Detect starting angle")
-                .accessibilityHint(automaticAngleDescription)
+            .padding(SettingsDesign.Spacing.controlSectionInset)
         }
     }
 
     private var automaticAngleDescription: String {
         if model.automaticStartAngle, let angle = model.learnedStartAngle {
-            return "Using \(Int(angle))°. Updates after a 1-second lid pause."
+            return "Using \(Int(angle))°. Updates after a still lid pause."
         }
         if model.automaticStartAngle {
-            return "Waiting for a 1-second lid pause. Begin at applies."
+            if model.automaticDetectionThreshold == 0 {
+                return "Waiting for a still lid. Begin at applies until then."
+            }
+            return "Waiting above \(Int(model.automaticDetectionThreshold))°. Begin at applies until then."
         }
-        return "Detects the angle after a 1-second lid pause."
+        if model.automaticDetectionThreshold == 0 {
+            return "Detects an angle after a still pause."
+        }
+        return "Detects an angle after a still pause above \(Int(model.automaticDetectionThreshold))°."
+    }
+
+    private func waitTimeControl(title: String, detail: String, duration: Double,
+                                 setDuration: @escaping (Double) -> Void) -> some View {
+        HStack(spacing: SettingsDesign.Spacing.cards) {
+            VStack(alignment: .leading, spacing: SettingsDesign.Spacing.detail) {
+                Text("Wait time").font(SettingsDesign.Typography.controlTitle)
+                Text(detail)
+                    .font(SettingsDesign.Typography.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            WaitTimeEntry(title: title, duration: duration, setDuration: setDuration)
+        }
     }
 
 }
@@ -874,27 +1014,38 @@ private final class AngleDraft: ObservableObject {
 
 /// Keep incomplete typing separate from the clamped, persisted setting.
 private struct AngleEntry: View {
-    @ObservedObject var model: SettingsModel
+    let title: String
+    let angle: Double
+    var allowsZero = false
+    let setAngle: (Double) -> Void
     @StateObject private var draft = AngleDraft()
     @FocusState private var isFocused: Bool
 
     var body: some View {
         HStack(spacing: SettingsDesign.Spacing.detail) {
             VStack(spacing: 0) {
-                arrow(rotation: 0, label: "Increase start angle", step: 1)
-                    .disabled(model.startAngle >= 130)
-                arrow(rotation: 180, label: "Decrease start angle", step: -1)
-                    .disabled(model.startAngle <= 20)
+                FieldStepArrow(rotation: 0, label: "Increase \(title.lowercased())",
+                               help: "Increase \(title.lowercased()) by 1°", step: 1) {
+                    stepAngle(1)
+                }
+                    .disabled(angle >= 130)
+                FieldStepArrow(rotation: 180, label: "Decrease \(title.lowercased())",
+                               help: "Decrease \(title.lowercased()) by 1°", step: -1) {
+                    stepAngle(-1)
+                }
+                    .disabled(angle <= (allowsZero ? 0 : 20))
             }
 
             HStack(alignment: .firstTextBaseline, spacing: 1) {
-                TextField("Start angle", text: $draft.text)
+                TextField(title, text: $draft.text)
                     .labelsHidden().multilineTextAlignment(.trailing)
                     .font(SettingsDesign.Typography.editableValue)
                     .textFieldStyle(.plain).frame(width: SettingsDesign.Metrics.angleNumberWidth)
                     .focused($isFocused)
-                    .accessibilityLabel("Start angle in degrees")
-                    .help("Enter an angle from 20° to 130°, then press Return.")
+                    .accessibilityLabel("\(title) in degrees")
+                    .help(allowsZero
+                          ? "Enter 0° to disable the threshold, or an angle from 20° to 130°, then press Return."
+                          : "Enter an angle from 20° to 130°, then press Return.")
                     .onSubmit { commit() }
                 Text("°")
                     .font(SettingsDesign.Typography.angleUnit).foregroundStyle(.secondary)
@@ -906,16 +1057,92 @@ private struct AngleEntry: View {
         }
         .background(SettingsDesign.Palette.field, in: RoundedRectangle(cornerRadius: SettingsDesign.Radius.angleField))
         .modifier(ControlHoverFeedback(isActive: isFocused, inset: 0, showsHover: false))
-        .onAppear { draft.text = String(Int(model.startAngle)) }
-        .onChange(of: model.startAngle) { _, angle in draft.text = String(Int(angle)) }
+        .onAppear { draft.text = String(Int(angle)) }
+        .onChange(of: angle) { _, newAngle in draft.text = String(Int(newAngle)) }
         .onChange(of: isFocused) { _, focused in if !focused { commit() } }
     }
 
-    private func arrow(rotation: Double, label: String, step: Double) -> some View {
-        Button {
-            commit()
-            model.setStartAngle(model.startAngle + step)
-        } label: {
+    private func commit() {
+        let value = normalizedDraftAngle()
+        setAngle(value)
+        draft.text = String(Int(value))
+    }
+
+    private func stepAngle(_ step: Double) {
+        let current = normalizedDraftAngle()
+        let value: Double
+        if allowsZero && step < 0 && current == 20 {
+            value = 0
+        } else if allowsZero && step > 0 && current == 0 {
+            value = 20
+        } else {
+            value = min(130, max(20, current + step))
+        }
+        setAngle(value)
+        draft.text = String(Int(value))
+    }
+
+    private func normalizedDraftAngle() -> Double {
+        guard let typed = Double(draft.text.trimmingCharacters(in: .whitespacesAndNewlines)),
+              typed.isFinite else { return angle }
+        if allowsZero && typed <= 0 { return 0 }
+        return min(130, max(20, typed)).rounded()
+    }
+}
+
+private struct WaitTimeEntry: View {
+    let title: String
+    let duration: Double
+    let setDuration: (Double) -> Void
+
+    private var numberText: String {
+        duration.truncatingRemainder(dividingBy: 1) == 0
+            ? String(Int(duration)) : String(format: "%.1f", duration)
+    }
+
+    var body: some View {
+        HStack(spacing: SettingsDesign.Spacing.detail) {
+            VStack(spacing: 0) {
+                FieldStepArrow(rotation: 0, label: "Increase \(title.lowercased())",
+                               help: "Increase \(title.lowercased()) by 0.5 seconds", step: 1) {
+                    setDuration(duration + 0.5)
+                }
+                .disabled(duration >= 10)
+                FieldStepArrow(rotation: 180, label: "Decrease \(title.lowercased())",
+                               help: "Decrease \(title.lowercased()) by 0.5 seconds", step: -1) {
+                    setDuration(duration - 0.5)
+                }
+                .disabled(duration <= 0.5)
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 1) {
+                Text(numberText)
+                    .font(SettingsDesign.Typography.editableValue)
+                    .frame(width: SettingsDesign.Metrics.angleNumberWidth, alignment: .trailing)
+                Text("s")
+                    .font(SettingsDesign.Typography.angleUnit)
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+            }
+            .padding(.trailing, SettingsDesign.Spacing.angleFieldTrailingInset)
+            .padding(.vertical, SettingsDesign.Spacing.angleFieldInset)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(title)
+            .accessibilityValue("\(numberText) seconds")
+        }
+        .background(SettingsDesign.Palette.field,
+                    in: RoundedRectangle(cornerRadius: SettingsDesign.Radius.angleField))
+    }
+}
+
+private struct FieldStepArrow: View {
+    let rotation: Double
+    let label: String
+    let help: String
+    let step: Double
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
             IconlyIcon(.chevronUp, size: SettingsDesign.Metrics.angleChevronSize, rotation: rotation)
                 .offset(y: step > 0 ? 1.5 : -1.5)
                 .frame(width: SettingsDesign.Metrics.arrowWidth, height: SettingsDesign.Metrics.arrowHeight)
@@ -924,14 +1151,7 @@ private struct AngleEntry: View {
         .buttonStyle(AngleArrowStyle())
         .buttonRepeatBehavior(.enabled)
         .accessibilityLabel(label)
-        .help(label + " by 1°")
-    }
-
-    private func commit() {
-        if let value = Double(draft.text.trimmingCharacters(in: .whitespacesAndNewlines)) {
-            model.setStartAngle(value)
-        }
-        draft.text = String(Int(model.startAngle))
+        .help(help)
     }
 }
 
