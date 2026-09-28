@@ -743,18 +743,6 @@ private struct AnimationSettingsView: View {
     private var angleControls: some View {
         let automaticAngleIsActive = model.automaticStartAngle && model.learnedStartAngle != nil
         return VStack(alignment: .leading, spacing: SettingsDesign.Spacing.controls) {
-            HStack(spacing: 6) {
-                Circle().fill(model.displayedLidAngle == nil ? Color.gray : SettingsDesign.Palette.feature)
-                    .frame(width: 5, height: 5)
-                Text("Current lid angle").foregroundStyle(.secondary)
-                Text(model.displayedLidAngle.map { "\(Int($0))°" } ?? "—")
-                    .font(SettingsDesign.Typography.liveValue)
-                Spacer()
-            }
-            .font(SettingsDesign.Typography.caption)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Current lid angle")
-            .accessibilityValue(model.displayedLidAngle.map { "\(Int($0)) degrees" } ?? "Unavailable")
             HStack {
                 VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
                     Text("Begin at").font(SettingsDesign.Typography.controlTitle)
@@ -776,7 +764,8 @@ private struct AnimationSettingsView: View {
                 HStack {
                     Text("20°").foregroundStyle(.secondary)
                     Spacer()
-                    Button("Use current angle") {
+                    Button(model.displayedLidAngle.map { "Use current angle (\(Int($0))°)" }
+                           ?? "Use current angle") {
                         if let angle = model.currentAngle { model.setStartAngle(angle) }
                     }
                     .buttonStyle(FeedbackButtonStyle(kind: .link))

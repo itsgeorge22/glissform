@@ -16,6 +16,7 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ### Changed
 
+- Show the live lid reading in the **Use current angle** button, such as **Use current angle (112°)**, below the **Begin at** slider instead of in a separate row above it.
 - Use the native pointing-hand cursor for active Settings controls, including the visual-only Update button; show the system operation-not-allowed cursor for disabled buttons, switches, and step arrows. Text entry, sliders, and Soon tags retain their usual cursors. Raise the unreleased app's minimum system version to macOS 15.
 - Add a softer hover to angle and wait-time fields. Arrow highlights sit flush against the field's left edge without their own rounded corners; the field clips them to its outer shape. Blur strength hover darkens only the placeholder image, while its selection outline stays unchanged. Battery Ripple preview buttons use the same subtle neutral hover as the fields and a slightly darker pressed state. Give the sidebar Update preview hover and pressed states without adding update behavior.
 - Give Lock Screen support a neutral gray icon and tile, move Blur to the former light-blue detection color, and give Detect starting angle a muted violet icon and tile.
