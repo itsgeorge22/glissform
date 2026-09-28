@@ -50,6 +50,8 @@ The source repository and its [issue tracker](https://github.com/itsgeorge22/gli
 
 Developer build and verification steps are documented in [Contributing](CONTRIBUTING.md). CI does not verify physical lid behaviour.
 
+Local builds are **Glissform Dev**, with a red icon, separate app identity and settings, and no public update checks. The installed beta from the DMG remains **Glissform**, with the blue icon and signed updates. Use an explicit release build only when preparing a versioned DMG; avoid running both apps' effects at once.
+
 ## Credits and licensing
 
 The [LidAngleSensor project](https://github.com/samhenrigold/LidAngleSensor) and [Clamshell](https://github.com/danielradosa/clamshell) were consulted for the HID reports. Glissform's sensor implementation and visual effect were written independently. Updates use [Sparkle](https://sparkle-project.org/), whose [license and notices](docs/SPARKLE_LICENSE.txt) are included with the app. Some interface icons are by [Iconly](https://iconly.pro), used under the owner's paid license; see [provenance](docs/ICONLY.md). See [app artwork](Artwork/README.md) for the native icon sources.

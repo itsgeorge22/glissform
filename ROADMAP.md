@@ -120,6 +120,9 @@ The broader investigations below and above are follow-up work, not a requirement
 
 ## Planned for 0.1.0-beta.2
 
+- [x] Make local builds visually distinct as Glissform Dev with a red icon, separate app identity and settings, and no public updates. Keep tagged release builds blue with signed updates.
+- [x] Add a Utilities application category to future app builds for Spotlight's app browser. Confirm appearance from an installed build when beta.2 is tested.
+
 - [ ] Replace the **Send feedback** page's “Nothing here yet” placeholder with useful guidance and a working public contact method. The source repository and GitHub forms are private.
 - [ ] Add a way to exit an active Seamless Close animation when **Resume desktop after pause** is off. The action should return to the live desktop, release the captured image, and avoid immediately restarting the same gesture. Decide where the control appears and verify it with the lid, sleep, Space changes, and quit.
 

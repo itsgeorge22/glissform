@@ -36,7 +36,7 @@ jobs:
         run: bash scripts/test.sh --motion-only
 
       - name: Build the release app
-        run: bash scripts/build.sh
+        run: bash scripts/build.sh --release
 
       - name: Verify the app version and update configuration
         run: |
@@ -45,6 +45,8 @@ jobs:
           test "$("$app/Contents/MacOS/Glissform" --version)" = "Glissform $(cat VERSION)"
           test "$(/usr/libexec/PlistBuddy -c 'Print :GlissformVersion' "$plist")" = "$(cat VERSION)"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")" = "$(cat BUILD_NUMBER)"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist")" = 'com.george.glissform.mvp'
+          test "$(/usr/libexec/PlistBuddy -c 'Print :GlissformDeveloperTools' "$plist")" = false
           test "$(/usr/libexec/PlistBuddy -c 'Print :SUFeedURL' "$plist")" = 'https://glissform.app/updates/appcast.xml'
           test -n "$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$plist")"
           test "$(/usr/libexec/PlistBuddy -c 'Print :SURequireSignedFeed' "$plist")" = true

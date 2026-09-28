@@ -29,9 +29,12 @@ jobs:
       - name: Run motion checks (no physical sensor or GPU required)
         run: bash scripts/test.sh --motion-only
       - name: Build locally signed app
-        run: bash scripts/build.sh
+        run: bash scripts/build.sh --dev
       - name: Check bundle version
         run: |
           expected="Glissform $(cat VERSION)"
-          actual="$(build/Glissform.app/Contents/MacOS/Glissform --version)"
+          actual="$(build/Glissform\ Dev.app/Contents/MacOS/Glissform --version)"
           test "$actual" = "$expected"
+          plist="build/Glissform Dev.app/Contents/Info.plist"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist")" = 'com.george.glissform.mvp.dev'
+          ! /usr/libexec/PlistBuddy -c 'Print :SUFeedURL' "$plist" >/dev/null 2>&1

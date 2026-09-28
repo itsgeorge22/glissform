@@ -13,7 +13,7 @@ For Battery Ripple, distinguish the manual preview from connecting power, and me
 ## Propose a change
 
 1. Keep the change focused and explain the user-visible problem.
-2. Build with `bash scripts/build.sh`.
+2. Build with `bash scripts/build.sh`. This makes **Glissform Dev** in `build/Glissform Dev.app`, with a red icon, separate app identity, and no public updates. Use `--release` only when preparing a release candidate.
 3. Run `bash scripts/test.sh` on a Mac with Metal; use `--motion-only` only when GPU testing is unavailable and say so.
 4. Perform relevant checks in [docs/TESTING.md](docs/TESTING.md).
 5. Review README.md, CHANGELOG.md, and ROADMAP.md. Update affected documents with the change; record completed work under Unreleased.

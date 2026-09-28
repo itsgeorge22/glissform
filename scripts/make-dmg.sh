@@ -5,7 +5,13 @@ cd "$(dirname "$0")/.."
 
 APP="$PWD/build/Glissform.app"
 if [[ ! -d "$APP" ]]; then
-    echo "Build the app first: bash scripts/build.sh" >&2
+    echo "Build the release app first: bash scripts/build.sh --release" >&2
+    exit 1
+fi
+PLIST="$APP/Contents/Info.plist"
+if [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$PLIST")" != "com.george.glissform.mvp" ]] ||
+   [[ "$(/usr/libexec/PlistBuddy -c 'Print :GlissformDeveloperTools' "$PLIST")" != "false" ]]; then
+    echo "Refusing to package a development app. Build with --release." >&2
     exit 1
 fi
 

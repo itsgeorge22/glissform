@@ -16,6 +16,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let screenAccessAllowed: () -> Bool
     private let settingsModel = SettingsModel()
     private var appUpdates: AppUpdates?
+    private var appDisplayName: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Glissform"
+    }
     private let chargingFeedback = ChargingFeedbackController()
     private var chargingPowerMonitor: ChargingPowerMonitor?
     private var chargingSuppressedUntil = 0.0
@@ -118,10 +121,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusMenu.addItem(lowBatteryMenuItem)
         let settings = statusMenu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
         settings.target = self
-        let checkUpdates = statusMenu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
-        checkUpdates.target = self
+        if !settingsModel.isDevelopmentBuild {
+            let checkUpdates = statusMenu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
+            checkUpdates.target = self
+        }
         statusMenu.addItem(.separator())
-        let quit = statusMenu.addItem(withTitle: "Quit Glissform", action: #selector(quitApp), keyEquivalent: "q")
+        let quit = statusMenu.addItem(withTitle: "Quit \(appDisplayName)", action: #selector(quitApp), keyEquivalent: "q")
         quit.target = self
         updateMenuBarIcon(visible: UserDefaults.standard.bool(forKey: "showMenuBarIcon"))
         installApplicationMenu()
@@ -194,7 +199,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             UserDefaults.standard.set(visible, forKey: "showMenuBarIcon")
             self?.updateMenuBarIcon(visible: visible)
         }
-        appUpdates = AppUpdates(model: settingsModel)
+        if !settingsModel.isDevelopmentBuild {
+            appUpdates = AppUpdates(model: settingsModel)
+        }
 
         let center = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.willSleepNotification, NSWorkspace.screensDidSleepNotification] {
@@ -285,7 +292,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if statusItem == nil {
             let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
             item.button?.image = BrandIcon.menuBar
-            item.button?.toolTip = "Glissform"
+            item.button?.toolTip = appDisplayName
             item.menu = statusMenu
             statusItem = item
         }
@@ -968,17 +975,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func installApplicationMenu() {
         let mainMenu = NSMenu()
         let appItem = NSMenuItem()
-        let appMenu = NSMenu(title: "Glissform")
-        for (title, action, key) in [("About Glissform", #selector(showAbout), ""),
+        let appMenu = NSMenu(title: appDisplayName)
+        for (title, action, key) in [("About \(appDisplayName)", #selector(showAbout), ""),
                                      ("Settings…", #selector(showSettings), ",")] {
             let item = appMenu.addItem(withTitle: title, action: action, keyEquivalent: key)
             item.target = self
         }
         appMenu.addItem(.separator())
-        let hide = appMenu.addItem(withTitle: "Hide Glissform", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        let hide = appMenu.addItem(withTitle: "Hide \(appDisplayName)", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         hide.target = NSApp
         appMenu.addItem(.separator())
-        let quit = appMenu.addItem(withTitle: "Quit Glissform", action: #selector(quitApp), keyEquivalent: "q")
+        let quit = appMenu.addItem(withTitle: "Quit \(appDisplayName)", action: #selector(quitApp), keyEquivalent: "q")
         quit.target = self
         appItem.submenu = appMenu
         mainMenu.addItem(appItem)

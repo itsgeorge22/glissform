@@ -2,7 +2,7 @@
 
 ## App icon
 
-`Glissform.icon` is the editable Icon Composer source. `Reference/Glissform-approved.png` preserves the owner's selected blue-wave concept for visual comparison; it is not bundled into the app.
+`Glissform.icon` is the editable blue release icon source. `GlissformDev.icon` uses the same glass-wave composition recolored red for local builds. `Reference/Glissform-approved.png` preserves the owner's selected blue-wave concept for visual comparison; it is not bundled into the app.
 
 The native asset adapts that concept on Icon Composer's 1024 × 1024 canvas. `Assets/BlueGlass.png` isolates the rounded blue pane, preserving its soft blue-to-cyan wave, convex shading, bright rim and top-left highlight. It uses 84% of its imported size, with no horizontal offset and a 3-point downward correction for the artwork's slightly uneven transparent margins. Position is checked against the rendered glass bounds, not just the PNG canvas. The outer background is an Icon Composer fill; macOS supplies the outer mask and background material. The foreground deliberately retains the approved illustration's glass shading instead of replacing it with a flatter system effect. Native rendering remains an adaptation, not a pixel-identical copy of the reference.
 
@@ -12,7 +12,7 @@ The native asset adapts that concept on Icon Composer's 1024 × 1024 canvas. `As
 
 Open `Glissform.icon` in Icon Composer to inspect all appearances. The system's icon style is independent of the app window's appearance. Do not add a custom icon-style preference or assign a raster image to `NSApp.applicationIconImage`: the bundled asset must remain under system control. Launch resets that property to `nil` after foreground activation, which asks AppKit to restore the native bundle icon.
 
-`bash scripts/build.sh` requires Xcode 26 or later. It detects the Icon Composer export interface (`--export-preview` in Xcode 26 or `--export-image` in Xcode 27). It compiles the source with Apple's `actool`, copies the resulting native icon catalog and legacy `.icns` into the app, and merges the compiler's icon metadata into `Info.plist` before signing. CI uses a macOS 26 host: the previous macOS 15 runner crashed in Apple's asset runtime during native icon compilation. The legacy rendition supports the app's macOS 15 deployment target; native clear/tinted appearances require macOS 26 or later.
+`bash scripts/build.sh` requires Xcode 26 or later and makes the red Glissform Dev app by default; `--release` selects the blue icon for public builds. It detects the Icon Composer export interface (`--export-preview` in Xcode 26 or `--export-image` in Xcode 27). It compiles the selected source with Apple's `actool`, copies the resulting native icon catalog and legacy `.icns` into the app, and merges the compiler's icon metadata into `Info.plist` before signing. CI uses a macOS 26 host: the previous macOS 15 runner crashed in Apple's asset runtime during native icon compilation. The legacy rendition supports the app's macOS 15 deployment target; native clear/tinted appearances require macOS 26 or later.
 
 Validate the compiled app in the Dock, Finder, and Privacy & About, including default, dark, clear light/dark, and tinted styles. The Icon Composer preview and actual system rendering are the acceptance checks; SVG previews alone do not establish the final material appearance. See [testing](../docs/TESTING.md).
 

@@ -12,7 +12,7 @@ On the development Mac, unplug and reconnect power to inspect the emerald wave, 
 
 ## Automated
 
-Run `bash scripts/build.sh` followed by `bash scripts/test.sh`.
+Run `bash scripts/build.sh` followed by `bash scripts/test.sh` for local work. This tests `build/Glissform Dev.app`; its red icon, separate app identity, and absent public updater keep it distinct from the installed beta. For release acceptance, use `bash scripts/build.sh --release` followed by `bash scripts/test.sh --release`. Do not run Dev and release effects at the same time.
 
 Motion checks exercise thresholds, automatic resting-angle learning with its adjustable wait and fallback, repeated closure, slow whole-degree readings, reversal, settling, zero-effect entrance, interrupted handoffs, low-lid startup, and reset behavior. They also check that the separate Settings angle display suppresses alternating one-degree reports, accepts a sustained one-degree change after 250 ms, follows slow one-degree steps and larger movements, and resets after a sensor gap. A synthetic lifecycle check verifies that changing the manual fallback does not cancel a capture anchored to a learned angle. Quantized sensor traces run on 60/120 Hz frame clocks, including uneven report intervals and mixed one/two-degree reports. Noisy hundredth-degree traces at 30/60 Hz bound tracking delay and frame-to-frame speed variation, then check a stationary stop and slow reversal without extrapolation. A recorded fast-close trace from the development Mac checks speed variation between roughly 100 ms sensor changes, and a synthetic 100°/s abrupt stop bounds overshoot. Acquisition-time checks separate sample history from render queries, cover batched delivery and future presentation queries, and verify bounded velocity-aware returns. Further checks reject alternating one-degree direction chatter, accept sustained fine reversals, preserve velocity through real reversal and programmatic stops, and verify lower pause-return peak speed at shallow and deep folds. Manual completion is interrupted by sleep, display changes, and quit through the real coordinator. Renderer timeline checks compare the final manual degree and a reclose frame-for-frame against uninterrupted lid smoothing, hold one degree below the threshold without triggering a return, and allow slow settling beyond 800 ms without fading early. Both tracking error and frame-to-frame speed ripple are bounded; checking delay alone can reward visibly uneven movement. Full-angle checks cover starting angles from 20° to 130°. Requested polling rates are not measurements of real sensor update frequency. A continuous fast close on the development Mac showed that fractional report 7 and whole-degree report 1 changed together about every 100 ms; a prior stationary probe showed report 7 fluctuating within 101.61–101.65° while report 1 stayed at 102°. Whether the revised app feels smoother during physical motion remains unverified.
 
@@ -23,7 +23,7 @@ Synthetic Metal checks compare projected pixels to independent CPU ray/plane int
 For a local GPU rendering measurement using synthetic pixels at the built-in display's current backing dimensions:
 
 ```sh
-build/Glissform.app/Contents/MacOS/Glissform --render-benchmark
+"build/Glissform Dev.app/Contents/MacOS/Glissform" --render-benchmark
 ```
 
 The benchmark reports its actual width/height and mean, 95th-percentile and maximum GPU command duration over 120 closing/reopening frames after warmup. Scaled display modes can have backing dimensions larger than the panel's physical dimensions; keep the reported size with every result. `GLISSFORM_BENCHMARK_WIDTH` and `GLISSFORM_BENCHMARK_HEIGHT` permit explicit comparison sizes; without a built-in display it falls back to 2880 × 1864. The frame sweep excludes initial image preparation; a separate measurement reports the synthetic image copy, Gaussian pyramid and first identity frame. Both measurements exclude screenshot capture, the window compositor, sensor delivery and actual display frame pacing, so they cannot establish end-to-end smoothness or a guaranteed frame rate. Generated images stay under `build/`.
@@ -53,7 +53,7 @@ One synthetic 3840 × 2486 run measured image preparation at 4.01 ms GPU / 12.13
 To repeat the live metadata check with an existing Screen Recording grant (it does not request permission or capture pixels):
 
 ```sh
-build/Glissform.app/Contents/MacOS/Glissform --capture-metadata-test
+"build/Glissform Dev.app/Contents/MacOS/Glissform" --capture-metadata-test
 ```
 
 A local comparison against checkpoint `c2fa862` used the existing synthetic 30 Hz whole-degree traces rendered at 60/120 Hz. At 2–7 degrees/second, relative speed variation fell by about 20–30%, with roughly 24–31 ms more average tracking delay; medium-speed results were similar, and faster traces also became steadier. These are algorithm measurements, not sensor-to-screen latency or physical acceptance. The implementation keeps sensor-target prediction disabled.
@@ -72,7 +72,7 @@ The following physical comparisons remain required:
 For optional local numeric timing diagnostics, quit the existing app instance and launch the built executable with the diagnostic flag:
 
 ```sh
-GLISSFORM_MOTION_DIAGNOSTICS=1 build/Glissform.app/Contents/MacOS/Glissform
+GLISSFORM_MOTION_DIAGNOSTICS=1 "build/Glissform Dev.app/Contents/MacOS/Glissform"
 ```
 
 In another terminal, stream the debug events while performing a trial:
@@ -114,7 +114,7 @@ Logs contain event names, elapsed times, and numeric pre-sleep sensor evidence, 
 For a repeatable material review with original synthetic desktop artwork (text, widgets, window panels and Dock icons):
 
 ```sh
-build/Glissform.app/Contents/MacOS/Glissform --material-preview
+"build/Glissform Dev.app/Contents/MacOS/Glissform" --material-preview
 ```
 
 This writes sharp and 12°/24°/40°/60° rotated frames to `build/material-preview/` through the production renderer. It does not capture the screen. Compare the shapes, diffusion and retained colour with the supplied reference stills; these images cannot establish the reference animation's timing or physical viewing geometry.
@@ -174,7 +174,7 @@ Separate offscreen samples of the earlier revision covered all three page layout
 - Inspect the compiler's legacy `.icns`; earlier-macOS appearance still needs an actual supported-OS check. Native clear/tinted styles are only expected on macOS 26 or later.
 - Verify Light and Dark appearances, keyboard navigation, focus, disabled controls, and VoiceOver labels on all three pages.
 - Confirm Bold is the default throughout, with flat 16%-opacity card icon containers and slightly darker icon colours in Light Mode.
-- Build with `--dev` to compare Bulk, Bold, Outline, and Custom with ⌥⌘1–4. Check live updates in settings and Privacy & About; the rounded-wave menu bar brand mark must stay unchanged. Restart returns to Bold. A normal build hides Developer tools.
+- Use the default Dev build to compare Bulk, Bold, Outline, and Custom with ⌥⌘1–4. Check live updates in settings and Privacy & About; the rounded-wave menu bar brand mark must stay unchanged. Restart returns to Bold. A `--release` build hides Developer tools.
 - Verify Privacy & About has the Glissform name/version and the two cards, with no old descriptive paragraph, alpha text, or footer text beneath them.
 - Confirm local icon resources load from the built app bundle without an account connection or network request.
 

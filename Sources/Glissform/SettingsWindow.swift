@@ -61,6 +61,9 @@ final class SettingsModel: ObservableObject {
     }
     @Published private(set) var automaticUpdatesEnabled = false
     @Published private(set) var availableUpdate: AvailableUpdate?
+    var isDevelopmentBuild: Bool {
+        Bundle.main.object(forInfoDictionaryKey: "GlissformDeveloperTools") as? Bool == true
+    }
     var manualUpdateAvailable: Bool { !automaticUpdatesEnabled && availableUpdate != nil }
     var onAutomaticUpdatesEnabledChange: ((Bool) -> Void)?
     var onPreviewBatteryRipple: ((BatteryRippleStyle) -> Void)?
@@ -355,7 +358,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
             backing: .buffered, defer: false
         )
-        window.title = "Glissform"
+        window.title = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Glissform"
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.titlebarSeparatorStyle = .none
@@ -1132,16 +1135,32 @@ private struct GeneralSettingsView: View {
             .padding(SettingsDesign.Spacing.switchCardInsets)
             .modifier(SettingsCardSurface())
 
-            FeatureToggleRow(title: "Automatic updates",
-                             detail: "Download updates and install when Glissform quits.",
-                             color: .neutral,
-                             isEnabled: Binding(get: { model.automaticUpdatesEnabled },
-                                                set: { model.setAutomaticUpdatesEnabled($0) }),
-                             preview: nil) {
-                FeatureIcon(.automaticUpdates)
+            if model.isDevelopmentBuild {
+                HStack(spacing: SettingsDesign.Spacing.controls) {
+                    FeatureIcon(.automaticUpdates)
+                        .frame(width: SettingsDesign.Metrics.iconSize, height: SettingsDesign.Metrics.iconSize)
+                    VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
+                        Text("Updates disabled in Dev")
+                            .font(SettingsDesign.Typography.sectionTitle)
+                        Text("Release updates are available only in Glissform.")
+                            .font(SettingsDesign.Typography.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(SettingsDesign.Spacing.switchCardInsets)
+                .modifier(SettingsCardSurface())
+            } else {
+                FeatureToggleRow(title: "Automatic updates",
+                                 detail: "Download updates and install when Glissform quits.",
+                                 color: .neutral,
+                                 isEnabled: Binding(get: { model.automaticUpdatesEnabled },
+                                                    set: { model.setAutomaticUpdatesEnabled($0) }),
+                                 preview: nil) {
+                    FeatureIcon(.automaticUpdates)
+                }
+                .padding(SettingsDesign.Spacing.switchCardInsets)
+                .modifier(SettingsCardSurface())
             }
-            .padding(SettingsDesign.Spacing.switchCardInsets)
-            .modifier(SettingsCardSurface())
         }
         .padding(SettingsDesign.Spacing.page)
     }
@@ -1421,7 +1440,7 @@ private struct AboutSettingsView: View {
                     Image(nsImage: NSApp.applicationIconImage)
                         .resizable().frame(width: 68, height: 68).accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
-                        Text("Glissform")
+                        Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Glissform")
                             .font(SettingsDesign.Typography.aboutTitle)
                             .tracking(SettingsDesign.Typography.headlineTracking)
                         Text("\(Bundle.main.object(forInfoDictionaryKey: "GlissformVersion") as? String ?? "Development")")

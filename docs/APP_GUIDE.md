@@ -6,6 +6,8 @@ Glissform brings subtle animations and quality-of-life improvements to everyday 
 
 **Public beta: 0.1.0-beta.1.** The [versioned DMG and installation instructions](https://glissform.app/) are available on the project website. The app uses a signed update feed there; an upgrade through the public feed still needs physical verification. Development testing uses a MacBook Air M5 15-inch; wider compatibility is still being evaluated.
 
+The project builds a separate **Glissform Dev** app for local work. Its red icon, name, bundle identity, and settings distinguish it from the blue release app installed from the DMG. Dev has no public update checks or update controls; it may require its own Screen Recording permission. Do not run both apps' effects at once.
+
 Beta.1 includes the capture, motion, material, and Space-change improvements described below. Repeatable physical acceptance remains pending where noted.
 
 Alpha.9 adds Battery Ripple as a second experience, along with the refreshed sidebar and General controls described below. Earlier alpha releases used the name Infinite Screen for Seamless Close.
@@ -107,8 +109,8 @@ For Seamless Close, only the built-in display receives an overlay. The app does 
 ```sh
 bash scripts/build.sh
 bash scripts/test.sh
-build/Glissform.app/Contents/MacOS/Glissform --version
-build/Glissform.app/Contents/MacOS/Glissform --probe
+"build/Glissform Dev.app/Contents/MacOS/Glissform" --version
+"build/Glissform Dev.app/Contents/MacOS/Glissform" --probe
 ```
 
 Tests cover motion, thresholds, reversals, tracking delay, boundary transitions, wake eligibility and deadlines, Metal rendering against synthetic pixels, snapshot cancellation through the real gesture coordinator using synthetic captures, and overlay visibility without foreground activation. The overlay checks can also run while another app is full screen; see the testing notes for wake diagnostics and physical acceptance. `--probe` reads the actual lid sensor. For a machine without Metal rendering support:
@@ -137,4 +139,4 @@ An open-source license has not been selected. The source repository is private.
 
 ### Developer icon comparison
 
-Build with `bash scripts/build.sh --dev` to show **Developer → Icon Style** in the app menu bar. Select **Bulk**, **Bold**, **Outline**, or **Custom** (⌥⌘1, ⌥⌘2, ⌥⌘3, ⌥⌘4) to update interface icons immediately. The branded menu bar mark stays unchanged. The choice lasts for this app session; restarting restores Bold. Bold is the default product set; the previous Custom mix and all three original sets stay available. A normal build omits the Developer menu.
+Build with `bash scripts/build.sh` to show **Developer → Icon Style** in Glissform Dev's app menu bar. Select **Bulk**, **Bold**, **Outline**, or **Custom** (⌥⌘1, ⌥⌘2, ⌥⌘3, ⌥⌘4) to update interface icons immediately. The branded menu bar mark stays unchanged. The choice lasts for this app session; restarting restores Bold. Bold is the default product set; the previous Custom mix and all three original sets stay available. A `--release` build omits the Developer menu.

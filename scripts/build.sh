@@ -1,12 +1,25 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-DEV_TOOLS=false
-if [[ "${1:-}" == "--dev" ]]; then
-    DEV_TOOLS=true
-elif [[ "${1:-}" != "" ]]; then
-    echo "Usage: bash scripts/build.sh [--dev]" >&2
+BUILD_VARIANT="${1:---dev}"
+if [[ "$BUILD_VARIANT" != "--dev" && "$BUILD_VARIANT" != "--release" ]]; then
+    echo "Usage: bash scripts/build.sh [--dev|--release]" >&2
     exit 1
+fi
+if [[ "$BUILD_VARIANT" == "--dev" ]]; then
+    DEV_TOOLS=true
+    APP_NAME="Glissform Dev"
+    BUNDLE_ID="com.george.glissform.mvp.dev"
+    ICON_SOURCE="$PWD/Artwork/GlissformDev.icon"
+    ICON_NAME="GlissformDev"
+    UPDATE_PLIST='<key>SUEnableAutomaticChecks</key><false/>'
+else
+    DEV_TOOLS=false
+    APP_NAME="Glissform"
+    BUNDLE_ID="com.george.glissform.mvp"
+    ICON_SOURCE="$PWD/Artwork/Glissform.icon"
+    ICON_NAME="Glissform"
+    UPDATE_PLIST=''
 fi
 APP_VERSION="$(cat VERSION)"
 APP_BUILD="$(cat BUILD_NUMBER)"
@@ -15,15 +28,18 @@ if [[ ! "$APP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?$ ]]
     exit 1
 fi
 APP_SHORT_VERSION="${APP_VERSION%%-*}"
-SPARKLE_PUBLIC_KEY_FILE="$PWD/config/sparkle-public-key.txt"
-if [[ ! -f "$SPARKLE_PUBLIC_KEY_FILE" ]]; then
-    echo "Missing Sparkle public key: $SPARKLE_PUBLIC_KEY_FILE" >&2
-    exit 1
-fi
-SPARKLE_PUBLIC_KEY="$(tr -d '\r\n' < "$SPARKLE_PUBLIC_KEY_FILE")"
-if [[ ! "$SPARKLE_PUBLIC_KEY" =~ ^[A-Za-z0-9+/]{43}=$ ]]; then
-    echo "Invalid Sparkle EdDSA public key in $SPARKLE_PUBLIC_KEY_FILE" >&2
-    exit 1
+SPARKLE_PUBLIC_KEY=""
+if [[ "$BUILD_VARIANT" == "--release" ]]; then
+    SPARKLE_PUBLIC_KEY_FILE="$PWD/config/sparkle-public-key.txt"
+    if [[ ! -f "$SPARKLE_PUBLIC_KEY_FILE" ]]; then
+        echo "Missing Sparkle public key: $SPARKLE_PUBLIC_KEY_FILE" >&2
+        exit 1
+    fi
+    SPARKLE_PUBLIC_KEY="$(tr -d '\r\n' < "$SPARKLE_PUBLIC_KEY_FILE")"
+    if [[ ! "$SPARKLE_PUBLIC_KEY" =~ ^[A-Za-z0-9+/]{43}=$ ]]; then
+        echo "Invalid Sparkle EdDSA public key in $SPARKLE_PUBLIC_KEY_FILE" >&2
+        exit 1
+    fi
 fi
 # Icon Composer assets need the full Xcode toolchain, not Command Line Tools.
 # Discover a standard Xcode installation without changing the user's global selection.
@@ -65,11 +81,11 @@ fi
 for appearance in ClearDark; do
     for scale in 1 2; do
         if [[ "$ICON_EXPORT_MODE" == image ]]; then
-            "$ICON_COMPOSER" "$PWD/Artwork/Glissform.icon" \
+            "$ICON_COMPOSER" "$ICON_SOURCE" \
                 --export-image --output-file "$MENU_ASSET/$appearance-$scale.png" \
                 --platform macOS --rendition "$appearance" --width 18 --height 18 --scale "$scale"
         else
-            "$ICON_COMPOSER" "$PWD/Artwork/Glissform.icon" \
+            "$ICON_COMPOSER" "$ICON_SOURCE" \
                 --export-preview macOS "$appearance" 18 18 "$scale" "$MENU_ASSET/$appearance-$scale.png"
         fi
     done
@@ -85,16 +101,16 @@ cat > "$MENU_ASSET/Contents.json" <<'JSON'
   "info": {"author":"xcode","version":1}
 }
 JSON
-xcrun actool "$PWD/Artwork/Glissform.icon" \
+xcrun actool "$ICON_SOURCE" \
     "$ICON_BUILD/MenuBar.xcassets" \
     --compile "$ICON_BUILD/Resources" \
-    --app-icon Glissform \
+    --app-icon "$ICON_NAME" \
     --platform macosx \
     --minimum-deployment-target 15.0 \
     --output-partial-info-plist "$ICON_BUILD/Info.plist" \
     --output-format human-readable-text \
     --notices --warnings
-if [[ ! -s "$ICON_BUILD/Resources/Assets.car" ]] || [[ ! -s "$ICON_BUILD/Resources/Glissform.icns" ]]; then
+if [[ ! -s "$ICON_BUILD/Resources/Assets.car" ]] || [[ ! -s "$ICON_BUILD/Resources/$ICON_NAME.icns" ]]; then
     echo "The app icon compiler did not produce both native and legacy icon resources." >&2
     exit 1
 fi
@@ -104,7 +120,7 @@ fi
 swift build -c release \
     -Xlinker -platform_version -Xlinker macos -Xlinker 15.0 -Xlinker "$SDK_VERSION" \
     -Xlinker -rpath -Xlinker @executable_path/../Frameworks
-APP="$PWD/build/Glissform.app"
+APP="$PWD/build/$APP_NAME.app"
 mkdir -p "$APP/Contents/MacOS"
 BIN_DIR="$(swift build -c release --show-bin-path)"
 LINKED_SDK="$(xcrun vtool -show-build "$BIN_DIR/Glissform" | awk '$1 == "sdk" { print $2; exit }')"
@@ -135,21 +151,16 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>CFBundleExecutable</key><string>Glissform</string>
-<key>CFBundleIdentifier</key><string>com.george.glissform.mvp</string>
+<key>CFBundleIdentifier</key><string>$BUNDLE_ID</string>
 <key>GlissformDeveloperTools</key><$DEV_TOOLS/>
-<key>CFBundleName</key><string>Glissform</string>
-<key>CFBundleDisplayName</key><string>Glissform</string>
+<key>CFBundleName</key><string>$APP_NAME</string>
+<key>CFBundleDisplayName</key><string>$APP_NAME</string>
 <key>CFBundlePackageType</key><string>APPL</string>
+<key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
 <key>CFBundleShortVersionString</key><string>$APP_SHORT_VERSION</string>
 <key>GlissformVersion</key><string>$APP_VERSION</string>
 <key>CFBundleVersion</key><string>$APP_BUILD</string>
-<key>SUFeedURL</key><string>https://glissform.app/updates/appcast.xml</string>
-<key>SUPublicEDKey</key><string>$SPARKLE_PUBLIC_KEY</string>
-<key>SURequireSignedFeed</key><true/>
-<key>SUVerifyUpdateBeforeExtraction</key><true/>
-<key>SUEnableAutomaticChecks</key><true/>
-<key>SUAutomaticallyUpdate</key><false/>
-<key>SUEnableSystemProfiling</key><false/>
+$UPDATE_PLIST
 <key>LSMinimumSystemVersion</key><string>15.0</string>
 <key>LSUIElement</key><false/>
 <key>NSHighResolutionCapable</key><true/>
@@ -157,6 +168,15 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </dict></plist>
 PLIST
 /usr/libexec/PlistBuddy -c "Merge '$ICON_BUILD/Info.plist'" "$APP/Contents/Info.plist"
+if [[ "$BUILD_VARIANT" == "--release" ]]; then
+    /usr/libexec/PlistBuddy -c "Add :SUFeedURL string https://glissform.app/updates/appcast.xml" "$APP/Contents/Info.plist"
+    /usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string $SPARKLE_PUBLIC_KEY" "$APP/Contents/Info.plist"
+    /usr/libexec/PlistBuddy -c "Add :SURequireSignedFeed bool true" "$APP/Contents/Info.plist"
+    /usr/libexec/PlistBuddy -c "Add :SUVerifyUpdateBeforeExtraction bool true" "$APP/Contents/Info.plist"
+    /usr/libexec/PlistBuddy -c "Add :SUEnableAutomaticChecks bool true" "$APP/Contents/Info.plist"
+    /usr/libexec/PlistBuddy -c "Add :SUAutomaticallyUpdate bool false" "$APP/Contents/Info.plist"
+    /usr/libexec/PlistBuddy -c "Add :SUEnableSystemProfiling bool false" "$APP/Contents/Info.plist"
+fi
 # Rebuilding resources in place does not update the .app directory date. Let
 # Launch Services notice the changed icon on the next launch.
 touch "$APP"
@@ -170,6 +190,6 @@ codesign --force --sign - --options runtime "$SPARKLE_VERSION_DIR/Autoupdate"
 codesign --force --sign - --options runtime "$SPARKLE_VERSION_DIR/Updater.app"
 codesign --force --sign - --options runtime "$SPARKLE_FRAMEWORK"
 # Stable local identity allows subsequent development builds to reuse permission.
-codesign --force --sign - --identifier com.george.glissform.mvp --requirements '=designated => identifier "com.george.glissform.mvp"' "$APP"
+codesign --force --sign - --identifier "$BUNDLE_ID" --requirements "=designated => identifier \"$BUNDLE_ID\"" "$APP"
 codesign --verify --deep --strict "$APP"
 printf 'Built %s\n' "$APP"
