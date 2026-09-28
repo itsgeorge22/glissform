@@ -1,0 +1,195 @@
+name: Package version tag
+
+on:
+  push:
+    tags: ['v*']
+
+# One release at a time prevents competing writes to the public update feed.
+concurrency:
+  group: glissform-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the tagged source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+
+      - name: Validate the tag and increasing build number
+        run: |
+          git fetch origin main
+          bash scripts/validate-release-tag.sh "$GITHUB_REF_NAME"
+
+      - name: Check release notes
+        run: python3 scripts/release-notes.py "$(cat VERSION)" "$RUNNER_TEMP/release-notes.md"
+
+      - name: Run CI-safe motion checks
+        run: bash scripts/test.sh --motion-only
+
+      - name: Build the release app
+        run: bash scripts/build.sh
+
+      - name: Verify the app version and update configuration
+        run: |
+          app=build/Glissform.app
+          plist="$app/Contents/Info.plist"
+          test "$("$app/Contents/MacOS/Glissform" --version)" = "Glissform $(cat VERSION)"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :GlissformVersion' "$plist")" = "$(cat VERSION)"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")" = "$(cat BUILD_NUMBER)"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :SUFeedURL' "$plist")" = 'https://glissform.app/updates/appcast.xml'
+          test -n "$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$plist")"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :SURequireSignedFeed' "$plist")" = true
+          test "$(/usr/libexec/PlistBuddy -c 'Print :SUVerifyUpdateBeforeExtraction' "$plist")" = true
+          test -s "$app/Contents/Resources/Sparkle-LICENSE.txt"
+          codesign --verify --strict "$app"
+
+      - name: Package and inspect the exact DMG
+        run: |
+          bash scripts/make-dmg.sh
+          dmg="build/Glissform-$(cat VERSION).dmg"
+          (cd build && shasum -a 256 "$(basename "$dmg")" > "$(basename "$dmg").sha256")
+          mkdir "$RUNNER_TEMP/glissform-mounted"
+          hdiutil attach -quiet -readonly -nobrowse -mountpoint "$RUNNER_TEMP/glissform-mounted" "$dmg"
+          trap 'hdiutil detach -quiet "$RUNNER_TEMP/glissform-mounted"' EXIT
+          test -d "$RUNNER_TEMP/glissform-mounted/Glissform.app"
+          test -L "$RUNNER_TEMP/glissform-mounted/Applications"
+          codesign --verify --strict "$RUNNER_TEMP/glissform-mounted/Glissform.app"
+
+      - name: Install pinned Sparkle signing tool
+        run: |
+          curl --fail --location --silent --show-error \
+            'https://github.com/sparkle-project/Sparkle/releases/download/2.10.0/Sparkle-2.10.0.tar.xz' \
+            -o "$RUNNER_TEMP/Sparkle-2.10.0.tar.xz"
+          printf '%s  %s\n' 'c2bf58aa8387266ac179357b1415d6f2635f044da8be41042af32425dae6da0c' "$RUNNER_TEMP/Sparkle-2.10.0.tar.xz" | shasum -a 256 -c
+          mkdir "$RUNNER_TEMP/sparkle"
+          tar -xf "$RUNNER_TEMP/Sparkle-2.10.0.tar.xz" -C "$RUNNER_TEMP/sparkle" ./bin/sign_update
+
+      - name: Load current public update feed
+        run: |
+          status="$(curl --location --silent --show-error \
+            --output "$RUNNER_TEMP/existing-appcast.xml" --write-out '%{http_code}' \
+            'https://glissform.app/updates/appcast.xml')"
+          if [[ "$status" == 404 ]]; then
+            rm "$RUNNER_TEMP/existing-appcast.xml"
+          elif [[ "$status" != 200 ]]; then
+            echo "Update feed returned HTTP $status." >&2
+            exit 1
+          fi
+
+      - name: Sign the DMG and prepare a signed appcast
+        env:
+          SPARKLE_EDDSA_PRIVATE_KEY: ${{ secrets.SPARKLE_EDDSA_PRIVATE_KEY }}
+        run: |
+          test -n "$SPARKLE_EDDSA_PRIVATE_KEY" || { echo 'Set the SPARKLE_EDDSA_PRIVATE_KEY repository secret.' >&2; exit 1; }
+          signer="$RUNNER_TEMP/sparkle/bin/sign_update"
+          dmg="build/Glissform-$(cat VERSION).dmg"
+          public_key="$(printf '%s' "$SPARKLE_EDDSA_PRIVATE_KEY" | swift scripts/sparkle-public-key.swift)"
+          embedded_key="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' build/Glissform.app/Contents/Info.plist)"
+          test "$public_key" = "$embedded_key" || { echo 'Sparkle signing secret does not match the app public key.' >&2; exit 1; }
+          if [[ -f "$RUNNER_TEMP/existing-appcast.xml" ]]; then
+            printf '%s' "$SPARKLE_EDDSA_PRIVATE_KEY" | "$signer" --verify --ed-key-file - "$RUNNER_TEMP/existing-appcast.xml"
+          fi
+          signature="$(printf '%s' "$SPARKLE_EDDSA_PRIVATE_KEY" | "$signer" --ed-key-file - -p "$dmg")"
+          printf '%s' "$SPARKLE_EDDSA_PRIVATE_KEY" | "$signer" --verify --ed-key-file - "$dmg" "$signature"
+          python3 scripts/update-appcast.py \
+            --existing "$RUNNER_TEMP/existing-appcast.xml" \
+            --output "$RUNNER_TEMP/appcast.xml" \
+            --version "$(cat VERSION)" \
+            --build "$(cat BUILD_NUMBER)" \
+            --url "https://glissform.app/downloads/$(basename "$dmg")" \
+            --signature "$signature" \
+            --size "$(stat -f %z "$dmg")" \
+            --minimum-os "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' build/Glissform.app/Contents/Info.plist)"
+          printf '%s' "$SPARKLE_EDDSA_PRIVATE_KEY" | "$signer" --ed-key-file - "$RUNNER_TEMP/appcast.xml"
+          printf '%s' "$SPARKLE_EDDSA_PRIVATE_KEY" | "$signer" --verify --ed-key-file - "$RUNNER_TEMP/appcast.xml"
+
+      - name: Create or resume the private draft release and verify its assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$GITHUB_REF_NAME"
+          version="$(cat VERSION)"
+          dmg="build/Glissform-$version.dmg"
+          checksum="$dmg.sha256"
+          if gh release view "$tag" --json isDraft,isPrerelease >/dev/null 2>&1; then
+            state="$(gh release view "$tag" --json isDraft,isPrerelease)"
+            if [[ "$version" == *-* ]]; then expected_prerelease=true; else expected_prerelease=false; fi
+            test "$(jq -r '.isPrerelease' <<< "$state")" = "$expected_prerelease" || { echo 'Existing release has the wrong prerelease status.' >&2; exit 1; }
+          else
+            if [[ "$version" == *-* ]]; then
+              gh release create "$tag" --verify-tag --draft --prerelease \
+                --title "Glissform $version" --notes-file "$RUNNER_TEMP/release-notes.md"
+            else
+              gh release create "$tag" --verify-tag --draft \
+                --title "Glissform $version" --notes-file "$RUNNER_TEMP/release-notes.md"
+            fi
+          fi
+          mkdir -p "$RUNNER_TEMP/existing-asset"
+          for file in "$dmg" "$checksum"; do
+            name="$(basename "$file")"
+            if gh release view "$tag" --json assets --jq '.assets[].name' | grep -Fxq "$name"; then
+              gh release download "$tag" --pattern "$name" --dir "$RUNNER_TEMP/existing-asset"
+              cmp "$file" "$RUNNER_TEMP/existing-asset/$name" || { echo "Published $name differs from this build." >&2; exit 1; }
+            else
+              test "$(gh release view "$tag" --json isDraft --jq '.isDraft')" = true || { echo "Published release is missing $name." >&2; exit 1; }
+              gh release upload "$tag" "$file"
+            fi
+          done
+
+      - name: Upload the DMG, then publish the signed feed
+        env:
+          GLISSFORM_DEPLOY_SSH_KEY: ${{ secrets.GLISSFORM_DEPLOY_SSH_KEY }}
+        run: |
+          test -n "$GLISSFORM_DEPLOY_SSH_KEY" || { echo 'Set the GLISSFORM_DEPLOY_SSH_KEY repository secret.' >&2; exit 1; }
+          key="$RUNNER_TEMP/glissform-deploy-key"
+          printf '%s\n' "$GLISSFORM_DEPLOY_SSH_KEY" > "$key"
+          chmod 600 "$key"
+          bash scripts/publish-release-to-vps.sh \
+            "$(cat VERSION)" \
+            "build/Glissform-$(cat VERSION).dmg" \
+            "build/Glissform-$(cat VERSION).dmg.sha256" \
+            "$RUNNER_TEMP/appcast.xml" \
+            "$key"
+
+      - name: Publish the GitHub release page after the public download is ready
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq '.isDraft')" == true ]]; then
+            gh release edit "$GITHUB_REF_NAME" --draft=false
+          fi
+          gh release view "$GITHUB_REF_NAME" --json isDraft,assets \
+            --jq 'select(.isDraft == false and ([.assets[].name] | length) >= 2) | .isDraft' | grep -Fxq false
+
+      - name: Verify published release and update feed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$GITHUB_REF_NAME"
+          version="$(cat VERSION)"
+          state="$(gh release view "$tag" --json isDraft,tagName --jq '.tagName + " " + (.isDraft | tostring)')"
+          test "$state" = "$tag false"
+          gh release view "$tag" --json assets --jq '.assets[].name' | grep -Fxq "Glissform-$version.dmg"
+          gh release view "$tag" --json assets --jq '.assets[].name' | grep -Fxq "Glissform-$version.dmg.sha256"
+          mkdir -p "$RUNNER_TEMP/published-asset"
+          gh release download "$tag" --pattern "Glissform-$version.dmg" --dir "$RUNNER_TEMP/published-asset"
+          cmp "build/Glissform-$version.dmg" "$RUNNER_TEMP/published-asset/Glissform-$version.dmg"
+          feed_url='https://glissform.app/updates/appcast.xml'
+          for attempt in 1 2 3 4 5; do
+            if curl --fail --location --silent --show-error "$feed_url" -o "$RUNNER_TEMP/public-appcast.xml" \
+              && cmp -s "$RUNNER_TEMP/public-appcast.xml" "$RUNNER_TEMP/appcast.xml"; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'Published update feed is not yet available at the app URL.' >&2
+          exit 1

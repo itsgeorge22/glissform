@@ -43,6 +43,8 @@ final class SettingsModel: ObservableObject {
     var onPauseDurationChange: ((Double) -> Void)?
     @Published private(set) var blurEnabled = true
     var onBlurEnabledChange: ((Bool) -> Void)?
+    @Published private(set) var blurStrength: BlurStrength = .defaultStrength
+    var onBlurStrengthChange: ((BlurStrength) -> Void)?
     @Published private(set) var chargingFeedbackEnabled = true
     var onChargingFeedbackEnabledChange: ((Bool) -> Void)?
     @Published private(set) var lowBatteryRippleEnabled = true
@@ -53,6 +55,14 @@ final class SettingsModel: ObservableObject {
     var onShowMenuBarIconChange: ((Bool) -> Void)?
     @Published private(set) var launchAtLoginEnabled = false
     @Published private(set) var launchAtLoginMessage: String?
+    struct AvailableUpdate {
+        let version: String
+        let install: () -> Void
+    }
+    @Published private(set) var automaticUpdatesEnabled = false
+    @Published private(set) var availableUpdate: AvailableUpdate?
+    var manualUpdateAvailable: Bool { !automaticUpdatesEnabled && availableUpdate != nil }
+    var onAutomaticUpdatesEnabledChange: ((Bool) -> Void)?
     var onPreviewBatteryRipple: ((BatteryRippleStyle) -> Void)?
 
     var onOpenPermissions: (() -> Void)?
@@ -61,7 +71,7 @@ final class SettingsModel: ObservableObject {
                    resumeAfterPause: Bool = false, automaticStartAngle: Bool = false,
                    pauseDuration: Double = 1, automaticAngleDuration: Double = 1,
                    automaticDetectionThreshold: Double = 20,
-                   blurEnabled: Bool = true,
+                   blurEnabled: Bool = true, blurStrength: BlurStrength = .defaultStrength,
                    chargingFeedbackEnabled: Bool = true, lowBatteryRippleEnabled: Bool = true,
                    runInBackground: Bool = true, showMenuBarIcon: Bool = true) {
         self.animationEnabled = animationEnabled
@@ -73,6 +83,7 @@ final class SettingsModel: ObservableObject {
         self.pauseDuration = ClosingMotion.validStillDuration(pauseDuration)
         self.automaticAngleDuration = ClosingMotion.validStillDuration(automaticAngleDuration)
         self.blurEnabled = blurEnabled
+        self.blurStrength = blurStrength
         self.chargingFeedbackEnabled = chargingFeedbackEnabled
         self.lowBatteryRippleEnabled = lowBatteryRippleEnabled
         self.runInBackground = runInBackground
@@ -89,6 +100,20 @@ final class SettingsModel: ObservableObject {
         guard showMenuBarIcon != enabled else { return }
         showMenuBarIcon = enabled
         onShowMenuBarIconChange?(enabled)
+    }
+
+    func setAutomaticUpdatesEnabled(_ enabled: Bool) {
+        guard automaticUpdatesEnabled != enabled else { return }
+        automaticUpdatesEnabled = enabled
+        onAutomaticUpdatesEnabledChange?(enabled)
+    }
+
+    func syncAutomaticUpdatesEnabled(_ enabled: Bool) {
+        automaticUpdatesEnabled = enabled
+    }
+
+    func setAvailableUpdate(_ update: AvailableUpdate?) {
+        availableUpdate = update
     }
 
     func refreshLaunchAtLogin() {
@@ -156,6 +181,31 @@ final class SettingsModel: ObservableObject {
         guard blurEnabled != enabled else { return }
         blurEnabled = enabled
         onBlurEnabledChange?(enabled)
+    }
+
+    func setBlurStrength(_ strength: BlurStrength) {
+        guard blurStrength != strength else { return }
+        blurStrength = strength
+        onBlurStrengthChange?(strength)
+    }
+
+    var seamlessCloseHasCustomSettings: Bool {
+        !animationEnabled || startAngle != 100 || automaticStartAngle
+            || automaticDetectionThreshold != 20 || automaticAngleDuration != 1
+            || resumeAfterPause || pauseDuration != 1 || !blurEnabled
+            || blurStrength != .defaultStrength
+    }
+
+    func resetSeamlessCloseToDefaults() {
+        setAutomaticStartAngle(false)
+        setStartAngle(100)
+        setAutomaticDetectionThreshold(20)
+        setAutomaticAngleDuration(1)
+        setResumeAfterPause(false)
+        setPauseDuration(1)
+        setBlurEnabled(true)
+        setBlurStrength(.defaultStrength)
+        setAnimationEnabled(true)
     }
 
     func setChargingFeedbackEnabled(_ enabled: Bool) {
@@ -416,7 +466,9 @@ private struct SettingsRootView: View {
                 navigationRow(.about)
                 navigationRow(.foundBug)
                 Spacer(minLength: 0)
-                sidebarUpdateCard
+                if model.manualUpdateAvailable, let update = model.availableUpdate {
+                    sidebarUpdateCard(for: update)
+                }
             }
             .padding(.horizontal, 12)
             .padding(.top, 58).padding(.bottom, 16)
@@ -482,7 +534,7 @@ private struct SettingsRootView: View {
             .accessibilityAddTraits(.isHeader)
     }
 
-    private var sidebarUpdateCard: some View {
+    private func sidebarUpdateCard(for update: SettingsModel.AvailableUpdate) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 8) {
                 FeatureIcon(.automaticUpdates, size: 16)
@@ -494,18 +546,16 @@ private struct SettingsRootView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Update available")
                         .font(.system(size: 11, weight: .semibold))
-                    Text("0.1.0-alpha.9")
+                    Text(update.version)
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Button("Update") {}
+            Button("Update", action: update.install)
                 .buttonStyle(SidebarUpdateButtonStyle())
                 .modifier(SettingsActionCursor())
-                .accessibilityLabel("Update preview")
-                .accessibilityHint("Visual preview only. No update is installed.")
-                .help("Visual preview only. Updating is not available yet.")
+                .accessibilityLabel("Update to \(update.version)")
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -664,17 +714,22 @@ private final class PermissionPresentationState: ObservableObject {
     @Published var showConfirmation = false
 }
 
-private struct AnimationSettingsView: View {
-    private enum BlurStrength: String, CaseIterable {
-        case high = "High"
-        case regular = "Regular"
-        case subtle = "Subtle"
-    }
+private enum BlurPreviewAssets {
+    static let images: [BlurStrength: NSImage] = Dictionary(uniqueKeysWithValues:
+        BlurStrength.allCases.map { strength in
+            guard let url = Bundle.module.url(forResource: "blur-\(strength.rawValue)",
+                                              withExtension: "png", subdirectory: "BlurPreviews"),
+                  let image = NSImage(contentsOf: url), image.isValid else {
+                preconditionFailure("Missing \(strength.title) blur preview")
+            }
+            return (strength, image)
+        })
+}
 
+private struct AnimationSettingsView: View {
     @ObservedObject var model: SettingsModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var permission = PermissionPresentationState()
-    @State private var selectedBlurStrength: BlurStrength = .regular
     @State private var hoveredBlurStrength: BlurStrength?
 
     private var showsAccessCard: Bool { !model.screenCaptureAllowed || permission.showConfirmation }
@@ -693,10 +748,10 @@ private struct AnimationSettingsView: View {
                 subtitle: "Your desktop appears to stay in place as the lid closes.")
                 .padding(.bottom, SettingsDesign.Spacing.detail)
 
-            infiniteScreenCard
             if showsAccessCard {
                 ScreenAccessCard(model: model).transition(.opacity)
             }
+            infiniteScreenCard
             automaticAngleControls
                 .modifier(SettingsCardSurface())
             pauseControls
@@ -706,6 +761,12 @@ private struct AnimationSettingsView: View {
             lockScreenSupport
                 .padding(SettingsDesign.Spacing.switchCardInsets)
                 .modifier(SettingsCardSurface())
+            Button("Reset to defaults") { model.resetSeamlessCloseToDefaults() }
+                .buttonStyle(FeedbackButtonStyle(kind: .quiet))
+                .disabled(!model.seamlessCloseHasCustomSettings)
+                .modifier(SettingsActionCursor(isActionEnabled: model.seamlessCloseHasCustomSettings))
+                .help("Restore all Seamless Close settings to their defaults.")
+                .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(SettingsDesign.Spacing.page)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: showsAccessCard)
@@ -848,20 +909,26 @@ private struct AnimationSettingsView: View {
             HStack(spacing: SettingsDesign.Spacing.cards) {
                 ForEach(BlurStrength.allCases, id: \.self) { strength in
                     Button {
-                        selectedBlurStrength = strength
+                        model.setBlurStrength(strength)
                     } label: {
                         VStack(spacing: SettingsDesign.Spacing.label) {
-                            RoundedRectangle(cornerRadius: SettingsDesign.Radius.control)
-                                .fill(Color.gray.opacity(hoveredBlurStrength == strength ? 0.30 : 0.24))
+                            Image(nsImage: BlurPreviewAssets.images[strength]!)
+                                .resizable()
                                 .aspectRatio(1.6, contentMode: .fit)
+                                .clipShape(RoundedRectangle(cornerRadius: SettingsDesign.Radius.control))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: SettingsDesign.Radius.control)
+                                        .fill(Color.black.opacity(hoveredBlurStrength == strength ? 0.12 : 0))
+                                }
                                 .padding(4)
                                 .overlay {
-                                    if selectedBlurStrength == strength {
+                                    if model.blurStrength == strength {
                                         RoundedRectangle(cornerRadius: SettingsDesign.Radius.icon)
                                             .strokeBorder(Color.accentColor, lineWidth: 2)
                                     }
                                 }
-                            Text(strength.rawValue)
+                                .accessibilityHidden(true)
+                            Text(strength.title)
                                 .font(SettingsDesign.Typography.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -873,9 +940,9 @@ private struct AnimationSettingsView: View {
                     .modifier(SettingsActionCursor())
                     .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.hoverDuration),
                                value: hoveredBlurStrength == strength)
-                    .accessibilityLabel("\(strength.rawValue) blur strength")
-                    .accessibilityValue(selectedBlurStrength == strength ? "Selected" : "Not selected")
-                    .help("Placeholder only. Blur strength does not change yet.")
+                    .accessibilityLabel("\(strength.title) blur strength")
+                    .accessibilityValue(model.blurStrength == strength ? "Selected" : "Not selected")
+                    .help("Use \(strength.title.lowercased()) blur for Seamless Close.")
                 }
             }
             .padding(SettingsDesign.Spacing.controlSectionInset)
@@ -1065,20 +1132,13 @@ private struct GeneralSettingsView: View {
             .padding(SettingsDesign.Spacing.switchCardInsets)
             .modifier(SettingsCardSurface())
 
-            HStack(spacing: SettingsDesign.Spacing.controls) {
-                CardIconTile(color: .neutral) {
-                    FeatureIcon(.automaticUpdates)
-                }
-                .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Automatic updates").font(SettingsDesign.Typography.controlTitle)
-                    Text("Keep Glissform up to date automatically.")
-                        .font(SettingsDesign.Typography.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-                SoonTag()
+            FeatureToggleRow(title: "Automatic updates",
+                             detail: "Download updates and install when Glissform quits.",
+                             color: .neutral,
+                             isEnabled: Binding(get: { model.automaticUpdatesEnabled },
+                                                set: { model.setAutomaticUpdatesEnabled($0) }),
+                             preview: nil) {
+                FeatureIcon(.automaticUpdates)
             }
             .padding(SettingsDesign.Spacing.switchCardInsets)
             .modifier(SettingsCardSurface())
@@ -1382,7 +1442,7 @@ private struct AboutSettingsView: View {
             Text("Private by design.").font(SettingsDesign.Typography.sectionTitle)
             privacyDetail("Only what’s needed.", text: "Uses lid angle, power status, and temporary screen images.", symbol: .copy)
             privacyDetail("Kept in memory.", text: "Screen images are released after use, never saved or sent.", symbol: .memory)
-            privacyDetail("No tracking.", text: "No audio capture, analytics, or network requests.", symbol: .lock)
+            privacyDetail("No tracking.", text: "No audio capture or analytics. Network access is used for app updates.", symbol: .lock)
         }
         .padding(SettingsDesign.Spacing.cardInset)
         .frame(maxWidth: .infinity, alignment: .leading)

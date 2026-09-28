@@ -128,6 +128,11 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             if blurEnabled != oldValue { scheduleSettling() }
         }
     }
+    var blurStrength: BlurStrength = .defaultStrength {
+        didSet {
+            if blurStrength != oldValue { scheduleSettling() }
+        }
+    }
     private var ditherScale: Float = 1 // Disable only for the dark-gradient comparison.
 
     /// The reference desktop is a fixed plane at the angle where closure starts.
@@ -468,7 +473,8 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         let target = descriptor.colorAttachments[0].texture
         // A modest even Gaussian avoids the radius bands seen with a strong
         // masked variable blur. Its blend strength still follows the height.
-        let screenBlurRadius = min(Float(target?.height ?? 0) * 0.008, 24) * frostAmount * 0.8
+        let screenBlurRadius = min(Float(target?.height ?? 0) * 0.008, 24)
+            * frostAmount * 0.8 * blurStrength.scale
         var blurSlot: ProjectionSlot?
         var blurImage: CIImage?
         if sampledTexture != nil, visibleAngle > 0, opacity > 0, blurEnabled, blurScale > 0,
@@ -528,7 +534,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             encoder.setFragmentTexture(texture, index: 0)
             var uniforms = SIMD4<Float>(visibleProgress, Float(texture.width), Float(texture.height), visibleAngle)
             encoder.setFragmentBytes(&uniforms, length: MemoryLayout<SIMD4<Float>>.stride, index: 0)
-            var frost = blurEnabled ? blurScale : 0
+            var frost = blurEnabled ? blurScale * blurStrength.scale : 0
             encoder.setFragmentBytes(&frost, length: MemoryLayout<Float>.stride, index: 1)
             var eye = SIMD2<Float>(ScreenProjection.eyeDistance, ScreenProjection.eyeHeight)
             encoder.setFragmentBytes(&eye, length: MemoryLayout<SIMD2<Float>>.stride, index: 2)
@@ -647,10 +653,13 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             (0.5625, 0, 105, "projection45from105"),
             (1.125, 0, 105, "projection90from105"),
             (1.125, 0, 100, "projection90"), (1.5, 0, 130, "projection120"),
-            (0.25, 1, 85, "frost20"), (0.5, 1, 85, "frost40"), (0.65, 1, 85, "frost52"),
+            (0.25, 1, 85, "frost20"), (0.5, 1, 85, "frost40"),
+            (0.5, 1, 85, "frostRegular40"), (0.5, 1, 85, "frostSubtle40"),
+            (0.65, 1, 85, "frost52"),
             (1, 1, 85, "frost80"), (1.0125, 1, 85, "fullShadow")]
         var sharpBottomEdgeEnergy: Double?
         var sharpProjectionPixels: [UInt8]?
+        var strengthPixels: [String: [UInt8]] = [:]
         for (amount, frost, reference, label) in cases {
             if label == "zeroAngle" {
                 let preparedTexture = renderer.filteredTexture
@@ -665,6 +674,8 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             renderer.progress = amount
             renderer.blurScale = frost
             renderer.blurEnabled = label != "blurOff40"
+            renderer.blurStrength = label == "frostRegular40" ? .regular
+                : label == "frostSubtle40" ? .subtle : .high
             renderer.setLidAngle(label == "zeroAngle" ? reference : reference - Double(amount) * 80,
                                  referenceAngle: reference)
             let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm_srgb, width: width, height: height, mipmapped: false)
@@ -688,6 +699,9 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             if label == "projection40" { sharpProjectionPixels = rendered }
             if label == "blurOff40", rendered != sharpProjectionPixels {
                 throw failure("Disabling blur must retain the sharp projection and shadow")
+            }
+            if ["frost40", "frostRegular40", "frostSubtle40"].contains(label) {
+                strengthPixels[label] = rendered
             }
             if label == "projection40" || label == "frost40" {
                 // Compare identical projection/shadow with and without frost.
@@ -795,7 +809,13 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             let target = label == "frost52" ? outputURL : outputURL.deletingPathExtension().appendingPathExtension("\(label).png")
             try png.write(to: target)
         }
-        print("PASS: bounded GPU projection at 16°/40°/90°/120° and 45°/90° from one start angle, blur-off sharpness, orientation, opacity, retained-frame identity, top shadow, bottom-edge blur, frost at 20°/40°/52°/80°")
+        guard let highPixels = strengthPixels["frost40"],
+              let regularPixels = strengthPixels["frostRegular40"],
+              let subtlePixels = strengthPixels["frostSubtle40"],
+              highPixels != regularPixels, regularPixels != subtlePixels else {
+            throw failure("High, Regular, and Subtle must render distinct blur")
+        }
+        print("PASS: bounded GPU projection at 16°/40°/90°/120° and 45°/90° from one start angle, blur-off sharpness, three distinct blur strengths, orientation, opacity, retained-frame identity, top shadow, bottom-edge blur, frost at 20°/40°/52°/80°")
         try checkMaterial(renderer: renderer)
         renderer.update(pixelBuffer: buffer)
         if benchmark {
@@ -930,7 +950,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm_srgb,
             width: width, height: height, mipmapped: false)
         descriptor.storageMode = .shared
-        descriptor.usage = [.renderTarget]
+        descriptor.usage = [.renderTarget, .shaderRead, .shaderWrite]
         guard let target = renderer.device.makeTexture(descriptor: descriptor) else {
             throw failure("Cannot allocate material target")
         }
@@ -1054,8 +1074,8 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         renderer.ditherScale = 1
     }
 
-    /// Original synthetic desktop artwork for material review, never a screen capture.
-    static func materialPreview(outputDirectory: URL) throws {
+    /// Rendered preview material; wallpaper tiles use owner-supplied source art.
+    static func materialPreview(outputDirectory: URL, wallpaperOnly: Bool = false) throws {
         let width = 960, height = 600
         let view = MTKView(frame: NSRect(x: 0, y: 0, width: width, height: height))
         guard let renderer = EffectRenderer(view: view) else {
@@ -1086,6 +1106,19 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             (text as NSString).draw(at: NSPoint(x: x, y: y), withAttributes: [
                 .font: NSFont.systemFont(ofSize: size, weight: weight), .foregroundColor: color])
         }
+        if wallpaperOnly {
+            // The owner-supplied wallpaper is cropped once and kept as a small
+            // source asset so all three bundled previews can be regenerated.
+            let sourceURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+                .appendingPathComponent("Artwork/BlurPreviewWallpaper.png")
+            guard let image = NSImage(contentsOf: sourceURL) else {
+                throw NSError(domain: "Glissform.MaterialPreview", code: 6,
+                              userInfo: [NSLocalizedDescriptionKey: "Missing blur preview wallpaper at \(sourceURL.path)"])
+            }
+            NSGraphicsContext.current?.imageInterpolation = .high
+            image.draw(in: NSRect(x: 0, y: 0, width: width, height: height),
+                       from: NSRect(origin: .zero, size: image.size), operation: .copy, fraction: 1)
+        } else {
         NSGradient(colors: [NSColor(srgbRed: 0.13, green: 0.15, blue: 0.37, alpha: 1),
                             NSColor(srgbRed: 0.55, green: 0.35, blue: 0.58, alpha: 1),
                             NSColor(srgbRed: 0.91, green: 0.66, blue: 0.43, alpha: 1)])!
@@ -1129,6 +1162,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             card(NSRect(x: x, y: 38, width: 64, height: 54), colors[index], radius: 13)
             symbols[index].image.draw(in: NSRect(x: x + 15, y: 49, width: 34, height: 32))
         }
+        }
         NSGraphicsContext.restoreGraphicsState()
         CVPixelBufferUnlockBaseAddress(buffer, [])
         renderer.update(pixelBuffer: buffer)
@@ -1136,7 +1170,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm_srgb,
             width: width, height: height, mipmapped: false)
         descriptor.storageMode = .shared
-        descriptor.usage = [.renderTarget]
+        descriptor.usage = wallpaperOnly ? [.renderTarget, .shaderRead, .shaderWrite] : [.renderTarget]
         guard let target = renderer.device.makeTexture(descriptor: descriptor) else {
             throw NSError(domain: "Glissform.MaterialPreview", code: 4)
         }
@@ -1144,7 +1178,8 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         pass.colorAttachments[0].texture = target
         pass.colorAttachments[0].loadAction = .clear
         pass.colorAttachments[0].storeAction = .store
-        for degrees in [0, 12, 24, 40, 60] {
+        func writeFrame(degrees: Int, strength: BlurStrength, name: String) throws {
+            renderer.blurStrength = strength
             renderer.setLidAngle(95 - Double(degrees), referenceAngle: 95)
             guard let command = renderer.encode(descriptor: pass) else {
                 throw NSError(domain: "Glissform.MaterialPreview", code: 5)
@@ -1156,13 +1191,39 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
                 target.getBytes($0.baseAddress!, bytesPerRow: width * 4,
                                 from: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0)
             }
+            if wallpaperOnly {
+                let fraction = min(1, max(0, renderer.foldRadians / max(0.001, renderer.fullClosureRadians)))
+                let visibleProgress = fraction * fraction * (3 - 2 * fraction)
+                let finishingRadius = min(Float(height) * 0.008, 24)
+                    * pow(visibleProgress, 0.7) * 0.8 * strength.scale
+                if finishingRadius >= 0.5 {
+                    // Core Image's finishing pass has the opposite readback
+                    // origin from direct Metal output; flip only its PNG rows.
+                    let rowBytes = width * 4
+                    for row in 0..<(height / 2) {
+                        let opposite = height - 1 - row
+                        for column in 0..<rowBytes {
+                            pixels.swapAt(row * rowBytes + column, opposite * rowBytes + column)
+                        }
+                    }
+                }
+            }
             let provider = CGDataProvider(data: Data(pixels) as CFData)!
             let image = CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32,
                 bytesPerRow: width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
                 bitmapInfo: CGBitmapInfo.byteOrder32Little.union(CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedFirst.rawValue)),
                 provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)!
             let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])!
-            try png.write(to: outputDirectory.appendingPathComponent("fold-\(degrees).png"))
+            try png.write(to: outputDirectory.appendingPathComponent(name))
+        }
+        if wallpaperOnly {
+            for strength in BlurStrength.allCases {
+                try writeFrame(degrees: 42, strength: strength, name: "blur-\(strength.rawValue).png")
+            }
+        } else {
+            for degrees in [0, 12, 24, 40, 60] {
+                try writeFrame(degrees: degrees, strength: .high, name: "fold-\(degrees).png")
+            }
         }
         renderer.clear()
     }

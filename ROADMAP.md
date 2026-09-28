@@ -6,9 +6,9 @@ New experiences should feel native, have a clear purpose, stay lightweight, and 
 
 Glissform is a small passion project. The owner's intended price is $1.90, with occasional improvements and new features after launch. Keep release preparation proportional to that scope; broad hardware certification, formal performance studies, and a fixed tester cohort are not prerequisites.
 
-## Current — 0.1.0-alpha.9
+## Last tagged source prerelease — 0.1.0-alpha.9
 
-The first feature, Seamless Close, implements screenshot-based closing animation with continuous hinge perspective and upper-edge narrowing through the full gesture, steadier adaptive smoothing, optional full-image blur and shadow, awake reversal, cached post-sleep opening, native settings with a configurable starting angle, optional desktop restoration after an adjustable still-lid pause, menu bar controls, and lifecycle cleanup. On 2026-09-21, the owner confirmed correct smoothness, speed, abrupt lid stops, reversals, and opening after sleep without locking on the development Mac. The new animation geometry and blur levels, and locked wake, are outside that confirmation. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
+The first feature, Seamless Close, implements screenshot-based closing animation with continuous hinge perspective and upper-edge narrowing through the full gesture, steadier adaptive smoothing, optional full-image blur and shadow, awake reversal, cached post-sleep opening, native settings with a configurable starting angle, optional desktop restoration after an adjustable still-lid pause, menu bar controls, and lifecycle cleanup. On 2026-09-21, the owner confirmed correct smoothness, speed, abrupt lid stops, reversals, and opening after sleep without locking on the development Mac. On 2026-09-28, the owner confirmed the revised geometry and Blur on/off during everyday gestures, plus the requested Space and sleep/wake checks. Locked-screen animation remains unavailable. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
 
 ## Current priority — Space-change verification
 
@@ -17,8 +17,6 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 
 ## Product development
 
-- [ ] Develop Lock Screen support for Seamless Close before beta so its animation can play while the Mac is locked. The Settings card currently says Soon; no locked-screen animation is active yet.
-
 - [x] Implement Battery Ripple with independent power-connection and 20%-battery switches, using public power-source notifications and a reduced-motion fallback. Included in the alpha.9 source prerelease.
 - [x] Replace the original concentric connection rings with a fluid emerald light wave, a curling silhouette, and translucent folds; reuse the geometry in red for the 20% battery event. The owner approved the revised emerald appearance on 2026-09-26; the red variant awaits physical approval.
 - [ ] Complete physical Battery Ripple checks for both triggers with settings closed, full-screen apps, sleep/wake, lock, and Reduce Motion. On 2026-09-26, the owner confirmed one green ripple on one unplug/reconnect trial with the earlier visual design. The 20% event has only synthetic checks so far.
@@ -26,11 +24,13 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 - [x] Add sidebar navigation with separate Seamless Close, Battery Ripple, and Privacy & About pages, plus a Send feedback placeholder grouped under More.
 - [x] Add General as the first page under Features with saved background-running and menu bar icon controls. Background running removes the Dock icon on Settings close even when the menu bar icon is hidden; opening the app again restores Settings.
 - [x] Add a Launch at login control to General, backed by the system login-item status with approval feedback.
-- [x] Add a non-interactive Automatic updates card to General as a visual placeholder.
-- [x] Preview an update-available card at the bottom of the Settings sidebar with a visual-only Update button.
-- [x] Apply the native pointing-hand cursor to active Settings controls and the Update preview, use the system unavailable cursor for disabled actions, and raise the unreleased app's minimum deployment target to macOS 15.
-- [ ] Design and implement an optional update experience before adding an Automatic updates control.
-- [ ] Connect the sidebar Update button to an actual app update after a downloadable installer and update flow are ready; remove the preview state before public distribution.
+- [x] Replace the Automatic updates placeholder with a switch backed by Sparkle's download and install preference. Keep update checks active in both modes.
+- [x] Apply the native pointing-hand cursor to active Settings controls, use the system unavailable cursor for disabled actions, and raise the unreleased app's minimum deployment target to macOS 15.
+- [x] Connect the sidebar Update card to signed update detection and Sparkle's install flow; show it only when Automatic updates is off and a newer installable release is found.
+- [x] Complete an isolated installed-app trial with a signed local feed and DMG: manual mode showed the existing card and installed through its Update button; automatic mode kept the card hidden and installed on quit. A tampered feed was rejected.
+- [x] Provision glissform.app on the release VPS with HTTPS and a restricted release-upload account. The public DMG and signed feed are not published yet.
+- [x] Set the release workflow's dedicated VPS deploy secret in the private GitHub repository.
+- [ ] Check the first public DMG download, macOS first-open path, Screen Recording permission after update, and both update modes against the published feed before calling public beta distribution verified.
 - [x] Refine the compact settings composition with native toolbar controls over a narrower sidebar, concentric navigation rows and icons, subtle page icon tiles, a combined Seamless Close switch-and-angle card, and distinct automatic-selection and pause cards. Remove both feature preview illustrations and feature-page privacy footers.
 - [x] Add compact play buttons beside the two Battery Ripple event switches so either color can be previewed on demand.
 - [x] Build and run the full regression suite for the card and sidebar revision (2026-09-26). Inspect all three pages in the running app's Light appearance for the earlier separate-card layout, including compact rows, icon tiles, and removal of previews. Live Dark and earlier-macOS checks remain pending.
@@ -41,11 +41,12 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 ## Alpha.9 foundations and Seamless Close follow-up
 
 - [x] Add a saved Blur switch to Seamless Close that disables both blur passes without changing the projection, shadow, or one-screenshot gesture.
-- [x] Add a selectable High, Regular, and Subtle placeholder row below Blur without changing rendering.
-- [ ] Replace blur placeholders with representative images and connect the selected strength to rendering after visual approval.
+- [x] Add a selectable High, Regular, and Subtle row below Blur, save the choice, and apply it to both blur passes. Regular is the default; High retains the previous appearance.
+- [x] Add a page-level Reset to defaults action for Seamless Close's saved controls.
+- [x] Replace blur placeholders with previews of the supplied wallpaper rendered at the same 42° fold with each strength; retain physical comparison of the live effect as a separate gate.
 
 - [x] Owner approved the revised Seamless Close closing feel on the development Mac on 2026-09-28, including its stronger start and continuing later movement.
-- [ ] Physically check a deep pause, reopening, and Blur on/off with the revised geometry on the development Mac; broader gesture and material acceptance remains separate from the approved closing feel.
+- [x] Owner confirmed pauses, reopening, and Blur on/off with the revised geometry on the development Mac on 2026-09-28.
 
 - [x] Add **Detect starting angle** and implement resting-angle selection one degree below the held angle, **Begin at** fallback, gesture and wake reference locking, and adoption of a lower angle after eligible pause restoration. Its saved wait is independently adjustable from 0.5 to 10 seconds, defaulting to one second. A saved 20–130° detection threshold gates learning independently of **Begin at** and restores that fallback after a pause at or below the threshold; 0° disables the threshold.
 - [x] Let closing past the learned angle restart the animation after automatic pause restoration, without requiring the lid to open farther first.
@@ -111,16 +112,21 @@ Keep this a practical release check for a small passion project:
 - Fix the known full-screen Space-switching bug and confirm everyday animation still works on the development Mac.
 - Run the existing build and regression checks on the intended release build.
 - Check that normal desktop access returns when the effect stops or the app quits, and that sleep and the lock screen behave normally.
-- Complete and physically validate Lock Screen support for Seamless Close before beta; the Soon card alone does not satisfy this gate.
-- Provide a usable installation and permission flow, with honest tested-hardware and known-limitation notes.
+- Build and verify a release-tag-specific `.dmg`, then test a fresh installation and both update modes on the development Mac.
+- Provide a usable installation and permission flow for an ad-hoc signed download, with honest tested-hardware and known-limitation notes.
 
 The broader investigations below and above are follow-up work, not a requirement to complete every roadmap item before beta. Other additional features are not required for launch; improve the app incrementally after release.
+
+## Planned for 0.1.0-beta.2
+
+- [ ] Replace the **Send feedback** page's “Nothing here yet” placeholder with useful guidance and a working public contact method. The source repository and GitHub forms are private.
+- [ ] Add a way to exit an active Seamless Close animation when **Resume desktop after pause** is off. The action should return to the live desktop, release the captured image, and avoid immediately restarting the same gesture. Decide where the control appears and verify it with the lid, sleep, Space changes, and quit.
 
 ## Release candidate and stable — 1.0.0-rc.1 → 1.0.0
 
 - [ ] Confirm everyday use on the documented tested configuration, with no known release-blocking failures.
-- [ ] Establish Developer ID signing, notarization, and a reproducible distribution process.
-- [ ] Prepare and publish a `.dmg` on GitHub, then add public download links and installation instructions.
+- [ ] Reassess Developer ID signing and notarization; if the app remains ad-hoc signed, keep the installation warning and permission limitations explicit.
+- [ ] Verify the public `.dmg`, download links, installation instructions, and update path for the intended release.
 - [ ] Verify installation, upgrade, and removal on supported macOS versions.
 - [ ] Confirm normal desktop access is restored after errors and interruptions.
 - [ ] Finalize privacy documentation, support instructions, and release notes.
@@ -129,13 +135,14 @@ A release candidate is a complete proposed stable build. Publish 1.0.0 when thos
 
 ## Further possibilities — not committed
 
+- Lock Screen support for Seamless Close, if a privacy-safe design can be implemented and physically validated. It has no target version or date; the current Settings card says Soon, but no animation plays while the Mac is locked.
 - Touch ID feedback: a similar ripple spreading from the bottom-right corner with a red haze. Idea only; the exact Touch ID event and feasibility still need to be determined. Not implemented.
 - Broader wake-opening support after the prototype passes timing, privacy, and physical acceptance gates; no first-frame or locked-wake guarantee.
 - Carefully bounded blur, shadow, and motion preferences or presets.
 - Accessibility options and behavior that respects reduced-motion preferences.
 - Broader hardware support and calibration for different viewing angles.
 - Other visual feedback and transitions for everyday Mac interactions, where they add clarity or enjoyment and can be delivered reliably.
-- A signed update experience and additional distribution channels after platform requirements are assessed.
+- Additional distribution channels after platform requirements are assessed.
 
 ## Version policy
 

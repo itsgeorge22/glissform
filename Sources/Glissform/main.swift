@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let desktopAvailable: (CGDirectDisplayID) -> Bool
     private let screenAccessAllowed: () -> Bool
     private let settingsModel = SettingsModel()
+    private var appUpdates: AppUpdates?
     private let chargingFeedback = ChargingFeedbackController()
     private var chargingPowerMonitor: ChargingPowerMonitor?
     private var chargingSuppressedUntil = 0.0
@@ -85,6 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                   "seamlessCloseAutomaticAngleDuration": 1.0,
                                                   "seamlessCloseDetectionThreshold": 20.0,
                                                   "seamlessCloseBlurEnabled": true,
+                                                  "seamlessCloseBlurStrength": BlurStrength.defaultStrength.rawValue,
                                                   "automaticStartAngleEnabled": false,
                                                   "chargingFeedbackEnabled": true,
                                                   "lowBatteryRippleEnabled": true,
@@ -116,6 +118,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusMenu.addItem(lowBatteryMenuItem)
         let settings = statusMenu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
         settings.target = self
+        let checkUpdates = statusMenu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
+        checkUpdates.target = self
         statusMenu.addItem(.separator())
         let quit = statusMenu.addItem(withTitle: "Quit Glissform", action: #selector(quitApp), keyEquivalent: "q")
         quit.target = self
@@ -132,6 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             automaticAngleDuration: motion.automaticAngleDuration,
             automaticDetectionThreshold: motion.automaticDetectionThreshold,
             blurEnabled: UserDefaults.standard.bool(forKey: "seamlessCloseBlurEnabled"),
+            blurStrength: BlurStrength(rawValue: UserDefaults.standard.string(forKey: "seamlessCloseBlurStrength") ?? "") ?? .defaultStrength,
             chargingFeedbackEnabled: UserDefaults.standard.bool(forKey: "chargingFeedbackEnabled"),
             lowBatteryRippleEnabled: UserDefaults.standard.bool(forKey: "lowBatteryRippleEnabled"),
             runInBackground: UserDefaults.standard.bool(forKey: "runInBackground"),
@@ -165,6 +170,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsModel.onBlurEnabledChange = { [weak self] enabled in
             self?.applyBlurEnabled(enabled)
         }
+        settingsModel.onBlurStrengthChange = { [weak self] strength in
+            self?.applyBlurStrength(strength)
+        }
         settingsModel.onOpenPermissions = { [weak self] in self?.openPermissions() }
         settingsModel.onChargingFeedbackEnabledChange = { [weak self] enabled in
             UserDefaults.standard.set(enabled, forKey: "chargingFeedbackEnabled")
@@ -186,6 +194,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             UserDefaults.standard.set(visible, forKey: "showMenuBarIcon")
             self?.updateMenuBarIcon(visible: visible)
         }
+        appUpdates = AppUpdates(model: settingsModel)
 
         let center = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.willSleepNotification, NSWorkspace.screensDidSleepNotification] {
@@ -454,6 +463,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         effect.blurEnabled = settingsModel.blurEnabled
+        effect.blurStrength = settingsModel.blurStrength
         overlay.contentView = view
         overlay.alphaValue = 0
         overlay.orderFrontRegardless()
@@ -886,6 +896,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         renderer?.blurEnabled = enabled
     }
 
+    private func applyBlurStrength(_ strength: BlurStrength) {
+        UserDefaults.standard.set(strength.rawValue, forKey: "seamlessCloseBlurStrength")
+        renderer?.blurStrength = strength
+    }
+
     private func applyAutomaticStartAngle(_ enabled: Bool) {
         cancelWake("automatic starting angle changed")
         endGesture()
@@ -1021,6 +1036,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         warmCaptureMetadata()
     }
 
+    @objc private func checkForUpdates() {
+        appUpdates?.checkForUpdates()
+    }
+
     @objc private func openPermissions() {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
     }
@@ -1077,8 +1096,9 @@ extension AppDelegate {
     /// Real gesture/cancellation paths with synthetic pixels and no capture permission.
     static func lifecycleSelfTest() async throws {
         let savedSettings = ["animationStartAngle", "animationEnabled", "automaticStartAngleEnabled",
-                             "seamlessCloseDetectionThreshold",
-                             "seamlessCloseBlurEnabled",
+                             "resumeAfterPause", "seamlessClosePauseDuration",
+                             "seamlessCloseAutomaticAngleDuration", "seamlessCloseDetectionThreshold",
+                             "seamlessCloseBlurEnabled", "seamlessCloseBlurStrength",
                              "runInBackground", "showMenuBarIcon"].map {
             ($0, UserDefaults.standard.object(forKey: $0))
         }
@@ -1172,6 +1192,9 @@ extension AppDelegate {
             app.settingsModel.onBlurEnabledChange = { [weak app] enabled in
                 app?.applyBlurEnabled(enabled)
             }
+            app.settingsModel.onBlurStrengthChange = { [weak app] strength in
+                app?.applyBlurStrength(strength)
+            }
             try await waitForCapture(source)
             let captureTask = app.snapshotTask
             source.pending?.resume(returning: buffer)
@@ -1188,7 +1211,87 @@ extension AppDelegate {
                       && UserDefaults.standard.bool(forKey: "seamlessCloseBlurEnabled")
                       && app.hasSnapshot && source.count == 1,
                       "Turning Blur on must reuse the current screenshot")
-            print("PASS: saved Blur switch changes an active gesture without recapture")
+            for strength in [BlurStrength.high, .subtle, .regular] {
+                app.settingsModel.setBlurStrength(strength)
+                try check(app.settingsModel.blurStrength == strength
+                          && app.renderer?.blurStrength == strength
+                          && UserDefaults.standard.string(forKey: "seamlessCloseBlurStrength") == strength.rawValue
+                          && app.hasSnapshot && source.count == 1,
+                          "Changing Blur strength must save and reuse the current screenshot")
+            }
+            try check(BlurStrength(rawValue: "unknown") == nil
+                      && BlurStrength.defaultStrength == .regular && BlurStrength.high.scale == 1,
+                      "Regular must be the default while High retains the previous material")
+            print("PASS: saved Blur switch and strengths change an active gesture without recapture")
+        }
+        do {
+            let (app, _) = try makeGesture(startGesture: false)
+            defer { app.shutdown(); app.window?.close() }
+            let model = app.settingsModel
+            model.onAnimationEnabledChange = { [weak app] enabled in app?.applyAnimationEnabled(enabled) }
+            model.onStartAngleChange = { [weak app] angle in app?.applyStartAngle(angle) }
+            model.onAutomaticStartAngleChange = { [weak app] enabled in app?.applyAutomaticStartAngle(enabled) }
+            model.onAutomaticDetectionThresholdChange = { [weak app] angle in app?.applyAutomaticDetectionThreshold(angle) }
+            model.onAutomaticAngleDurationChange = { [weak app] duration in
+                app?.motion.automaticAngleDuration = duration
+                UserDefaults.standard.set(duration, forKey: "seamlessCloseAutomaticAngleDuration")
+            }
+            model.onResumeAfterPauseChange = { [weak app] enabled in
+                app?.motion.resumeAfterPause = enabled
+                UserDefaults.standard.set(enabled, forKey: "resumeAfterPause")
+            }
+            model.onPauseDurationChange = { [weak app] duration in
+                app?.motion.pauseDuration = duration
+                UserDefaults.standard.set(duration, forKey: "seamlessClosePauseDuration")
+            }
+            model.onBlurEnabledChange = { [weak app] enabled in app?.applyBlurEnabled(enabled) }
+            model.onBlurStrengthChange = { [weak app] strength in app?.applyBlurStrength(strength) }
+            try check(!model.seamlessCloseHasCustomSettings && model.blurStrength == .regular,
+                      "Fresh Seamless Close settings must start at defaults")
+            let chargingBefore = model.chargingFeedbackEnabled
+            let backgroundBefore = model.runInBackground
+            model.setAnimationEnabled(false)
+            model.setStartAngle(120)
+            model.setAutomaticDetectionThreshold(80)
+            model.setAutomaticAngleDuration(2)
+            model.setAutomaticStartAngle(true)
+            model.setResumeAfterPause(true)
+            model.setPauseDuration(3)
+            model.setBlurEnabled(false)
+            model.setBlurStrength(.subtle)
+            try check(model.seamlessCloseHasCustomSettings, "Changed controls must enable page reset")
+            model.resetSeamlessCloseToDefaults()
+            try check(!model.seamlessCloseHasCustomSettings && model.animationEnabled
+                      && model.startAngle == 100 && !model.automaticStartAngle
+                      && model.automaticDetectionThreshold == 20 && model.automaticAngleDuration == 1
+                      && !model.resumeAfterPause && model.pauseDuration == 1
+                      && model.blurEnabled && model.blurStrength == .regular,
+                      "Reset must restore every Seamless Close control")
+            try check(app.motion.startAngle == 100 && !app.motion.automaticStartAngle
+                      && app.motion.automaticDetectionThreshold == 20 && app.motion.automaticAngleDuration == 1
+                      && !app.motion.resumeAfterPause && app.motion.pauseDuration == 1
+                      && app.renderer?.blurEnabled == true && app.renderer?.blurStrength == .regular,
+                      "Reset must update active motion and rendering")
+            try check(UserDefaults.standard.bool(forKey: "animationEnabled"),
+                      "Reset must save the Seamless Close switch default")
+            try check(UserDefaults.standard.double(forKey: "animationStartAngle") == 100,
+                      "Reset must save the start angle default")
+            try check(!UserDefaults.standard.bool(forKey: "automaticStartAngleEnabled"),
+                      "Reset must save the automatic detection switch default")
+            try check(UserDefaults.standard.double(forKey: "seamlessCloseDetectionThreshold") == 20,
+                      "Reset must save the detection threshold default")
+            try check(UserDefaults.standard.double(forKey: "seamlessCloseAutomaticAngleDuration") == 1,
+                      "Reset must save the detection wait default")
+            try check(!UserDefaults.standard.bool(forKey: "resumeAfterPause")
+                      && UserDefaults.standard.double(forKey: "seamlessClosePauseDuration") == 1,
+                      "Reset must save pause defaults")
+            try check(UserDefaults.standard.bool(forKey: "seamlessCloseBlurEnabled")
+                      && UserDefaults.standard.string(forKey: "seamlessCloseBlurStrength") == BlurStrength.regular.rawValue,
+                      "Reset must save Blur defaults")
+            try check(model.chargingFeedbackEnabled == chargingBefore
+                      && model.runInBackground == backgroundBefore,
+                      "Page reset must preserve settings on other pages")
+            print("PASS: Seamless Close reset restores saved defaults and leaves other pages untouched")
         }
         do {
             let (app, source) = try makeGesture(startGesture: false)
@@ -1847,7 +1950,7 @@ extension AppDelegate {
 
 // Diagnostics should not register as foreground app launches. UI lifecycle
 // checks temporarily exercise regular activation, then terminate via AppKit.
-if CommandLine.arguments.contains(where: { ["--lifecycle-test", "--render-test", "--render-benchmark", "--material-preview", "--capture-metadata-test"].contains($0) }) {
+if CommandLine.arguments.contains(where: { ["--lifecycle-test", "--render-test", "--render-benchmark", "--material-preview", "--blur-preview", "--capture-metadata-test"].contains($0) }) {
     setbuf(stdout, nil)
     MainActor.assumeIsolated {
         _ = NSApplication.shared
@@ -1894,6 +1997,16 @@ if CommandLine.arguments.contains("--version") {
         print("Synthetic desktop material previews: \(directory.path)")
     } catch {
         fputs("Material preview failed: \(error)\n", stderr)
+        exit(1)
+    }
+} else if CommandLine.arguments.contains("--blur-preview") {
+    _ = NSApplication.shared
+    do {
+        let directory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("build/blur-preview")
+        try EffectRenderer.materialPreview(outputDirectory: directory, wallpaperOnly: true)
+        print("Wallpaper blur previews: \(directory.path)")
+    } catch {
+        fputs("Blur preview failed: \(error)\n", stderr)
         exit(1)
     }
 } else if CommandLine.arguments.contains("--render-test") || CommandLine.arguments.contains("--render-benchmark") {

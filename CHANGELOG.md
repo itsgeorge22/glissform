@@ -4,11 +4,15 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+## 0.1.0-beta.1 — 2026-09-28
+
+First beta: the signed update path, configurable Seamless Close blur and timing, and further Settings and motion refinements.
+
 ### Added
 
-- Preview a compact update-available card at the bottom of the Settings sidebar, with the download icon, a sample version subtitle, and an Update button that responds visually but does not run an update yet.
-- Show an Automatic updates card in General with the supplied download icon and an outlined Soon tag. This is a visual placeholder; the app does not check for or install updates.
-- Add three selectable gray image placeholders beneath the Blur switch for High, Regular, and Subtle strength. Regular is initially outlined in the system accent color, matching enabled switches, with a 4-point gap around its placeholder; choosing a strength does not change the effect yet.
+- Add signed update checking and a General switch for automatic download and installation. Automatic checks remain on in either mode. Manual mode shows the existing sidebar Update card when a newer installable release is found; its button starts Sparkle's download and installation flow. Add **Check for Updates…** to the menu bar.
+- Point signed update checks and versioned DMG downloads at glissform.app so public updates remain available when the source repository becomes private. The release workflow uploads each immutable DMG before publishing its signed feed entry.
+- Add three selectable image previews beneath the Blur switch for High, Regular, and Subtle strength. Each uses the same supplied wallpaper rendered through the actual effect at a 42° fold, with a system-accent outline and a 4-point gap around the selected preview.
 - Add a saved **Detect above** angle to Seamless Close's automatic-selection card. Automatic detection learns only after the lid rests strictly above this angle; **Begin at** remains the fallback until then, even when the detection threshold is below the manual angle. Set it to 0° to disable the threshold. Changing the threshold while automatic detection is on clears the learned angle and any active snapshot; while it is off, a manual gesture continues. The default is 20°.
 - Add independent, saved 0.5–10 second wait controls for automatic starting-angle detection and desktop restoration after a pause. Both default to one second; changing a wait restarts its pending timer.
 - Show planned Lock Screen support in Seamless Close settings with a non-interactive outlined Soon chip. The locked-screen animation is not implemented yet.
@@ -16,20 +20,29 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ### Changed
 
+- Place the Screen Recording access card first on the Seamless Close page when permission is required.
+- Keep the sidebar Update card and its button, showing them only when automatic installation is off and Sparkle finds an installable update.
+- Make the Blur strength choices functional and saved. High is the previous blur; Regular is the default, and Regular and Subtle scale down both source-space frost and the finishing blur. Switching strength during a gesture reuses the current screenshot.
+- Add a Reset to defaults button at the bottom of Seamless Close settings. It restores that page's saved feature, angle, detection, pause, and blur controls, including Regular blur, without changing General or Battery Ripple settings.
 - Show the live lid reading in the **Use current angle** button, such as **Use current angle (112°)**, below the **Begin at** slider instead of in a separate row above it.
-- Use the native pointing-hand cursor for active Settings controls, including the visual-only Update button; show the system operation-not-allowed cursor for disabled buttons, switches, and step arrows. Text entry, sliders, and Soon tags retain their usual cursors. Raise the unreleased app's minimum system version to macOS 15.
-- Add a softer hover to angle and wait-time fields. Arrow highlights sit flush against the field's left edge without their own rounded corners; the field clips them to its outer shape. Blur strength hover darkens only the placeholder image, while its selection outline stays unchanged. Battery Ripple preview buttons use the same subtle neutral hover as the fields and a slightly darker pressed state. Give the sidebar Update preview hover and pressed states without adding update behavior.
+- Use the native pointing-hand cursor for active Settings controls; show the system operation-not-allowed cursor for disabled buttons, switches, and step arrows. Text entry, sliders, and Soon tags retain their usual cursors. Raise the unreleased app's minimum system version to macOS 15.
+- Add a softer hover to angle and wait-time fields. Arrow highlights sit flush against the field's left edge without their own rounded corners; the field clips them to its outer shape. Blur strength hover darkens only the preview image, while its selection outline stays unchanged. Battery Ripple preview buttons use the same subtle neutral hover as the fields and a slightly darker pressed state.
 - Give Lock Screen support a neutral gray icon and tile, move Blur to the former light-blue detection color, and give Detect starting angle a muted violet icon and tile.
 - Use the supplied raindrop icon for **Blur** and scan-object icon for **Detect starting angle**.
 - Separate the starting-angle and desktop-resume switch rows from their wait controls with full-width dividers. Give all three Seamless Close control sections 24-point padding while keeping 24-point trailing padding on switch rows. Use the angle field's paired arrow controls for both wait times, with a title and explanatory subtitle beside each.
 - Keep Seamless Close's finishing blur appearance while removing a redundant full-screen alpha erosion and blend. On the development Mac, instrumented closing passes showed fewer late render callbacks with Blur on; the owner found the appearance unchanged but did not notice a clear difference in feel. The motion curve, Blur switch, and one-screenshot capture remain the same.
 - Start Seamless Close from a prepared frame at the latest measured lid angle instead of showing a flat screenshot first. Run the one-shot screen capture away from the main queue so lid readings continue during capture. The owner found the entrance sooner and more natural on the development Mac; remaining capture and presentation delay still varies. The screenshot count and privacy behavior are unchanged.
-- Use smooth, coordinated geometry for Seamless Close's image content and upper edge, replacing the early/late rotation handoff. Restore a stronger response in the first degrees while keeping the later fold active below a 60° lid angle and limiting deep vertical stretch. Spread blur buildup through the full gesture while reducing its final strength by about 20% at the top and 30% at the hinge. Keep lid-driven timing and the single-screenshot behavior. The owner approved the revised closing feel on the development Mac on 2026-09-28; broader gesture and material checks remain pending.
-- Let consecutive fractional lid readings shorten Seamless Close's smoothing delay during steady, slow movement. For fast closes with roughly 100 ms gaps between meaningful readings, carry a short, damped motion estimate through each gap instead of repeatedly accelerating and settling. Whole-degree slow motion retains its earlier response. The measured fast-close replay reduced speed variation, while synthetic abrupt-stop and reversal checks remain bounded; the change still needs physical lid comparison.
+- Use smooth, coordinated geometry for Seamless Close's image content and upper edge, replacing the early/late rotation handoff. Restore a stronger response in the first degrees while keeping the later fold active below a 60° lid angle and limiting deep vertical stretch. Spread blur buildup through the full gesture while reducing its final strength by about 20% at the top and 30% at the hinge. Keep lid-driven timing and the single-screenshot behavior. The owner approved the revised closing feel and confirmed slow and fast closes, pauses, reversals, reopening, and Blur on/off on the development Mac on 2026-09-28.
+- Let consecutive fractional lid readings shorten Seamless Close's smoothing delay during steady, slow movement. For fast closes with roughly 100 ms gaps between meaningful readings, carry a short, damped motion estimate through each gap instead of repeatedly accelerating and settling. Whole-degree slow motion retains its earlier response. The measured fast-close replay reduced speed variation, while synthetic abrupt-stop and reversal checks remain bounded. The owner confirmed the overall slow and fast closing behavior on the development Mac on 2026-09-28; a controlled comparison with the previous build remains pending.
 
 ### Fixed
 
 - Apply **Detect above** during pause restoration too. A still lid at or below the threshold restores the desktop without learning or rearming from that angle, and clears any previous learned angle so **Begin at** takes over.
+
+### Validation and limitations
+
+- On 2026-09-28, the owner confirmed the requested slow and fast closing, pauses, reversal and reclose, Blur on/off, normal and full-screen Space switching with Settings open and closed, sleep/wake/unlock, and desktop and mouse return including quit on the development Mac. This does not establish behavior on other Mac models or every interruption path.
+- The release build and full regression suite passed locally on 2026-09-28. A versioned DMG was created, mounted, and copied to a separate location; its signature, version, and build number were verified. The red Battery Ripple event, complete automatic-angle edge-case matrix, first launch from the DMG, and public installer and update path remain unverified. Local signed-feed update trials passed both update modes.
 
 ## 0.1.0-alpha.9 — 2026-09-27
 

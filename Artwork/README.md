@@ -1,4 +1,6 @@
-# Glissform app icon
+# Glissform artwork
+
+## App icon
 
 `Glissform.icon` is the editable Icon Composer source. `Reference/Glissform-approved.png` preserves the owner's selected blue-wave concept for visual comparison; it is not bundled into the app.
 
@@ -25,3 +27,7 @@ Prepared from the owner's approved image with the built-in image editing tool. T
 References: [Apple's app icon guidelines](https://developer.apple.com/design/human-interface-guidelines/app-icons), [Icon Composer workflow](https://developer.apple.com/documentation/xcode/creating-your-app-icon-using-icon-composer).
 
 The menu bar uses a monochrome template derived from the ClearDark export of this same source at 18 points (1× and 2×). `scripts/make-menu-template.swift` converts luminance into opacity to retain the original wave and contours instead of flattening the opaque tile into a square. The build compiles the `GlissformMenuBar` template image set alongside the app icon. AppKit supplies the native menu bar foreground colour; there is no separately drawn symbol. The conversion writes alpha bytes directly and validates opacity after decoding the generated PNG, so an invisible template cannot silently pass the build.
+
+## Blur preview wallpaper
+
+`BlurPreviewWallpaper.png` is a 960 × 600 centered crop of the wallpaper image supplied for the Seamless Close blur previews. It is a source asset, not a desktop screenshot or an app-bundled image. The app bundles only the three rendered High, Regular, and Subtle previews generated from it at a 42° fold.

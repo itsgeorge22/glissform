@@ -19,7 +19,7 @@ final class IconlyAppearance: ObservableObject {
 /// Iconly Regular vectors, with Bold, Bulk, and Outline bundled locally.
 /// See docs/ICONLY.md for provenance and asset licensing.
 enum IconlySymbol: String, CaseIterable {
-    case shieldDone, shieldInfo, pause, chevronUp, play, stop, lock, copy, memory, laptop
+    case shieldDone, shieldInfo, pause, chevronUp, play, lock, copy, memory, laptop
 
     private static let images: [IconlyStyle: [IconlySymbol: NSImage]] = Dictionary(uniqueKeysWithValues: [IconlyStyle.outline, .bulk, .bold].map { style in
         (style, Dictionary(uniqueKeysWithValues: allCases.map { symbol in
@@ -49,7 +49,7 @@ enum IconlySymbol: String, CaseIterable {
     // Keep future product icon adjustments here; the three source sets stay intact.
     private var customStyle: IconlyStyle {
         switch self {
-        case .chevronUp, .play, .stop: return .bold
+        case .chevronUp, .play: return .bold
         default: return .bulk
         }
     }
@@ -61,12 +61,6 @@ enum IconlySymbol: String, CaseIterable {
         return Self.images[style == .custom ? customStyle : style]![self]!
     }
     var image: NSImage { image(for: .current) }
-
-    func menuImage(size: CGFloat = 18) -> NSImage {
-        let result = image.copy() as! NSImage
-        result.size = NSSize(width: size, height: size)
-        return result
-    }
 }
 
 struct IconlyIcon: View {
@@ -92,23 +86,5 @@ struct IconlyIcon: View {
             .frame(width: size, height: size)
             .rotationEffect(.degrees(rotation))
             .accessibilityHidden(true)
-    }
-}
-
-struct IconlyLabel: View {
-    let title: String
-    let symbol: IconlySymbol
-    var rotation: Double = 0
-
-    init(_ title: String, icon: IconlySymbol, rotation: Double = 0) {
-        self.title = title
-        self.symbol = icon
-        self.rotation = rotation
-    }
-
-    var body: some View {
-        Label { Text(title) } icon: {
-            IconlyIcon(symbol, rotation: rotation)
-        }
     }
 }

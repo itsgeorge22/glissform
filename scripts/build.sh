@@ -10,11 +10,21 @@ elif [[ "${1:-}" != "" ]]; then
 fi
 APP_VERSION="$(cat VERSION)"
 APP_BUILD="$(cat BUILD_NUMBER)"
-if [[ ! "$APP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?$ ]] || [[ ! "$APP_BUILD" =~ ^[0-9]+$ ]]; then
+if [[ ! "$APP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?$ ]] || [[ ! "$APP_BUILD" =~ ^[1-9][0-9]*$ ]]; then
     echo "Invalid VERSION or BUILD_NUMBER" >&2
     exit 1
 fi
 APP_SHORT_VERSION="${APP_VERSION%%-*}"
+SPARKLE_PUBLIC_KEY_FILE="$PWD/config/sparkle-public-key.txt"
+if [[ ! -f "$SPARKLE_PUBLIC_KEY_FILE" ]]; then
+    echo "Missing Sparkle public key: $SPARKLE_PUBLIC_KEY_FILE" >&2
+    exit 1
+fi
+SPARKLE_PUBLIC_KEY="$(tr -d '\r\n' < "$SPARKLE_PUBLIC_KEY_FILE")"
+if [[ ! "$SPARKLE_PUBLIC_KEY" =~ ^[A-Za-z0-9+/]{43}=$ ]]; then
+    echo "Invalid Sparkle EdDSA public key in $SPARKLE_PUBLIC_KEY_FILE" >&2
+    exit 1
+fi
 # Icon Composer assets need the full Xcode toolchain, not Command Line Tools.
 # Discover a standard Xcode installation without changing the user's global selection.
 if ! xcrun --find actool >/dev/null 2>&1 && [[ -z "${DEVELOPER_DIR:-}" ]] && [[ -d /Applications/Xcode.app/Contents/Developer ]]; then
@@ -92,7 +102,8 @@ fi
 # target as its SDK version. Declare the actual SDK so AppKit uses the current
 # native window-control appearance on newer macOS releases.
 swift build -c release \
-    -Xlinker -platform_version -Xlinker macos -Xlinker 15.0 -Xlinker "$SDK_VERSION"
+    -Xlinker -platform_version -Xlinker macos -Xlinker 15.0 -Xlinker "$SDK_VERSION" \
+    -Xlinker -rpath -Xlinker @executable_path/../Frameworks
 APP="$PWD/build/Glissform.app"
 mkdir -p "$APP/Contents/MacOS"
 BIN_DIR="$(swift build -c release --show-bin-path)"
@@ -102,10 +113,23 @@ if [[ "$LINKED_SDK" != "$SDK_VERSION" ]]; then
     exit 1
 fi
 cp "$BIN_DIR/Glissform" "$APP/Contents/MacOS/Glissform"
+# SwiftPM links binary frameworks but does not embed them in a manually
+# assembled .app. Preserve Sparkle's framework symlinks and executable modes.
+SPARKLE_SOURCE="$PWD/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
+if [[ ! -d "$SPARKLE_SOURCE" ]]; then
+    echo "Sparkle.framework is missing from SwiftPM's resolved binary artifact." >&2
+    exit 1
+fi
+SPARKLE_FRAMEWORK="$APP/Contents/Frameworks/Sparkle.framework"
+mkdir -p "$APP/Contents/Frameworks"
+rm -rf "$SPARKLE_FRAMEWORK"
+ditto "$SPARKLE_SOURCE" "$SPARKLE_FRAMEWORK"
 mkdir -p "$APP/Contents/Resources"
 rm -rf "$APP/Contents/Resources/Glissform_Glissform.bundle"
 ditto "$BIN_DIR/Glissform_Glissform.bundle" "$APP/Contents/Resources/Glissform_Glissform.bundle"
 ditto "$ICON_BUILD/Resources" "$APP/Contents/Resources"
+rm -f "$APP/Contents/Resources/Sparkle-LICENSE.txt"
+cp "$PWD/docs/SPARKLE_LICENSE.txt" "$APP/Contents/Resources/Sparkle-LICENSE.txt"
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -119,6 +143,13 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <key>CFBundleShortVersionString</key><string>$APP_SHORT_VERSION</string>
 <key>GlissformVersion</key><string>$APP_VERSION</string>
 <key>CFBundleVersion</key><string>$APP_BUILD</string>
+<key>SUFeedURL</key><string>https://glissform.app/updates/appcast.xml</string>
+<key>SUPublicEDKey</key><string>$SPARKLE_PUBLIC_KEY</string>
+<key>SURequireSignedFeed</key><true/>
+<key>SUVerifyUpdateBeforeExtraction</key><true/>
+<key>SUEnableAutomaticChecks</key><true/>
+<key>SUAutomaticallyUpdate</key><false/>
+<key>SUEnableSystemProfiling</key><false/>
 <key>LSMinimumSystemVersion</key><string>15.0</string>
 <key>LSUIElement</key><false/>
 <key>NSHighResolutionCapable</key><true/>
@@ -129,7 +160,16 @@ PLIST
 # Rebuilding resources in place does not update the .app directory date. Let
 # Launch Services notice the changed icon on the next launch.
 touch "$APP"
+# Sign nested Sparkle code before signing the containing framework and app.
+# Avoid --deep for signing: Sparkle helpers have distinct bundle identities
+# and the downloader may carry its own entitlements.
+SPARKLE_VERSION_DIR="$SPARKLE_FRAMEWORK/Versions/Current"
+codesign --force --sign - --options runtime "$SPARKLE_VERSION_DIR/XPCServices/Installer.xpc"
+codesign --force --sign - --options runtime --preserve-metadata=entitlements "$SPARKLE_VERSION_DIR/XPCServices/Downloader.xpc"
+codesign --force --sign - --options runtime "$SPARKLE_VERSION_DIR/Autoupdate"
+codesign --force --sign - --options runtime "$SPARKLE_VERSION_DIR/Updater.app"
+codesign --force --sign - --options runtime "$SPARKLE_FRAMEWORK"
 # Stable local identity allows subsequent development builds to reuse permission.
 codesign --force --sign - --identifier com.george.glissform.mvp --requirements '=designated => identifier "com.george.glissform.mvp"' "$APP"
-codesign --verify --strict "$APP"
+codesign --verify --deep --strict "$APP"
 printf 'Built %s\n' "$APP"

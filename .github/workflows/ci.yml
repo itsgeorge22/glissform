@@ -3,7 +3,6 @@ name: Build and motion checks
 on:
   push:
     branches: [main]
-    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
