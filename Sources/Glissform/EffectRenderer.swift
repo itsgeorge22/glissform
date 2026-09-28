@@ -486,25 +486,25 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             filter.inputImage = projected.clampedToExtent()
             filter.radius = screenBlurRadius
             if let softened = filter.outputImage {
-                // Keep the existing coverage and side fade. Otherwise the blur
-                // carries bright pixels into transparent space as narrow seams.
-                let alpha = projected.applyingFilter("CIColorMatrix", parameters: [
-                    "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 1),
-                    "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 1),
-                    "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 1),
-                    "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0),
-                    "inputBiasVector": CIVector(x: 0, y: 0, z: 0, w: 1)
-                ])
-                let safeInterior = alpha.applyingFilter("CIMorphologyMinimum", parameters: [
-                    kCIInputRadiusKey: min(ceil(screenBlurRadius * 3), 36)
-                ]).cropped(to: bounds)
-                let verticallyMixed = softened.cropped(to: bounds).applyingFilter("CIBlendWithMask", parameters: [
+                // The projection covers the whole target with uniform alpha.
+                // Eroding that alpha yields the same constant and needlessly
+                // adds a full-screen morphology pass to every moving frame.
+                // During a fade, preserve the old two-blend result by scaling
+                // the height mask by that same constant opacity.
+                let effectiveMask: CIImage
+                if opacity < 1 {
+                    let scale = CGFloat(opacity)
+                    effectiveMask = mask.applyingFilter("CIColorMatrix", parameters: [
+                        "inputRVector": CIVector(x: scale, y: 0, z: 0, w: 0),
+                        "inputGVector": CIVector(x: 0, y: scale, z: 0, w: 0),
+                        "inputBVector": CIVector(x: 0, y: 0, z: scale, w: 0)
+                    ])
+                } else {
+                    effectiveMask = mask
+                }
+                blurImage = softened.cropped(to: bounds).applyingFilter("CIBlendWithMask", parameters: [
                     kCIInputBackgroundImageKey: projected,
-                    kCIInputMaskImageKey: mask
-                ])
-                blurImage = verticallyMixed.applyingFilter("CIBlendWithMask", parameters: [
-                    kCIInputBackgroundImageKey: projected,
-                    kCIInputMaskImageKey: safeInterior
+                    kCIInputMaskImageKey: effectiveMask
                 ]).cropped(to: bounds)
             }
             if blurImage != nil { blurSlot = slot }
