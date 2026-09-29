@@ -281,8 +281,10 @@ h1, h2, h3, p { margin: 0; }
 .setting-row { min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 10px; color: $muted; font-size: 16px; line-height: 24px; }
 .setting-row + .setting-row { margin-top: 8px; padding-top: 16px; border-top: 1px solid $line; min-height: 64px; }
 .setting-row strong { color: $ink; font-size: 32px; font-weight: 600; line-height: 40px; letter-spacing: -1px; white-space: nowrap; }
-.illustration-switch { width: 52px; height: 24px; flex: none; padding: 2px; display: flex; justify-content: flex-end; border-radius: 100px; background: #007aff; }
-.illustration-switch span { width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px #0003; }
+.illustration-switch { position: relative; width: 56px; height: 24px; flex: none; }
+.illustration-switch::before { content: ''; position: absolute; top: 0; right: 0; width: 54px; height: 24px; border-radius: 12px; background: #0187fd; }
+.illustration-switch::after { content: ''; position: absolute; top: 7px; left: 12px; width: 2px; height: 10px; border-radius: 2px; background: #fff; }
+.illustration-switch span { position: absolute; top: 2px; right: 2px; width: 32px; height: 20px; border-radius: 10px; background: #fff; box-shadow: 0 0 2px #0000001a; }
 .settings-card:last-child .setting-row { color: $ink; font-weight: 500; }
 
 .conveniences-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; }
