@@ -295,7 +295,7 @@ h1, h2, h3, p { margin: 0; }
 .convenience h3, .privacy-panel__facts h3, .faq-item h3 { font-size: 20px; font-weight: 600; line-height: 28px; }
 .convenience p, .privacy-panel__facts p, .faq-item p { margin-top: 8px; color: $muted; font-size: 16px; line-height: 24px; }
 
-.privacy-panel { margin-block: 32px; padding: 56px 64px; display: grid; grid-template-columns: 392px minmax(0, 1fr); gap: 120px; border: 1px solid #d7e0ea; border-radius: 40px; background: #eef3f9; }
+.privacy-panel { margin-block: 104px; padding: 56px 64px; display: grid; grid-template-columns: 392px minmax(0, 1fr); gap: 120px; border: 1px solid #d7e0ea; border-radius: 40px; background: #eef3f9; }
 .privacy-panel__intro img { display: block; margin-bottom: 24px; }
 .privacy-panel__intro p { margin-top: 16px; color: $muted; font-size: 18px; line-height: 28px; }
 .privacy-panel__facts { display: flex; flex-direction: column; gap: 16px; align-self: center; }
@@ -310,7 +310,7 @@ h1, h2, h3, p { margin: 0; }
 .faq-item + .faq-item { padding-top: 16px; border-top: 1px solid #e4e8ed; }
 .faq-item a { text-decoration-thickness: 1px; text-underline-offset: 3px; }
 
-.download-panel { margin-block: 32px; min-height: 316px; padding: 80px 64px; display: flex; flex-direction: column; align-items: center; text-align: center; border: 1px solid #d7e0ea; border-radius: 40px; background: #eef3f9; }
+.download-panel { margin: 104px auto 32px; min-height: 316px; padding: 80px 64px; display: flex; flex-direction: column; align-items: center; text-align: center; border: 1px solid #d7e0ea; border-radius: 40px; background: #eef3f9; }
 .download-panel p { margin-top: 16px; color: $muted; font-size: 18px; line-height: 28px; }
 .download-panel .download-link { margin-top: 32px; }
 .site-footer { min-height: 112px; margin-top: 32px; padding-top: 32px; display: flex; align-items: flex-start; justify-content: space-between; border-top: 1px solid #e4e8ed; }
