@@ -1,63 +1,15 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Glissform brings subtle animations and quality-of-life improvements to everyday interactions on your Mac. Download the macOS beta.">
-  <title>Glissform — macOS beta</title>
-  <style>
-    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #19233b; background: #f5f7fc; }
-    * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 80% 0%, #dce9ff 0, transparent 35rem), #f5f7fc; }
-    main { max-width: 860px; margin: auto; padding: clamp(32px, 8vw, 92px) 24px 72px; }
-    .eyebrow { color: #4666b9; font-size: 13px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
-    h1 { margin: 14px 0 18px; font-size: clamp(52px, 10vw, 88px); line-height: 1; letter-spacing: -.06em; }
-    .lead { max-width: 680px; margin: 0; color: #46516b; font-size: clamp(20px, 3vw, 27px); line-height: 1.4; }
-    .download { display: inline-block; margin-top: 34px; padding: 15px 22px; border-radius: 14px; background: #2459d8; color: white; font-size: 17px; font-weight: 650; text-decoration: none; box-shadow: 0 8px 20px #2459d829; }
-    .download:hover, .download:focus-visible { background: #1648c1; }
-    .meta { margin: 14px 0 0; color: #657089; font-size: 14px; }
-    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 68px; }
-    section { padding: 28px; border: 1px solid #e0e5f1; border-radius: 22px; background: #ffffffd9; }
-    h2 { margin: 0 0 12px; font-size: 19px; letter-spacing: -.02em; }
-    p, li { line-height: 1.6; }
-    section p { margin: 0; color: #4f5a73; }
-    .instructions { margin-top: 18px; }
-    ol { padding-left: 22px; margin: 10px 0 0; color: #4f5a73; }
-    li + li { margin-top: 8px; }
-    a { color: #2459d8; }
-    footer { margin-top: 40px; color: #657089; font-size: 13px; }
-    @media (max-width: 620px) { .grid { grid-template-columns: 1fr; margin-top: 48px; } section { padding: 24px; } }
-  </style>
-</head>
-<body>
-  <main>
-    <div class="eyebrow">Public beta for macOS</div>
-    <h1>Glissform</h1>
-    <p class="lead">Subtle animations and quality-of-life improvements for everyday interactions on your Mac.</p>
-    <a class="download" href="/downloads/Glissform-0.1.0-beta.1.dmg">Download beta 0.1.0-beta.1</a>
-    <p class="meta">macOS 15 or later · Tested on MacBook Air M5 15-inch · Other Macs are unverified</p>
-
-    <div class="grid">
-      <section>
-        <h2>Seamless Close</h2>
-        <p>Your desktop appears to stay in place as you close your MacBook lid, with perspective, frost, and shadow following the movement. It needs Screen Recording permission for one temporary screenshot per gesture.</p>
-      </section>
-      <section>
-        <h2>Battery Ripple</h2>
-        <p>A short wave responds when power connects or the built-in battery reaches 20%. Each event has its own switch. It does not capture your screen.</p>
-      </section>
-    </div>
-
-    <section class="instructions">
-      <h2>Install the beta</h2>
-      <ol>
-        <li>Open the DMG and drag Glissform into Applications.</li>
-        <li>Open Glissform. This beta is not Apple notarized, so macOS may block its first launch. If you trust this download, use <strong>System Settings → Privacy &amp; Security → Open Anyway</strong> after the blocked attempt. See <a href="https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac">Apple’s instructions</a>.</li>
-        <li>Grant Screen Recording access if you want to use Seamless Close. Future beta updates can be checked and installed from the app.</li>
-      </ol>
-    </section>
-
-    <footer>Glissform 0.1.0-beta.1 · <a href="/downloads/Glissform-0.1.0-beta.1.dmg.sha256">SHA-256 checksum</a></footer>
-  </main>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#fafbfd" />
+    <meta name="description" content="Glissform brings subtle animations and thoughtful improvements to everyday Mac moments. Download the macOS public beta." />
+    <link rel="icon" type="image/png" href="/assets/glissform-icon.png" />
+    <title>Glissform — Beautifully Polished Everyday Mac Moments</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

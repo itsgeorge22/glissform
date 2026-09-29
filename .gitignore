@@ -2,6 +2,8 @@
 build/
 .DS_Store
 .swiftpm/
+website/node_modules/
+website/dist/
 
 # Local settings, logs, credentials and signing material
 .env

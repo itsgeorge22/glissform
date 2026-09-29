@@ -29,6 +29,7 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 - [x] Connect the sidebar Update card to signed update detection and Sparkle's install flow; show it only when Automatic updates is off and a newer installable release is found.
 - [x] Complete an isolated installed-app trial with a signed local feed and DMG: manual mode showed the existing card and installed through its Update button; automatic mode kept the card hidden and installed on quit. A tampered feed was rejected.
 - [x] Provision glissform.app on the release VPS with HTTPS and a restricted release-upload account. Publish the beta.1 DMG, checksum, signed feed, and download page.
+- [x] Build the desktop Figma landing page with still feature previews and a MacBook viewing message below 1156px; defer website animations.
 - [x] Set the release workflow's dedicated VPS deploy secret in the private GitHub repository.
 - [x] Check the first public beta.1 DMG download against its published SHA-256 checksum.
 - [ ] Check macOS first-open from the public download, Screen Recording permission after update, and both update modes against the published feed before calling public beta distribution verified. The owner confirmed first launch and Seamless Close from the locally packaged beta DMG on the development Mac.
