@@ -42,7 +42,7 @@ function FeatureShowcase() {
           <p>A little magic when you close your MacBook. Perspective and blur</p>
         </div>
         <button className="preview-button" type="button" aria-pressed={selected === 'seamless'} aria-controls="feature-preview" onClick={() => setSelected('seamless')}>
-          <img src={asset('play.svg')} width="20" height="20" alt="" />Try it
+          <span className="preview-button__icon"><img src={asset('play.svg')} width="20" height="20" alt="" /></span><span>Try it</span>
         </button>
       </article>
       <article className={'feature-option' + (selected === 'battery' ? ' feature-option--selected' : '')}>
@@ -54,7 +54,7 @@ function FeatureShowcase() {
           <p>Green when power connects.<br />Red when your battery reaches 20%.</p>
         </div>
         <button className="preview-button" type="button" aria-pressed={selected === 'battery'} aria-controls="feature-preview" onClick={() => setSelected('battery')}>
-          <img src={asset('play.svg')} width="20" height="20" alt="" />Try it
+          <span className="preview-button__icon"><img src={asset('play.svg')} width="20" height="20" alt="" /></span><span>Try it</span>
         </button>
       </article>
     </div>

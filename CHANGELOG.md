@@ -4,7 +4,7 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
-- Redesign the glissform.app landing page from the desktop Figma design, with still feature previews, 160px hero top padding, 104px vertical section spacing, Figma-matched primary download buttons, current beta download links, and a logo-and-message view below 1156px. Website animations are deferred.
+- Redesign the glissform.app landing page from the desktop Figma design, with still feature previews, 160px hero top padding, 104px vertical section spacing, Figma-matched download and Try it buttons with softer texture, current beta download links, and a logo-and-message view below 1156px. Website animations are deferred.
 - Separate local builds as Glissform Dev with a red icon and bundle identity. Development builds no longer connect to or offer the public updater; release builds retain the blue icon and signed public update feed.
 - Classify Glissform as a Utilities app in its bundle metadata so macOS can place it in the Spotlight app browser. The existing beta.1 DMG does not contain this change.
 - Publish the beta.1 download page at glissform.app after the versioned DMG and signed update feed went live. The public DMG download matched its published SHA-256 checksum; public-feed upgrade testing remains pending.

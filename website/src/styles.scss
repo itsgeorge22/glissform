@@ -87,6 +87,7 @@ h1, h2, h3, p { margin: 0; }
   }
 
   &--secondary {
+    width: 191px;
     min-height: 40px;
     padding: 7px 16px;
     border-color: #c4dcff;
@@ -94,8 +95,9 @@ h1, h2, h3, p { margin: 0; }
     box-shadow: 0 12px 12px #356ab917, inset 0 -2px 1px #97c1ff66;
     color: $blue;
 
-    &::before { background: url('/assets/try-button-texture.png') top left / 1024px 1024px; opacity: .12; mix-blend-mode: soft-light; backdrop-filter: blur(2px); }
+    &::before { background: url('/assets/try-button-texture.png') top left / 1024px 1024px; opacity: .06; mix-blend-mode: soft-light; backdrop-filter: blur(2px); }
     img { display: block; flex: none; }
+    span { flex: none; width: 128px; text-align: center; letter-spacing: -.8px; }
   }
 }
 
@@ -184,6 +186,7 @@ h1, h2, h3, p { margin: 0; }
   align-items: center;
   justify-content: center;
   gap: 7px;
+  width: 98px;
   min-height: 40px;
   padding: 7px 16px;
   border: 1px solid #c4dcff;
@@ -194,7 +197,9 @@ h1, h2, h3, p { margin: 0; }
   font: 600 16px/24px 'SF Pro Rounded', ui-rounded, 'Inter', sans-serif;
   cursor: pointer;
 
-  &::before { content: ''; position: absolute; z-index: -1; inset: 0; border-radius: inherit; background: url('/assets/try-button-texture.png') top left / 1024px 1024px; opacity: .12; mix-blend-mode: soft-light; backdrop-filter: blur(2px); }
+  &::before { content: ''; position: absolute; z-index: -1; inset: 0; border-radius: inherit; background: url('/assets/try-button-texture.png') top left / 1024px 1024px; opacity: .06; mix-blend-mode: soft-light; backdrop-filter: blur(2px); }
+  &__icon { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 24px; height: 24px; }
+  > span:last-child { flex: none; letter-spacing: -.75px; }
   img { display: block; }
 }
 
