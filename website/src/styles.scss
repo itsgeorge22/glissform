@@ -69,15 +69,21 @@ h1, h2, h3, p { margin: 0; }
   white-space: nowrap;
   cursor: pointer;
 
+  &:not(&--secondary) {
+    width: 192px;
+
+    span { flex: none; letter-spacing: -.65px; }
+  }
+
   &::before {
     content: '';
     position: absolute;
     z-index: -1;
     inset: 0;
     border-radius: inherit;
-    background: url('/assets/button-texture.png') top left / 307px 307px;
+    background: url('/assets/button-texture.png') top left / 307.2px 307.2px;
     opacity: .4;
-    mix-blend-mode: screen;
+    mix-blend-mode: plus-lighter;
   }
 
   &--secondary {
