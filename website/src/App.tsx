@@ -60,13 +60,7 @@ function FeatureShowcase() {
     </div>
     <div className="feature-preview" id="feature-preview" aria-live="polite">
       {selected === 'seamless' ? <div className="feature-preview__screen"><img src={asset('seamless-settings.png')} alt="Still preview of Seamless Close settings in Glissform" /></div>
-        : <div className="battery-preview" role="img" aria-label="Still preview of green power connection and red low battery ripple effects">
-          <div className="battery-preview__window">
-            <div className="battery-preview__dots"><i /><i /><i /></div>
-            <div className="battery-preview__heading"><span className="feature-icon feature-icon--battery"><img src={asset('battery-ripple.svg')} width="24" height="24" alt="" /></span><span>Battery Ripple</span></div>
-            <div className="battery-preview__effects"><div className="battery-preview__effect battery-preview__effect--green"><span>Power connects</span></div><div className="battery-preview__effect battery-preview__effect--red"><span>Battery reaches 20%</span></div></div>
-          </div>
-        </div>}
+        : <div className="feature-preview__screen feature-preview__screen--battery"><img src={asset('battery-settings.png')} alt="Still preview of Battery Ripple settings in Glissform" /></div>}
       <div className="feature-preview__fade" aria-hidden="true" />
     </div>
   </div>;
