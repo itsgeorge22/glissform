@@ -99,7 +99,7 @@ h1, h2, h3, p { margin: 0; }
   align-items: center;
   gap: 128px;
   padding-top: 160px;
-  padding-bottom: 96px;
+  padding-bottom: 128px;
 
   &__content {
     width: 744px;
@@ -237,7 +237,7 @@ h1, h2, h3, p { margin: 0; }
   &__effect span { position: relative; }
 }
 
-.section { padding-top: 96px; padding-bottom: 96px; }
+.section { padding-top: 128px; padding-bottom: 128px; }
 .section-intro { text-align: center; }
 .section-intro h2, .faq-intro h2, .privacy-panel h2, .download-panel h2 {
   font-size: 48px;
