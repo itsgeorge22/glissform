@@ -1,6 +1,6 @@
 # Glissform website
 
-The website is a Vite, React, TypeScript, and SCSS project. Its desktop page follows the [Figma design](https://www.figma.com/design/IkSrf5xF80j0PeRMzPytZ8/Untitled?node-id=56-2717). Below 1156px, it shows only the Glissform logo and a MacBook viewing message. The feature selectors switch between still previews; there are no website animations yet.
+The website is a Vite, React, TypeScript, and SCSS project. Its desktop page follows the [Figma design](https://www.figma.com/design/IkSrf5xF80j0PeRMzPytZ8/Untitled?node-id=56-2717). Below 1156px, it shows only the Glissform logo and a MacBook viewing message. The clickable feature cards switch between still previews every five seconds, with a filling tint showing progress through the interval. Broader website animations are deferred.
 
 Run `npm ci` and `npm run dev` here to preview it, or `npm run build` to create `dist/`.
 

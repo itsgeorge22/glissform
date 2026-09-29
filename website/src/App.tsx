@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const asset = (name: string) => '/assets/' + name;
 const downloadUrl = '/downloads/Glissform-0.1.0-beta.1.dmg';
@@ -31,9 +31,22 @@ function SettingRow({ label, value, switchOn = false }: { label: string; value?:
 
 function FeatureShowcase() {
   const [selected, setSelected] = useState<'seamless' | 'battery'>('seamless');
+  const [cycle, setCycle] = useState(0);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setSelected(current => current === 'seamless' ? 'battery' : 'seamless'), 5000);
+    return () => window.clearTimeout(timeout);
+  }, [selected, cycle]);
+
+  const selectFeature = (feature: 'seamless' | 'battery') => {
+    setSelected(feature);
+    setCycle(current => current + 1);
+  };
+
   return <div className="feature-showcase" aria-label="Feature previews">
     <div className="feature-selector">
       <article className={'feature-option' + (selected === 'seamless' ? ' feature-option--selected' : '')}>
+        {selected === 'seamless' && <span key={`seamless-${cycle}`} className="feature-option__progress" aria-hidden="true" />}
         <div className="feature-option__copy">
           <div className="feature-option__title">
             <span className="feature-icon feature-icon--seamless"><img src={asset('seamless-close.svg')} width="24" height="24" alt="" /></span>
@@ -41,11 +54,10 @@ function FeatureShowcase() {
           </div>
           <p>A little magic when you close your MacBook. Perspective and blur</p>
         </div>
-        <button className="preview-button" type="button" aria-pressed={selected === 'seamless'} aria-controls="feature-preview" onClick={() => setSelected('seamless')}>
-          <span className="preview-button__icon"><img src={asset('play.svg')} width="20" height="20" alt="" /></span><span>Try it</span>
-        </button>
+        <button className="feature-option__control" type="button" aria-label="Show Seamless Close preview" aria-pressed={selected === 'seamless'} aria-controls="feature-preview" onClick={() => selectFeature('seamless')} />
       </article>
       <article className={'feature-option' + (selected === 'battery' ? ' feature-option--selected' : '')}>
+        {selected === 'battery' && <span key={`battery-${cycle}`} className="feature-option__progress" aria-hidden="true" />}
         <div className="feature-option__copy">
           <div className="feature-option__title">
             <span className="feature-icon feature-icon--battery"><img src={asset('battery-ripple.svg')} width="24" height="24" alt="" /></span>
@@ -53,12 +65,10 @@ function FeatureShowcase() {
           </div>
           <p>Green when power connects.<br />Red when your battery reaches 20%.</p>
         </div>
-        <button className="preview-button" type="button" aria-pressed={selected === 'battery'} aria-controls="feature-preview" onClick={() => setSelected('battery')}>
-          <span className="preview-button__icon"><img src={asset('play.svg')} width="20" height="20" alt="" /></span><span>Try it</span>
-        </button>
+        <button className="feature-option__control" type="button" aria-label="Show Battery Ripple preview" aria-pressed={selected === 'battery'} aria-controls="feature-preview" onClick={() => selectFeature('battery')} />
       </article>
     </div>
-    <div className="feature-preview" id="feature-preview" aria-live="polite">
+    <div className="feature-preview" id="feature-preview">
       {selected === 'seamless' ? <div className="feature-preview__screen"><img src={asset('seamless-settings.png')} alt="Still preview of Seamless Close settings in Glissform" /></div>
         : <div className="feature-preview__screen feature-preview__screen--battery"><img src={asset('battery-settings.png')} alt="Still preview of Battery Ripple settings in Glissform" /></div>}
       <div className="feature-preview__fade" aria-hidden="true" />
