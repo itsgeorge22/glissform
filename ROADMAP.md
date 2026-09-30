@@ -33,7 +33,7 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 - [x] Build the desktop Figma landing page with still feature previews and a MacBook viewing message below 1156px. Add a ten-second feature-card timer, manual selection, smooth preview transitions, interactive feature-card states, and interactive blur choices, starting-angle slider, and switches in the Customisable grid; defer broader website animations.
 - [x] Set the release workflow's dedicated VPS deploy secret in the private GitHub repository.
 - [x] Check the first public beta.1 DMG download against its published SHA-256 checksum.
-- [ ] Publish beta.3 to replace the broken beta.2 DMG, whose flat SwiftPM resource directory causes a Settings startup crash. The corrected local installed build opened on the development Mac. Verify the beta.3 DMG, Screen Recording permission after update, and both update modes against the published feed. The owner confirmed first launch and Seamless Close from the earlier locally packaged beta DMG on the development Mac.
+- [x] Publish beta.3 to replace the broken beta.2 DMG, whose flat SwiftPM resource directory causes a Settings startup crash. The public DMG checksum, signature, bundle structure, and installed startup were verified on the development Mac on 2026-09-30; Screen Recording access remained allowed after a direct reinstall. The owner confirmed first launch and Seamless Close from the earlier locally packaged beta DMG on the development Mac.
 - [x] Refine the compact settings composition with native toolbar controls over a narrower sidebar, concentric navigation rows and icons, subtle page icon tiles, a combined Seamless Close switch-and-angle card, and distinct automatic-selection and pause cards. Remove both feature preview illustrations and feature-page privacy footers.
 - [x] Add compact play buttons beside the two Battery Ripple event switches so either color can be previewed on demand.
 - [x] Build and run the full regression suite for the card and sidebar revision (2026-09-26). Inspect all three pages in the running app's Light appearance for the earlier separate-card layout, including compact rows, icon tiles, and removal of previews. Live Dark and earlier-macOS checks remain pending.
@@ -124,7 +124,8 @@ The broader investigations below and above are follow-up work, not a requirement
 
 - [x] Make bundled interface resources load independently of SwiftPM's Xcode-specific bundle accessor, normalize the release bundle structure, and check that structure in the packaged DMG.
 - [x] Check the signed feed at launch and hourly; retain a detected manual update until a later check finds none.
-- [ ] Confirm the published beta.3 DMG launches and its signed feed offers an update from beta.2. Verify the website download link and permission state after upgrade.
+- [x] Confirm the published beta.3 DMG launches, the signed feed includes beta.3, and the website points to its live download. Screen Recording access remained allowed after direct installation on the development Mac.
+- [ ] Verify the actual beta.2-to-beta.3 Sparkle upgrade and permission state afterward; manual and automatic update modes still need physical checks.
 
 ## Beta.2 — 0.1.0-beta.2
 
