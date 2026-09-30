@@ -4,13 +4,31 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
-- Redesign the glissform.app landing page from the desktop Figma design, with still feature previews, 160px hero top padding, 104px vertical section spacing, Figma-matched download buttons with softer texture, matching Customize switch illustrations, a 4px Blur preview outline gap, 32px and 64px upper-card gaps, a 32px angle value, current beta download links, and a logo-and-message view below 1156px. Broader website animations are deferred.
+## 0.1.0-beta.2 — 2026-09-30
+
+Second beta: direct feedback by email, an Escape return during Seamless Close, clearer Settings cards, and website improvements.
+
+- Replace the Send feedback placeholder with a Send an email button that opens a draft addressed to support@glissform.app and prefills the Glissform and macOS versions, an icon beside the address that briefly turns into a green checkmark after copying, guidance on useful details, and a shield-marked note that no screenshots or diagnostic files are attached. Match the other Settings pages' header, card gaps, padding, and full-width dividers, with feedback copy written as “we” and “us.”
+- Use two Settings card padding patterns throughout: main sections match Power connection (12 points on the top, left, and bottom; 24 on the right), while support sections use 24 points on the sides and 20 on the top and bottom.
+- Let Escape exit an active Seamless Close animation whether Resume desktop after pause is on or off. Keep the shortcut hint visible in the first Seamless Close card, use the pause feature's fold-to-flat return for a visible image, then release the screenshot and require reopening above the starting angle before another gesture. A pending capture is canceled immediately.
+- Add a period to the Seamless Close hero card description and remove the final period from each Customisable card title.
+- Add centered website navigation for Customisable, Private, and F.A.Q, with hover, pressed, keyboard-focus, and current-section states. Keep the same navbar fixed while scrolling and smoothly add or remove its translucent, blurred material as soon as scrolling begins or returns to the top. Follow the linked section occupying the largest visible area, make the navbar brand return to the top and clear the selection, and use the supplied transparent-corner icon in the navbar.
+- Ease away only the outer shadow on hover for all three website download buttons; remove the remaining inset shadow and darken the buttons by 4% while pressed.
+- Match the website Privacy panel, FAQ dividers and spacing, and footer to the desktop Figma layout.
+- Redesign the glissform.app landing page from the desktop Figma design, with still feature previews, 200px hero top padding, 104px vertical section spacing, Figma-matched download buttons with softer texture, matching Customize switch illustrations, a 4px Blur preview outline gap, 32px and 64px upper-card gaps, a 32px angle value, current beta download links, and a logo-and-message view below 1156px. Broader website animations are deferred.
 - Give the Privacy panel 104px of space above and below, and the final Download panel 104px above and 32px below, following the updated Figma layout.
+- Make the website Customisable grid's blur choices, thin starting-angle slider, and plain switches interactive, with matching hover, pressed, focus, and reduced-motion states. Keep timing values as illustrations, and smoothly dim or restore each wait-time row as its switch changes.
 - Match the website's Battery Ripple feature preview to the updated Figma card using its app Settings image.
-- Make the feature cards selectable and cycle their still previews every five seconds, with the active card filling as a timer; temporarily hide the Try it buttons and size the cards to their content.
+- Make the feature cards selectable and cycle their still previews every ten seconds, with a slim progress bar on the white active card. Smooth both automatic and manual card and preview transitions, and add matching hover, pressed, and keyboard-focus states; temporarily hide the Try it buttons and size the cards to their content.
 - Separate local builds as Glissform Dev with a red icon and bundle identity. Development builds no longer connect to or offer the public updater; release builds retain the blue icon and signed public update feed.
 - Classify Glissform as a Utilities app in its bundle metadata so macOS can place it in the Spotlight app browser. The existing beta.1 DMG does not contain this change.
 - Publish the beta.1 download page at glissform.app after the versioned DMG and signed update feed went live. The public DMG download matched its published SHA-256 checksum; public-feed upgrade testing remains pending.
+
+### Validation and limitations
+
+- The beta.2 release build, full regression suite, and website build passed locally. A local beta.2 DMG was mounted, copied to a separate test location, and checked for signature, version, and build number.
+- On 2026-09-30, the owner confirmed Esc returns the desktop with Pause enabled, another close works after reopening, and the Settings card stays in place when Pause is toggled. Broader Esc interruption paths remain synthetic-only. Public-feed upgrades, permission after update, and compatibility beyond the development Mac still need physical verification.
+- The owner confirmed a test email arrived at support@glissform.app on 2026-09-30.
 
 ## 0.1.0-beta.1 — 2026-09-28
 

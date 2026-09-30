@@ -1,10 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 
 const asset = (name: string) => '/assets/' + name;
-const downloadUrl = '/downloads/Glissform-0.1.0-beta.1.dmg';
+const downloadUrl = '/downloads/Glissform-0.1.0-beta.2.dmg';
 
-function Brand() {
-  return <span className="brand"><img src={asset('glissform-icon.png')} width="32" height="32" alt="" /><span>Glissform</span></span>;
+function Brand({ homeLink = false }: { homeLink?: boolean }) {
+  const icon = homeLink ? 'navbar-glissform-icon.png' : 'glissform-icon.png';
+  const content = <><img src={asset(icon)} width="32" height="32" alt="" /><span>Glissform</span></>;
+  return homeLink
+    ? <a className="brand brand--link" href="#" aria-label="Glissform — back to top">{content}</a>
+    : <span className="brand">{content}</span>;
 }
 
 function DownloadLink({ secondary = false }: { secondary?: boolean }) {
@@ -14,6 +18,87 @@ function DownloadLink({ secondary = false }: { secondary?: boolean }) {
   </a>;
 }
 
+const sectionLinks = [
+  { id: 'customise', label: 'Customisable' },
+  { id: 'privacy', label: 'Private' },
+  { id: 'good-to-know', label: 'F.A.Q' },
+];
+
+function SectionNavigation() {
+  const [activeSection, setActiveSection] = useState(() => window.location.hash.slice(1));
+
+  useEffect(() => {
+    let animationFrame = 0;
+
+    const updateActiveSection = () => {
+      if (window.scrollY <= 0) {
+        setActiveSection('');
+        return;
+      }
+
+      const viewportTop = 72;
+      const viewportBottom = window.innerHeight;
+      let nextSection = '';
+      let largestVisibleArea = 0;
+
+      sectionLinks.forEach(({ id }) => {
+        const section = document.getElementById(id);
+        if (!section) return;
+        const bounds = section.getBoundingClientRect();
+        const visibleArea = Math.max(0, Math.min(bounds.bottom, viewportBottom) - Math.max(bounds.top, viewportTop));
+        if (visibleArea > largestVisibleArea) {
+          largestVisibleArea = visibleArea;
+          nextSection = id;
+        }
+      });
+
+      setActiveSection(nextSection);
+    };
+
+    const scheduleUpdate = () => {
+      window.cancelAnimationFrame(animationFrame);
+      animationFrame = window.requestAnimationFrame(updateActiveSection);
+    };
+
+    const updateFromHash = () => {
+      const hashSection = window.location.hash.slice(1);
+      if (sectionLinks.some(({ id }) => id === hashSection)) setActiveSection(hashSection);
+      else scheduleUpdate();
+    };
+
+    updateActiveSection();
+    window.addEventListener('scroll', scheduleUpdate, { passive: true });
+    window.addEventListener('resize', scheduleUpdate);
+    window.addEventListener('hashchange', updateFromHash);
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      window.removeEventListener('scroll', scheduleUpdate);
+      window.removeEventListener('resize', scheduleUpdate);
+      window.removeEventListener('hashchange', updateFromHash);
+    };
+  }, []);
+
+  return <nav className="site-nav" aria-label="Main sections">
+    {sectionLinks.map(({ id, label }) => <a key={id} className="site-nav__link" href={`#${id}`} aria-current={activeSection === id ? 'location' : undefined}>{label}</a>)}
+  </nav>;
+}
+
+function SiteHeader() {
+  const [hasMaterial, setHasMaterial] = useState(() => window.scrollY > 0);
+
+  useEffect(() => {
+    const updateHeader = () => setHasMaterial(window.scrollY > 0);
+    window.addEventListener('scroll', updateHeader, { passive: true });
+    return () => window.removeEventListener('scroll', updateHeader);
+  }, []);
+
+  return <header className={'site-header shell' + (hasMaterial ? ' site-header--material' : '')}>
+    <Brand homeLink />
+    <SectionNavigation />
+    <DownloadLink secondary />
+  </header>;
+}
+
 function SectionIntro({ title, copy }: { title: [string, string]; copy: [string, string] }) {
   return <div className="section-intro">
     <h2>{title[0]}<br />{title[1]}</h2>
@@ -21,12 +106,56 @@ function SectionIntro({ title, copy }: { title: [string, string]; copy: [string,
   </div>;
 }
 
-function IllustrationSwitch() {
-  return <span className="illustration-switch" aria-hidden="true"><span /></span>;
+function IllustrationSwitch({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+  return <button className="illustration-switch" type="button" role="switch" aria-label={label} aria-checked={checked} onClick={() => onChange(!checked)}><span /></button>;
 }
 
-function SettingRow({ label, value, switchOn = false }: { label: string; value?: string; switchOn?: boolean }) {
-  return <div className="setting-row"><span>{label}</span>{switchOn ? <IllustrationSwitch /> : <strong>{value}</strong>}</div>;
+function SettingRow({ label, switchValue, onSwitch, value, muted = false }: { label: string; switchValue?: boolean; onSwitch?: (checked: boolean) => void; value?: string; muted?: boolean }) {
+  return <div className={'setting-row' + (muted ? ' setting-row--muted' : '')}><span>{label}</span>{switchValue !== undefined && onSwitch
+    ? <IllustrationSwitch label={label} checked={switchValue} onChange={onSwitch} />
+    : <strong>{value}</strong>}</div>;
+}
+
+function CustomizationGrid() {
+  const [blur, setBlur] = useState<'high' | 'regular' | 'subtle'>('regular');
+  const [angle, setAngle] = useState(100);
+  const [detectAngle, setDetectAngle] = useState(true);
+  const [pauseReturn, setPauseReturn] = useState(true);
+  const [powerConnection, setPowerConnection] = useState(true);
+  const [batteryLow, setBatteryLow] = useState(true);
+  const blurChoices = [
+    { id: 'high', label: 'High', image: 'blur-high.png' },
+    { id: 'regular', label: 'Regular', image: 'blur-regular.png' },
+    { id: 'subtle', label: 'Subtle', image: 'blur-subtle.png' },
+  ] as const;
+
+  return <div className="customization-grid">
+    <article className="content-card blur-card">
+      <div className="card-copy"><h3>Just the right amount of blur</h3><p>Choose Subtle, Regular or High. Or turn blur off entirely.</p></div>
+      <div className="blur-choices" aria-label="Blur strength">
+        {blurChoices.map((choice) => <button className={'blur-choice' + (blur === choice.id ? ' blur-choice--selected' : '')} type="button" aria-pressed={blur === choice.id} onClick={() => setBlur(choice.id)} key={choice.id}><span className="blur-choice__image"><img src={asset(choice.image)} alt="" /></span><span>{choice.label}</span></button>)}
+      </div>
+    </article>
+    <article className="content-card angle-card">
+      <div className="card-copy"><h3>Start at just<br />the right angle</h3><p>Choose when Seamless Close begins, or use your current lid position.</p></div>
+      <div className="angle-illustration">
+        <div className="angle-illustration__value"><label htmlFor="starting-angle">Begin at</label><strong>{angle}°</strong></div>
+        <input id="starting-angle" className="angle-illustration__range" type="range" min="60" max="120" step="1" value={angle} aria-valuetext={`${angle} degrees`} onChange={(event) => setAngle(Number(event.target.value))} style={{ '--angle-progress': `${(angle - 60) / 60 * 100}%` } as CSSProperties} />
+      </div>
+    </article>
+    <article className="content-card settings-card">
+      <div className="card-copy"><h3>Finds your angle.<br />Automatically</h3><p>Let a still lid set the starting point. Choose how long to wait.</p></div>
+      <div className="settings-card__rows"><SettingRow label="Detect starting angle" switchValue={detectAngle} onSwitch={setDetectAngle} /><SettingRow label="Wait time" value="1.0 s" muted={!detectAngle} /></div>
+    </article>
+    <article className="content-card settings-card">
+      <div className="card-copy"><h3>Pause.<br />Your desktop returns</h3><p>Hold the lid still to restore the desktop. Set the pause delay to suit you.</p></div>
+      <div className="settings-card__rows"><SettingRow label="Pause to return" switchValue={pauseReturn} onSwitch={setPauseReturn} /><SettingRow label="Wait time" value="0.5 s" muted={!pauseReturn} /></div>
+    </article>
+    <article className="content-card settings-card">
+      <div className="card-copy"><h3>Your moments.<br />Your choice</h3><p>Enable each battery alert separately. Preview either ripple in app.</p></div>
+      <div className="settings-card__rows"><SettingRow label="Power connection" switchValue={powerConnection} onSwitch={setPowerConnection} /><SettingRow label="Battery at 20%" switchValue={batteryLow} onSwitch={setBatteryLow} /></div>
+    </article>
+  </div>;
 }
 
 function FeatureShowcase() {
@@ -34,7 +163,7 @@ function FeatureShowcase() {
   const [cycle, setCycle] = useState(0);
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => setSelected(current => current === 'seamless' ? 'battery' : 'seamless'), 5000);
+    const timeout = window.setTimeout(() => setSelected(current => current === 'seamless' ? 'battery' : 'seamless'), 10000);
     return () => window.clearTimeout(timeout);
   }, [selected, cycle]);
 
@@ -52,7 +181,7 @@ function FeatureShowcase() {
             <span className="feature-icon feature-icon--seamless"><img src={asset('seamless-close.svg')} width="24" height="24" alt="" /></span>
             <h2>Seamless Close</h2>
           </div>
-          <p>A little magic when you close your MacBook. Perspective and blur</p>
+          <p>A little magic when you close your MacBook. Perspective and blur.</p>
         </div>
         <button className="feature-option__control" type="button" aria-label="Show Seamless Close preview" aria-pressed={selected === 'seamless'} aria-controls="feature-preview" onClick={() => selectFeature('seamless')} />
       </article>
@@ -69,8 +198,12 @@ function FeatureShowcase() {
       </article>
     </div>
     <div className="feature-preview" id="feature-preview">
-      {selected === 'seamless' ? <div className="feature-preview__screen"><img src={asset('seamless-settings.png')} alt="Still preview of Seamless Close settings in Glissform" /></div>
-        : <div className="feature-preview__screen feature-preview__screen--battery"><img src={asset('battery-settings.png')} alt="Still preview of Battery Ripple settings in Glissform" /></div>}
+      <div className={'feature-preview__screen' + (selected === 'seamless' ? ' feature-preview__screen--active' : '')} aria-hidden={selected !== 'seamless'}>
+        <img src={asset('seamless-settings.png')} alt="Still preview of Seamless Close settings in Glissform" />
+      </div>
+      <div className={'feature-preview__screen feature-preview__screen--battery' + (selected === 'battery' ? ' feature-preview__screen--active' : '')} aria-hidden={selected !== 'battery'}>
+        <img src={asset('battery-settings.png')} alt="Still preview of Battery Ripple settings in Glissform" />
+      </div>
       <div className="feature-preview__fade" aria-hidden="true" />
     </div>
   </div>;
@@ -93,7 +226,7 @@ const faq = [
 function App() {
   return <>
     <div className="desktop-site">
-      <header className="site-header shell"><Brand /><DownloadLink secondary /></header>
+      <SiteHeader />
       <main>
         <section className="hero shell" aria-labelledby="hero-title">
           <div className="hero__content">
@@ -104,48 +237,20 @@ function App() {
           <FeatureShowcase />
         </section>
 
-        <section className="section section--personalization shell" aria-label="Personalization">
+        <section className="section section--personalization shell" id="customise" aria-label="Personalization">
           <SectionIntro title={['Easy To Customise.', 'Make It Feel Like Yours']} copy={['Choose the look, the timing, and the moments you want to see.', 'Small adjustments that make each experience feel like yours.']} />
-          <div className="customization-grid">
-            <article className="content-card blur-card">
-              <div className="card-copy"><h3>Just the right amount of blur.</h3><p>Choose Subtle, Regular or High. Or turn blur off entirely.</p></div>
-              <div className="blur-choices" aria-label="Illustration of the three available blur strengths">
-                <div className="blur-choice"><div className="blur-choice__image"><img src={asset('blur-high.png')} alt="High blur preview" /></div><span>High</span></div>
-                <div className="blur-choice blur-choice--selected"><div className="blur-choice__image"><img src={asset('blur-regular.png')} alt="Regular blur preview" /></div><span>Regular</span></div>
-                <div className="blur-choice"><div className="blur-choice__image"><img src={asset('blur-subtle.png')} alt="Subtle blur preview" /></div><span>Subtle</span></div>
-              </div>
-            </article>
-            <article className="content-card angle-card">
-              <div className="card-copy"><h3>Start at just<br />the right angle.</h3><p>Choose when Seamless Close begins, or use your current lid position.</p></div>
-              <div className="angle-illustration" aria-label="Illustration of a starting angle set to 100 degrees">
-                <div className="angle-illustration__value"><span>Begin at</span><strong>100°</strong></div>
-                <div className="angle-illustration__track"><span /></div>
-              </div>
-            </article>
-            <article className="content-card settings-card">
-              <div className="card-copy"><h3>Finds your angle.<br />Automatically.</h3><p>Let a still lid set the starting point. Choose how long to wait.</p></div>
-              <div className="settings-card__rows"><SettingRow label="Detect starting angle" switchOn /><SettingRow label="Wait time" value="1.0 s" /></div>
-            </article>
-            <article className="content-card settings-card">
-              <div className="card-copy"><h3>Pause.<br />Your desktop returns.</h3><p>Hold the lid still to restore the desktop. Set the pause delay to suit you.</p></div>
-              <div className="settings-card__rows"><SettingRow label="Pause to return" switchOn /><SettingRow label="Wait time" value="0.5 s" /></div>
-            </article>
-            <article className="content-card settings-card">
-              <div className="card-copy"><h3>Your moments.<br />Your choice.</h3><p>Enable each battery alert separately. Preview either ripple in app.</p></div>
-              <div className="settings-card__rows"><SettingRow label="Power connection" switchOn /><SettingRow label="Battery at 20%" switchOn /></div>
-            </article>
-          </div>
+          <CustomizationGrid />
         </section>
 
-        <section className="section section--conveniences shell" aria-label="Everyday controls">
+        <section className="section section--conveniences shell" id="everyday" aria-label="Everyday controls">
           <SectionIntro title={['Feels At Home.', 'Stays Out Of Your Way']} copy={['Choose how Glissform starts, runs, and stays up to date.', 'Everyday controls, right where you need them.']} />
           <div className="conveniences-grid">
             {conveniences.map((item) => <article className="convenience" key={item.title}><img src={asset(item.icon)} width="32" height="32" alt="" /><h3>{item.title}</h3><p>{item.copy}</p></article>)}
           </div>
         </section>
 
-        <section className="privacy-panel shell" aria-labelledby="privacy-title">
-          <div className="privacy-panel__intro"><img src={asset('privacy-shield.svg')} width="34" height="40" alt="" /><h2 id="privacy-title">Your Screen<br />Stays Yours</h2><p>Personal moments deserve privacy. Glissform keeps your screen images on your Mac.</p></div>
+        <section className="privacy-panel shell" id="privacy" aria-labelledby="privacy-title">
+          <div className="privacy-panel__intro"><span className="privacy-panel__icon"><img src={asset('privacy-shield.svg')} width="34" height="40" alt="" /></span><h2 id="privacy-title">Your Screen<br />Stays Yours</h2><p>Personal moments deserve privacy. Glissform keeps your screen images on your Mac.</p></div>
           <div className="privacy-panel__facts">
             <div><h3>No continuous recording.</h3><p>One temporary screenshot powers each gesture.</p></div>
             <div><h3>No saved or shared screenshots.</h3><p>Screen images stay in memory. They are never saved or sent.</p></div>
@@ -153,16 +258,16 @@ function App() {
           </div>
         </section>
 
-        <section className="section section--future shell" aria-label="More to come">
+        <section className="section section--future shell" id="more-to-come" aria-label="More to come">
           <SectionIntro title={['More To Come.', 'Already In The Making']} copy={['We’re working on new features for everyday Mac moments.', 'Thoughtful additions, with the same attention to detail.']} />
-          <img className="future-field" src={asset('future-field.svg')} width="1128" height="282" alt="" />
+          <img className="future-field" src={asset('future-field.svg?v=figma-282')} width="1128" height="282" alt="" />
         </section>
 
-        <section className="section section--faq shell" aria-labelledby="faq-title">
+        <section className="section section--faq shell" id="good-to-know" aria-labelledby="faq-title">
           <div className="faq-intro"><h2 id="faq-title">Good To Know</h2><p>A few practical details before you try it.</p></div>
           <div className="faq-list">
             {faq.map((item) => <div className="faq-item" key={item.question}><h3>{item.question}</h3><p>{item.answer}</p></div>)}
-            <div className="faq-item"><h3>Will macOS ask me to approve it?</h3><p>Open the DMG and drag Glissform to Applications. The beta is not Apple notarized yet. After a blocked first launch, open System Settings → Privacy &amp; Security and choose Open Anyway if you trust the download. <a href="https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac">Apple’s instructions</a> explain this step.</p></div>
+            <div className="faq-item"><h3>Will macOS ask me to approve it?</h3><p>The beta is not Apple notarized yet. After a blocked first launch, open System Settings → Privacy &amp; Security and choose Open Anyway if you trust the download.</p></div>
           </div>
         </section>
 

@@ -891,6 +891,13 @@ import Foundation
         for frame in 41...95 { _ = noRestore.update(angle: 80, time: Double(frame) / 20) }
         precondition(noRestore.active && noRestore.learnedStartAngle == 109,
                      "Automatic selection must respect the separate pause-restoration toggle")
+        noRestore.cancelUntilOpened(above: 109)
+        for frame in 96...140 { _ = noRestore.update(angle: 80, time: Double(frame) / 20) }
+        precondition(!noRestore.active && noRestore.learnedStartAngle == 109,
+                     "Escape must not learn a lower angle or rearm while the lid stays closed")
+        _ = noRestore.update(angle: 110, time: 7.05)
+        precondition(noRestore.update(angle: 80, time: 7.1) > 0,
+                     "Reopening above the escaped angle must permit a new gesture")
         print("PASS: automatic rest learning, manual fallback, gesture lock, wake reference, sample gaps and pause latch")
         print("PASS: ordinary angles, closing progression, reversal, repeated closure, low-lid startup, wake reset, invalid angles")
     }

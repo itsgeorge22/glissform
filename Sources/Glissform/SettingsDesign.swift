@@ -10,12 +10,10 @@ enum SettingsDesign {
         static let controls: CGFloat = 12
         static let cards: CGFloat = 12
         static let cardInset: CGFloat = 16
-        static let featureInset: CGFloat = 12
-        static let controlSectionInset: CGFloat = 24
         static let angleFieldInset: CGFloat = 7
         static let angleFieldTrailingInset: CGFloat = 4
-        static let switchCardInsets = EdgeInsets(top: featureInset, leading: featureInset,
-                                                 bottom: featureInset, trailing: 24)
+        static let mainCardInsets = EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 24)
+        static let supportCardInsets = EdgeInsets(top: 20, leading: 24, bottom: 20, trailing: 24)
         static let groups: CGFloat = 24
         static let sections: CGFloat = 18
         static let page: CGFloat = 24
@@ -59,13 +57,14 @@ enum SettingsDesign {
         static let attention = Color(red: 1, green: 159 / 255, blue: 10 / 255)
         static let danger = Color(red: 1, green: 69 / 255, blue: 58 / 255)
         enum CardIconColor {
-            case feature, automaticAngle, blur, success, attention, danger, neutral
+            case feature, automaticAngle, blur, feedback, success, attention, danger, neutral
 
             var tile: Color {
                 switch self {
                 case .feature: return Palette.feature
                 case .automaticAngle: return Color(red: 0xAD / 255, green: 0x91 / 255, blue: 0xDC / 255)
                 case .blur: return Color(red: 0x70 / 255, green: 0xB9 / 255, blue: 0xEE / 255)
+                case .feedback: return Palette.feedbackSidebar
                 case .success: return Palette.success
                 case .attention: return Palette.attention
                 case .danger: return Palette.danger
@@ -78,11 +77,13 @@ enum SettingsDesign {
                 case (.feature, .light): return Color(red: 0x43 / 255, green: 0x5C / 255, blue: 0xCD / 255)
                 case (.automaticAngle, .light): return Color(red: 0x86 / 255, green: 0x63 / 255, blue: 0xC7 / 255)
                 case (.blur, .light): return Color(red: 0x3B / 255, green: 0x94 / 255, blue: 0xD0 / 255)
+                case (.feedback, .light): return Color(red: 0xA8 / 255, green: 0x55 / 255, blue: 0x60 / 255)
                 case (.success, .light): return Color(red: 0x2A / 255, green: 0xB8 / 255, blue: 0x4D / 255)
                 case (.attention, .light): return Color(red: 0xE0 / 255, green: 0x8C / 255, blue: 0x09 / 255)
                 case (.danger, .light): return Color(red: 0xDF / 255, green: 0x38 / 255, blue: 0x35 / 255)
                 case (.feature, _): return Color(red: 0x66 / 255, green: 0x7C / 255, blue: 0xE7 / 255)
                 case (.automaticAngle, _): return Color(red: 0xC2 / 255, green: 0xA6 / 255, blue: 0xED / 255)
+                case (.feedback, _): return Color(red: 0xDC / 255, green: 0x92 / 255, blue: 0x9A / 255)
                 case (.blur, _): return Color(red: 0x8C / 255, green: 0xCE / 255, blue: 0xFF / 255)
                 case (.success, _): return Palette.success
                 case (.attention, _): return Palette.attention

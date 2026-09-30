@@ -6,7 +6,7 @@ body:
 - type: markdown
   attributes:
     value: 'Thanks for helping improve Glissform. Search existing issues first. Reports
-      and attachments are public: omit serial numbers, credentials, and private desktop
+      and attachments are visible to repository collaborators: omit serial numbers, credentials, and private desktop
       content.'
 - type: textarea
   id: problem

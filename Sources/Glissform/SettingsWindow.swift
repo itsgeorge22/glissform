@@ -496,7 +496,7 @@ private struct SettingsRootView: View {
                     case .batteryRipple: BatterySettingsView(model: model)
                     case .general: GeneralSettingsView(model: model)
                     case .about: AboutSettingsView(model: model)
-                    case .foundBug: FoundBugPlaceholderView()
+                    case .foundBug: SendFeedbackView()
                     }
                 }
                 .frame(width: SettingsDesign.Metrics.contentWidth)
@@ -707,7 +707,7 @@ private struct FeatureToggleCard<Icon: View>: View {
     var body: some View {
         FeatureToggleRow(title: title, detail: detail, color: color, isEnabled: $isEnabled,
                          preview: preview, icon: icon)
-            .padding(SettingsDesign.Spacing.switchCardInsets)
+            .padding(SettingsDesign.Spacing.mainCardInsets)
             .modifier(SettingsCardSurface())
     }
 }
@@ -762,7 +762,7 @@ private struct AnimationSettingsView: View {
             blurControls
                 .modifier(SettingsCardSurface())
             lockScreenSupport
-                .padding(SettingsDesign.Spacing.switchCardInsets)
+                .padding(SettingsDesign.Spacing.mainCardInsets)
                 .modifier(SettingsCardSurface())
             Button("Reset to defaults") { model.resetSeamlessCloseToDefaults() }
                 .buttonStyle(FeedbackButtonStyle(kind: .quiet))
@@ -792,16 +792,38 @@ private struct AnimationSettingsView: View {
                              preview: nil) {
                 FeatureIcon(.infiniteScreen)
             }
-            .padding(SettingsDesign.Spacing.switchCardInsets)
+            .padding(SettingsDesign.Spacing.mainCardInsets)
 
             Rectangle()
                 .fill(SettingsDesign.Palette.cardBorder)
                 .frame(height: 1)
 
             angleControls
-                .padding(SettingsDesign.Spacing.controlSectionInset)
+                .padding(SettingsDesign.Spacing.supportCardInsets)
+            escapeShortcutHint
         }
         .modifier(SettingsCardSurface())
+    }
+
+    private var escapeShortcutHint: some View {
+        VStack(spacing: 0) {
+            Rectangle()
+                .fill(SettingsDesign.Palette.cardBorder)
+                .frame(height: 1)
+            HStack(spacing: 12) {
+                Text("Esc")
+                    .font(SettingsDesign.Typography.caption.weight(.semibold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(SettingsDesign.Palette.cardBorder, in: RoundedRectangle(cornerRadius: 6))
+                Text("Press Esc during the animation to return to your desktop.")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(SettingsDesign.Spacing.supportCardInsets)
+        }
     }
 
     private var angleControls: some View {
@@ -869,7 +891,7 @@ private struct AnimationSettingsView: View {
                 .labelsHidden().toggleStyle(AppleSwitchStyle())
                 .accessibilityLabel("Resume desktop after pause")
             }
-            .padding(SettingsDesign.Spacing.switchCardInsets)
+            .padding(SettingsDesign.Spacing.mainCardInsets)
 
             Rectangle()
                 .fill(SettingsDesign.Palette.cardBorder)
@@ -879,7 +901,7 @@ private struct AnimationSettingsView: View {
                             detail: "How long the lid stays still before restoring the desktop.",
                             duration: model.pauseDuration,
                             setDuration: model.setPauseDuration)
-                .padding(SettingsDesign.Spacing.controlSectionInset)
+                .padding(SettingsDesign.Spacing.supportCardInsets)
         }
     }
 
@@ -903,7 +925,7 @@ private struct AnimationSettingsView: View {
                 .labelsHidden().toggleStyle(AppleSwitchStyle())
                 .accessibilityLabel("Blur")
             }
-            .padding(SettingsDesign.Spacing.switchCardInsets)
+            .padding(SettingsDesign.Spacing.mainCardInsets)
 
             Rectangle()
                 .fill(SettingsDesign.Palette.cardBorder)
@@ -948,7 +970,7 @@ private struct AnimationSettingsView: View {
                     .help("Use \(strength.title.lowercased()) blur for Seamless Close.")
                 }
             }
-            .padding(SettingsDesign.Spacing.controlSectionInset)
+            .padding(SettingsDesign.Spacing.supportCardInsets)
         }
     }
 
@@ -990,7 +1012,7 @@ private struct AnimationSettingsView: View {
                     .accessibilityLabel("Detect starting angle")
                     .accessibilityHint(automaticAngleDescription)
             }
-            .padding(SettingsDesign.Spacing.switchCardInsets)
+            .padding(SettingsDesign.Spacing.mainCardInsets)
 
             Rectangle()
                 .fill(SettingsDesign.Palette.cardBorder)
@@ -1000,7 +1022,7 @@ private struct AnimationSettingsView: View {
                             detail: "How long the lid stays still before choosing the angle.",
                             duration: model.automaticAngleDuration,
                             setDuration: model.setAutomaticAngleDuration)
-                .padding(SettingsDesign.Spacing.controlSectionInset)
+                .padding(SettingsDesign.Spacing.supportCardInsets)
 
             Rectangle()
                 .fill(SettingsDesign.Palette.cardBorder)
@@ -1019,7 +1041,7 @@ private struct AnimationSettingsView: View {
                            allowsZero: true,
                            setAngle: model.setAutomaticDetectionThreshold)
             }
-            .padding(SettingsDesign.Spacing.controlSectionInset)
+            .padding(SettingsDesign.Spacing.supportCardInsets)
         }
     }
 
@@ -1101,7 +1123,7 @@ private struct GeneralSettingsView: View {
                              preview: nil) {
                 FeatureIcon(.backgroundRunning)
             }
-            .padding(SettingsDesign.Spacing.switchCardInsets)
+            .padding(SettingsDesign.Spacing.mainCardInsets)
             .modifier(SettingsCardSurface())
 
             FeatureToggleRow(title: "Menu bar icon",
@@ -1112,7 +1134,7 @@ private struct GeneralSettingsView: View {
                              preview: nil) {
                 FeatureIcon(.menuBarIcon)
             }
-            .padding(SettingsDesign.Spacing.switchCardInsets)
+            .padding(SettingsDesign.Spacing.mainCardInsets)
             .modifier(SettingsCardSurface())
 
             VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
@@ -1132,7 +1154,7 @@ private struct GeneralSettingsView: View {
                         .padding(.leading, SettingsDesign.Metrics.iconSize + SettingsDesign.Spacing.controls)
                 }
             }
-            .padding(SettingsDesign.Spacing.switchCardInsets)
+            .padding(SettingsDesign.Spacing.mainCardInsets)
             .modifier(SettingsCardSurface())
 
             if model.isDevelopmentBuild {
@@ -1147,7 +1169,7 @@ private struct GeneralSettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .padding(SettingsDesign.Spacing.switchCardInsets)
+                .padding(SettingsDesign.Spacing.mainCardInsets)
                 .modifier(SettingsCardSurface())
             } else {
                 FeatureToggleRow(title: "Automatic updates",
@@ -1158,7 +1180,7 @@ private struct GeneralSettingsView: View {
                                  preview: nil) {
                     FeatureIcon(.automaticUpdates)
                 }
-                .padding(SettingsDesign.Spacing.switchCardInsets)
+                .padding(SettingsDesign.Spacing.mainCardInsets)
                 .modifier(SettingsCardSurface())
             }
         }
@@ -1406,25 +1428,134 @@ private struct ScreenAccessCard: View {
             .fixedSize()
             .help("Open Screen & System Audio Recording in System Settings to enable or revoke access for Glissform.")
         }
-        .padding(SettingsDesign.Spacing.featureInset)
+        .padding(SettingsDesign.Spacing.mainCardInsets)
         .frame(maxWidth: .infinity, alignment: .leading)
         .modifier(SettingsCardSurface())
         .accessibilityElement(children: .contain)
     }
 }
 
-private struct FoundBugPlaceholderView: View {
+enum FeedbackEmail {
+    static let address = "support@glissform.app"
+
+    static var draftURL: URL? {
+        let version = Bundle.main.object(forInfoDictionaryKey: "GlissformVersion") as? String ?? "Development"
+        var components = URLComponents()
+        components.scheme = "mailto"
+        components.path = address
+        components.queryItems = [
+            URLQueryItem(name: "body", value: "Glissform version: \(version)\nmacOS: \(ProcessInfo.processInfo.operatingSystemVersionString)")
+        ]
+        return components.url
+    }
+}
+
+private struct SendFeedbackView: View {
+    @State private var addressCopied = false
+    @State private var copyFeedbackToken = 0
+    @State private var emailAppUnavailable = false
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("Send feedback")
-                .font(SettingsDesign.Typography.pageTitle)
-                .tracking(SettingsDesign.Typography.headlineTracking)
-            Text("Nothing here yet.")
-                .font(SettingsDesign.Typography.body)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, minHeight: 360)
+        VStack(alignment: .leading, spacing: SettingsDesign.Spacing.cards) {
+            SettingsFeatureHeader(title: "Send feedback",
+                subtitle: "We'd love to hear what you think about Glissform.")
+                .padding(.bottom, SettingsDesign.Spacing.detail)
+            contactCard
+            guidanceCard
+            HStack(alignment: .top, spacing: SettingsDesign.Spacing.label) {
+                IconlyIcon(.shieldDone, size: 17)
+                    .accessibilityHidden(true)
+                Text("Nothing is sent until you send the email. Glissform does not attach screenshots or diagnostic files.")
+                    .font(SettingsDesign.Typography.caption)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .foregroundStyle(.secondary)
         }
         .padding(SettingsDesign.Spacing.page)
+        .alert("No email app available", isPresented: $emailAppUnavailable) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Copy \(FeedbackEmail.address) and use it in your preferred email service.")
+        }
+    }
+
+    private var contactCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: SettingsDesign.Spacing.controls) {
+                CardIconTile(color: .feedback) { FeatureIcon(.sendFeedback) }
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: SettingsDesign.Spacing.detail) {
+                    Text("Tell us what's on your mind")
+                        .font(SettingsDesign.Typography.controlTitle)
+                    Text("Send us a problem report, an idea, or a question.")
+                        .font(SettingsDesign.Typography.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(SettingsDesign.Spacing.mainCardInsets)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Rectangle()
+                .fill(SettingsDesign.Palette.cardBorder)
+                .frame(height: 1)
+            HStack(spacing: SettingsDesign.Spacing.detail) {
+                Text(FeedbackEmail.address)
+                    .font(SettingsDesign.Typography.body)
+                    .textSelection(.enabled)
+                Button {
+                    NSPasteboard.general.clearContents()
+                    addressCopied = NSPasteboard.general.setString(FeedbackEmail.address, forType: .string)
+                    if addressCopied { copyFeedbackToken += 1 }
+                } label: {
+                    if addressCopied {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(SettingsDesign.Palette.success)
+                            .frame(width: 16, height: 16)
+                    } else {
+                        IconlyIcon(.copy, size: 16)
+                    }
+                }
+                .buttonStyle(FeedbackButtonStyle(kind: .link))
+                .modifier(SettingsActionCursor())
+                .accessibilityLabel(addressCopied ? "Email address copied" : "Copy support email address")
+                .help(addressCopied ? "Copied" : "Copy email address")
+                .task(id: copyFeedbackToken) {
+                    guard addressCopied else { return }
+                    do { try await Task.sleep(for: .seconds(2)) }
+                    catch { return }
+                    addressCopied = false
+                }
+                Spacer(minLength: 0)
+                Button("Send an email") { compose() }
+                    .buttonStyle(FeedbackButtonStyle(kind: .filled))
+                    .modifier(SettingsActionCursor())
+            }
+            .padding(SettingsDesign.Spacing.supportCardInsets)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .modifier(SettingsCardSurface())
+    }
+
+    private var guidanceCard: some View {
+        VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
+            Text("What helps in feedback")
+                .font(SettingsDesign.Typography.controlTitle)
+            Text("For a problem, tell us what happened, what you expected, and how to repeat it if you know. For an idea, tell us what you would like Glissform to do. The draft includes your Glissform and macOS versions; you can edit or remove them.")
+                .font(SettingsDesign.Typography.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(SettingsDesign.Spacing.supportCardInsets)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .modifier(SettingsCardSurface())
+    }
+
+    private func compose() {
+        guard let url = FeedbackEmail.draftURL, NSWorkspace.shared.open(url) else {
+            emailAppUnavailable = true
+            return
+        }
     }
 }
 
@@ -1463,7 +1594,7 @@ private struct AboutSettingsView: View {
             privacyDetail("Kept in memory.", text: "Screen images are released after use, never saved or sent.", symbol: .memory)
             privacyDetail("No tracking.", text: "No audio capture or analytics. Network access is used for app updates.", symbol: .lock)
         }
-        .padding(SettingsDesign.Spacing.cardInset)
+        .padding(SettingsDesign.Spacing.supportCardInsets)
         .frame(maxWidth: .infinity, alignment: .leading)
         .modifier(SettingsCardSurface())
     }

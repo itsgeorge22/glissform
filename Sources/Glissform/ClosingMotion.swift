@@ -39,6 +39,7 @@ struct ClosingMotion {
     private(set) var desktopResumed = false
     private var desktopResumeRearmAngle: Double?
     private var desktopResumeCanRearmByClosing = false
+    private var escapeRearmAngle: Double?
     private var stillSince: Double?
     private var lastSampleTime: Double?
     private var lowestAngle = 0.0
@@ -120,8 +121,14 @@ struct ClosingMotion {
         desktopResumed = false
         desktopResumeRearmAngle = nil
         desktopResumeCanRearmByClosing = false
+        escapeRearmAngle = nil
         clearPauseTracking()
         clearRestingTracking()
+    }
+
+    mutating func cancelUntilOpened(above angle: Double) {
+        reset()
+        escapeRearmAngle = angle
     }
 
     /// Only the wake coordinator may arm below the threshold, after fresh
@@ -140,6 +147,10 @@ struct ClosingMotion {
             clearPauseTracking()
             clearRestingTracking()
             return 0
+        }
+        if let escapeRearmAngle {
+            guard angle > escapeRearmAngle else { return 0 }
+            self.escapeRearmAngle = nil
         }
         learnRestingAngle(angle, time: time)
         if let startAngle = effectiveStartAngle {

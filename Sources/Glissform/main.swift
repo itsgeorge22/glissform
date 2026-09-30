@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import MetalKit
 import OSLog
 
@@ -72,6 +73,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var retryAfter = Date.distantPast
     private var starting = false
     private var permissionRequested = false
+    private var escapeHotKey: EventHotKeyRef?
+    private var escapeHandler: EventHandlerRef?
+    private var escapeReturning = false
 
     init(capture: DesktopScreenshotSource? = nil,
          desktopAvailable: @escaping (CGDirectDisplayID) -> Bool = DesktopAvailability.allowsCapture,
@@ -160,6 +164,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             self.motion.resumeAfterPause = enabled
             UserDefaults.standard.set(enabled, forKey: "resumeAfterPause")
+            self.updateEscapeHotKey()
         }
         settingsModel.onPauseDurationChange = { [weak self] duration in
             self?.motion.pauseDuration = duration
@@ -343,6 +348,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         lastLidAngle = angle
         lastLidTime = time
         settingsModel.updateAngle(angle, time: time)
+        if escapeReturning { return }
         guard settingsModel.animationEnabled else {
             finishGesture()
             motion.reset()
@@ -378,6 +384,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard ready else { return }
         let progress = beganOpening ? currentProgress : motion.update(angle: angle, time: time)
         currentProgress = progress
+        updateEscapeHotKey()
         settingsModel.updateLearnedStartAngle(motion.learnedStartAngle)
         sensor.setActivePolling(motion.active || earlyCaptureRequested || wakeOpening.pending
                                 || (hasSnapshot && !motion.desktopResumed))
@@ -653,7 +660,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !hasSnapshot { window?.alphaValue = 0 }
     }
 
+    private func updateEscapeHotKey() {
+        guard motion.active, settingsModel.animationEnabled,
+              !sleeping, !quitting else {
+            removeEscapeHotKey()
+            return
+        }
+        guard escapeHotKey == nil else { return }
+        var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard),
+                                      eventKind: UInt32(kEventHotKeyPressed))
+        let handlerStatus = InstallEventHandler(GetApplicationEventTarget(), { _, _, context in
+            guard let context else { return noErr }
+            let app = Unmanaged<AppDelegate>.fromOpaque(context).takeUnretainedValue()
+            MainActor.assumeIsolated { app.exitSeamlessClose() }
+            return noErr
+        }, 1, &eventType, Unmanaged.passUnretained(self).toOpaque(), &escapeHandler)
+        guard handlerStatus == noErr else { return }
+        let hotKeyID = EventHotKeyID(signature: 0x474C4553, id: 1)
+        if RegisterEventHotKey(UInt32(kVK_Escape), 0, hotKeyID,
+                               GetApplicationEventTarget(), 0, &escapeHotKey) != noErr {
+            removeEscapeHotKey()
+        }
+    }
+
+    private func removeEscapeHotKey() {
+        if let escapeHotKey { UnregisterEventHotKey(escapeHotKey); self.escapeHotKey = nil }
+        if let escapeHandler { RemoveEventHandler(escapeHandler); self.escapeHandler = nil }
+    }
+
+    private func exitSeamlessClose() {
+        guard motion.active else { return }
+        let rearmAngle = motion.effectiveStartAngle ?? settingsModel.startAngle
+        cancelWake("Escape")
+        motion.cancelUntilOpened(above: rearmAngle)
+        escapeReturning = true
+        finishGesture(mode: .pause)
+        setStatus("Desktop restored · Open above \(Int(rearmAngle))° to rearm")
+    }
+
     private func finishGesture(mode: EffectRenderer.CompletionMode = .disabled) {
+        removeEscapeHotKey()
         guard hasSnapshot else { endGesture(); return }
         guard !finishingGesture else { return }
         finishingGesture = true
@@ -680,6 +726,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func endGesture(retainingSnapshot: Bool = false) {
+        removeEscapeHotKey()
+        escapeReturning = false
         if openingGesture && wakeOpening.pending { clearWakeTracking() }
         openingGesture = false
         finishingGesture = false
@@ -1129,6 +1177,16 @@ extension AppDelegate {
                               userInfo: [NSLocalizedDescriptionKey: message])
             }
         }
+        let feedbackDraft = FeedbackEmail.draftURL
+            .flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }
+        let version = Bundle.main.object(forInfoDictionaryKey: "GlissformVersion") as? String ?? "Development"
+        let expectedBody = "Glissform version: \(version)\nmacOS: \(ProcessInfo.processInfo.operatingSystemVersionString)"
+        try check(feedbackDraft?.scheme == "mailto" && feedbackDraft?.path == FeedbackEmail.address
+                  && feedbackDraft?.queryItems?.count == 1
+                  && feedbackDraft?.queryItems?.first?.name == "body"
+                  && feedbackDraft?.queryItems?.first?.value == expectedBody,
+                  "Feedback draft must address support and include the current app and macOS versions")
+        print("PASS: feedback draft includes the support address and current versions")
         var storage: CVPixelBuffer?
         let attributes = [kCVPixelBufferMetalCompatibilityKey as String: true,
                           kCVPixelBufferIOSurfacePropertiesKey as String: [:]] as [String: Any]
@@ -1140,7 +1198,8 @@ extension AppDelegate {
         CVPixelBufferUnlockBaseAddress(buffer, [])
 
         func makeGesture(screenAccessAllowed: @escaping () -> Bool = { true },
-                         startGesture: Bool = true) throws -> (AppDelegate, SyntheticCapture) {
+                         startGesture: Bool = true,
+                         resumeAfterPause: Bool = false) throws -> (AppDelegate, SyntheticCapture) {
             let source = SyntheticCapture()
             let app = AppDelegate(capture: source, desktopAvailable: { _ in true },
                                   screenAccessAllowed: screenAccessAllowed)
@@ -1156,8 +1215,10 @@ extension AppDelegate {
             app.renderer = renderer
             app.displayID = CGMainDisplayID()
             app.ready = true
-            app.settingsModel.configure(animationEnabled: true, startAngle: 100, screenCaptureAllowed: true)
+            app.settingsModel.configure(animationEnabled: true, startAngle: 100,
+                                        screenCaptureAllowed: true, resumeAfterPause: resumeAfterPause)
             app.motion.startAngle = 100
+            app.motion.resumeAfterPause = resumeAfterPause
             if startGesture {
                 app.handleLidReading(110)
                 app.handleLidReading(80)
@@ -1522,6 +1583,62 @@ extension AppDelegate {
             await freshTask?.value
             try checkCleared(app)
             print("PASS: Space change cancels \(visible ? "visible" : "pending") animation and requires opening above Begin at")
+        }
+        for pauseEnabled in [false, true] {
+            for visible in [false, true] {
+                let (app, source) = try makeGesture(resumeAfterPause: pauseEnabled)
+                defer { app.shutdown(); app.window?.close() }
+                try await waitForCapture(source)
+                let task = app.snapshotTask
+                if visible {
+                    source.pending?.resume(returning: buffer)
+                    source.pending = nil
+                    await task?.value
+                    try check(app.hasSnapshot, "Escape test needs a visible snapshot")
+                }
+                app.exitSeamlessClose()
+                if visible {
+                    try check(app.finishingGesture && app.escapeReturning && app.hasSnapshot,
+                              "Escape must use the pause return before releasing a visible capture")
+                    app.handleLidReading(70)
+                    try check(source.count == 1 && app.finishingGesture,
+                              "Lid movement during Escape return must not start a new capture")
+                }
+                source.pending?.resume(returning: buffer)
+                source.pending = nil
+                await task?.value
+                if visible { try await waitForCleanup(app) }
+                try checkCleared(app)
+                app.handleLidReading(70)
+                try check(source.count == 1 && !app.motion.active,
+                          "Escape must not restart below Begin at")
+                app.handleLidReading(101)
+                app.handleLidReading(80)
+                try await waitForCapture(source)
+                try check(source.count == 2 && app.motion.active,
+                          "Opening above Begin at must rearm after Escape")
+                app.exitSeamlessClose()
+                source.pending?.resume(returning: buffer)
+                source.pending = nil
+                print("PASS: Escape \(visible ? "animates visible" : "releases pending") capture with pause \(pauseEnabled ? "on" : "off") and requires reopening")
+            }
+        }
+        for interruption in ["sleep", "Space change", "quit"] {
+            let (app, source) = try makeGesture()
+            defer { app.shutdown(); app.window?.close() }
+            try await waitForCapture(source)
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await app.snapshotTask?.value
+            app.exitSeamlessClose()
+            try check(app.finishingGesture, "Escape must begin a visible pause return")
+            switch interruption {
+            case "sleep": app.suspend()
+            case "Space change": app.handleActiveSpaceChange()
+            default: app.shutdown()
+            }
+            try checkCleared(app)
+            print("PASS: Escape return cleanup on \(interruption)")
         }
         // Resolve a capture *after* each interruption to prove stale work cannot reappear.
         // Also interrupt a revealed snapshot to verify overlay and GPU cleanup.

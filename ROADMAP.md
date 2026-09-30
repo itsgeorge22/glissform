@@ -29,7 +29,7 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 - [x] Connect the sidebar Update card to signed update detection and Sparkle's install flow; show it only when Automatic updates is off and a newer installable release is found.
 - [x] Complete an isolated installed-app trial with a signed local feed and DMG: manual mode showed the existing card and installed through its Update button; automatic mode kept the card hidden and installed on quit. A tampered feed was rejected.
 - [x] Provision glissform.app on the release VPS with HTTPS and a restricted release-upload account. Publish the beta.1 DMG, checksum, signed feed, and download page.
-- [x] Build the desktop Figma landing page with still feature previews and a MacBook viewing message below 1156px. Add a five-second feature-card timer and manual card selection; defer broader website animations.
+- [x] Build the desktop Figma landing page with still feature previews and a MacBook viewing message below 1156px. Add a ten-second feature-card timer, manual selection, smooth preview transitions, interactive feature-card states, and interactive blur choices, starting-angle slider, and switches in the Customisable grid; defer broader website animations.
 - [x] Set the release workflow's dedicated VPS deploy secret in the private GitHub repository.
 - [x] Check the first public beta.1 DMG download against its published SHA-256 checksum.
 - [ ] Check macOS first-open from the public download, Screen Recording permission after update, and both update modes against the published feed before calling public beta distribution verified. The owner confirmed first launch and Seamless Close from the locally packaged beta DMG on the development Mac.
@@ -119,13 +119,13 @@ Keep this a practical release check for a small passion project:
 
 The broader investigations below and above are follow-up work, not a requirement to complete every roadmap item before beta. Other additional features are not required for launch; improve the app incrementally after release.
 
-## Planned for 0.1.0-beta.2
+## Beta.2 — 0.1.0-beta.2
 
 - [x] Make local builds visually distinct as Glissform Dev with a red icon, separate app identity and settings, and no public updates. Keep tagged release builds blue with signed updates.
 - [x] Add a Utilities application category to future app builds for Spotlight's app browser. Confirm appearance from an installed build when beta.2 is tested.
 
-- [ ] Replace the **Send feedback** page's “Nothing here yet” placeholder with useful guidance and a working public contact method. The source repository and GitHub forms are private.
-- [ ] Add a way to exit an active Seamless Close animation when **Resume desktop after pause** is off. The action should return to the live desktop, release the captured image, and avoid immediately restarting the same gesture. Decide where the control appears and verify it with the lid, sleep, Space changes, and quit.
+- [x] Replace the **Send feedback** placeholder with an email action addressed to support@glissform.app that includes the current app and macOS versions, an icon to copy the address, and concise guidance. The source repository and GitHub forms remain private. The owner confirmed a test email arrived on 2026-09-30.
+- [x] Add Escape to exit an active Seamless Close animation whether **Resume desktop after pause** is on or off, with an always-visible shortcut hint in the first Seamless Close card. A visible image uses the pause feature's fold-to-flat return before releasing its capture; a pending capture is canceled immediately. Reopening above the start angle is required before another gesture. Synthetic checks cover pending and visible captures plus return interruption. On 2026-09-30, the owner confirmed the return with Pause enabled, a fresh close after reopening, and stable card layout when toggling Pause. Broader sleep, Space-change, and quit interruptions remain synthetic-only for this shortcut.
 
 ## Release candidate and stable — 1.0.0-rc.1 → 1.0.0
 

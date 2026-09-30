@@ -8,13 +8,13 @@ Subtle animations and quality-of-life improvements for everyday interactions on 
 
 ## Project status
 
-**Public beta available:** [Download Glissform 0.1.0-beta.1](https://glissform.app/downloads/Glissform-0.1.0-beta.1.dmg) from [glissform.app](https://glissform.app/). The source repository is private.
+**Public beta available:** [Download Glissform 0.1.0-beta.2](https://glissform.app/downloads/Glissform-0.1.0-beta.2.dmg) from [glissform.app](https://glissform.app/). The source repository is private.
 
-The website presents the desktop landing page at widths of 1156px or more. Its feature cards show still previews, cycle every five seconds, and can be selected manually. Narrower windows show a MacBook viewing message.
+The website presents the desktop landing page with fixed Customisable, Private, and F.A.Q navigation at widths of 1156px or more. As soon as scrolling begins, the same navbar smoothly gains a translucent, blurred material and removes it again at the top. The selected link follows the linked section occupying the largest visible area; the brand returns to the top and clears the selection. Its feature cards show still previews, cycle every ten seconds, and transition smoothly through automatic and manual selection, with hover, pressed, and keyboard-focus feedback. The Customisable grid provides interactive blur choices, starting-angle slider, and switches; timing values are illustrations. Narrower windows show a MacBook viewing message.
 
 Open the DMG and drag Glissform into Applications. The beta is not Apple notarized, so macOS may block first launch; after a blocked attempt, use **System Settings → Privacy & Security → Open Anyway** if you trust the download. See [Apple's instructions](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac). Seamless Close needs Screen Recording permission. Future beta updates are checked through the app; Automatic updates controls whether they download and install automatically. The public DMG and signed update feed are live, while an upgrade against that public feed has not yet been physically verified. Lock Screen animation is not available; Settings shows it as a planned feature.
 
-Beta.1 adds signed updates and configurable Seamless Close blur strength. Earlier alpha releases introduced **Battery Ripple** and renamed **Infinite Screen** to **Seamless Close**. See the [changelog](CHANGELOG.md) for version-specific changes and ongoing limitations.
+Beta.2 adds an Esc return for Seamless Close and an email contact page. Beta.1 added signed updates and configurable Seamless Close blur strength. Earlier alpha releases introduced **Battery Ripple** and renamed **Infinite Screen** to **Seamless Close**. See the [changelog](CHANGELOG.md) for version-specific changes and ongoing limitations.
 
 ## Current features
 
@@ -22,8 +22,9 @@ Beta.1 adds signed updates and configurable Seamless Close blur strength. Earlie
 - Reverse the effect by reopening the lid, including experimental opening after lid-close sleep using the same screenshot.
 - Choose the starting angle manually or let a still-lid pause set it automatically, one degree below the held angle. Set a minimum lid angle for automatic detection, or set it to 0° to disable the threshold; **Begin at** remains the fallback until an angle is learned. Optionally restore desktop access after a pause. Set each wait independently from 0.5 to 10 seconds (1 second by default).
 - Keep Glissform running after its Settings window closes, with menu bar access by default.
+- Press Esc during Seamless Close to use the same fold-to-flat return as pause restoration, whether the pause feature is on or off. Reopen above the starting angle to start another gesture.
 
-Battery Ripple plays a green wave when power connects or a red wave when the built-in battery falls to 20%. The two events have independent saved switches and preview buttons; there is no overall Battery Ripple switch. A compact sidebar groups General, Seamless Close, and Battery Ripple in that order under Features, with Privacy & About and a Send feedback placeholder under More. General controls whether Glissform keeps running after Settings closes, whether its menu bar icon appears, whether macOS launches it at login, and whether updates download and install automatically. With automatic installation off, the sidebar shows the existing Update card only when a newer installable version is found; its button opens the installer. When background running is on, closing Settings removes Glissform from the Dock even if its menu bar icon is hidden; opening the app again restores Settings. Seamless Close keeps its switch, live lid reading, and manual angle together in one card, with separate automatic-selection and pause cards and a page reset for its settings. Battery Ripple uses no screenshot or additional permission.
+Battery Ripple plays a green wave when power connects or a red wave when the built-in battery falls to 20%. The two events have independent saved switches and preview buttons; there is no overall Battery Ripple switch. A compact sidebar groups General, Seamless Close, and Battery Ripple in that order under Features, with Privacy & About and Send feedback under More. General controls whether Glissform keeps running after Settings closes, whether its menu bar icon appears, whether macOS launches it at login, and whether updates download and install automatically. With automatic installation off, the sidebar shows the existing Update card only when a newer installable version is found; its button opens the installer. When background running is on, closing Settings removes Glissform from the Dock even if its menu bar icon is hidden; opening the app again restores Settings. Seamless Close keeps its switch, live lid reading, and manual angle together in one card, with separate automatic-selection and pause cards and a page reset for its settings. Battery Ripple uses no screenshot or additional permission.
 
 ## Compatibility
 
@@ -44,7 +45,7 @@ Battery Ripple reads the Mac's power-source and built-in battery charge state. I
 
 ## Feedback and support
 
-The source repository and its [issue tracker](https://github.com/itsgeorge22/glissform/issues) are private, so public bug reports and feature suggestions are not available there. The in-app Send feedback page is a placeholder; a public contact method is planned. For detailed feature behaviour, see the [app guide](docs/APP_GUIDE.md).
+The source repository and its [issue tracker](https://github.com/itsgeorge22/glissform/issues) are private, so public bug reports and feature suggestions are not available there. The Send feedback page opens an email addressed to [support@glissform.app](mailto:support@glissform.app) with the app and macOS versions in its editable body, and has an icon to copy the address for another email service. For detailed feature behaviour, see the [app guide](docs/APP_GUIDE.md).
 
 ## Development
 
