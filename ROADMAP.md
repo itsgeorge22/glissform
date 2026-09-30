@@ -27,12 +27,13 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 - [x] Replace the Automatic updates placeholder with a switch backed by Sparkle's download and install preference. Keep update checks active in both modes.
 - [x] Apply the native pointing-hand cursor to active Settings controls, use the system unavailable cursor for disabled actions, and raise the unreleased app's minimum deployment target to macOS 15.
 - [x] Connect the sidebar Update card to signed update detection and Sparkle's install flow; show it only when Automatic updates is off and a newer installable release is found.
+- [x] Prepare the beta.3 update-flow correction: check quietly on app launch and hourly while open, then keep a detected manual-mode update visible until a check finds none. Verify it against the published feed in an installed build; beta.2 does not contain this correction.
 - [x] Complete an isolated installed-app trial with a signed local feed and DMG: manual mode showed the existing card and installed through its Update button; automatic mode kept the card hidden and installed on quit. A tampered feed was rejected.
 - [x] Provision glissform.app on the release VPS with HTTPS and a restricted release-upload account. Publish the beta.1 DMG, checksum, signed feed, and download page.
 - [x] Build the desktop Figma landing page with still feature previews and a MacBook viewing message below 1156px. Add a ten-second feature-card timer, manual selection, smooth preview transitions, interactive feature-card states, and interactive blur choices, starting-angle slider, and switches in the Customisable grid; defer broader website animations.
 - [x] Set the release workflow's dedicated VPS deploy secret in the private GitHub repository.
 - [x] Check the first public beta.1 DMG download against its published SHA-256 checksum.
-- [ ] Check macOS first-open from the public download, Screen Recording permission after update, and both update modes against the published feed before calling public beta distribution verified. The owner confirmed first launch and Seamless Close from the locally packaged beta DMG on the development Mac.
+- [ ] Publish beta.3 to replace the broken beta.2 DMG, whose flat SwiftPM resource directory causes a Settings startup crash. The corrected local installed build opened on the development Mac. Verify the beta.3 DMG, Screen Recording permission after update, and both update modes against the published feed. The owner confirmed first launch and Seamless Close from the earlier locally packaged beta DMG on the development Mac.
 - [x] Refine the compact settings composition with native toolbar controls over a narrower sidebar, concentric navigation rows and icons, subtle page icon tiles, a combined Seamless Close switch-and-angle card, and distinct automatic-selection and pause cards. Remove both feature preview illustrations and feature-page privacy footers.
 - [x] Add compact play buttons beside the two Battery Ripple event switches so either color can be previewed on demand.
 - [x] Build and run the full regression suite for the card and sidebar revision (2026-09-26). Inspect all three pages in the running app's Light appearance for the earlier separate-card layout, including compact rows, icon tiles, and removal of previews. Live Dark and earlier-macOS checks remain pending.
@@ -118,6 +119,12 @@ Keep this a practical release check for a small passion project:
 - Provide a usable installation and permission flow for an ad-hoc signed download, with honest tested-hardware and known-limitation notes.
 
 The broader investigations below and above are follow-up work, not a requirement to complete every roadmap item before beta. Other additional features are not required for launch; improve the app incrementally after release.
+
+## Beta.3 — 0.1.0-beta.3
+
+- [x] Make bundled interface resources load independently of SwiftPM's Xcode-specific bundle accessor, normalize the release bundle structure, and check that structure in the packaged DMG.
+- [x] Check the signed feed at launch and hourly; retain a detected manual update until a later check finds none.
+- [ ] Confirm the published beta.3 DMG launches and its signed feed offers an update from beta.2. Verify the website download link and permission state after upgrade.
 
 ## Beta.2 — 0.1.0-beta.2
 

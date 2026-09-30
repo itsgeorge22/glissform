@@ -8,13 +8,13 @@ Subtle animations and quality-of-life improvements for everyday interactions on 
 
 ## Project status
 
-**Public beta available:** [Download Glissform 0.1.0-beta.2](https://glissform.app/downloads/Glissform-0.1.0-beta.2.dmg) from [glissform.app](https://glissform.app/). The source repository is private.
+**Public beta:** [Download Glissform 0.1.0-beta.3](https://glissform.app/downloads/Glissform-0.1.0-beta.3.dmg) from [glissform.app](https://glissform.app/). Beta.3 replaces beta.2, whose published DMG has a startup packaging defect. The source repository is private.
 
 The website presents the desktop landing page with fixed Customisable, Private, and F.A.Q navigation at widths of 1156px or more. As soon as scrolling begins, the same navbar smoothly gains a translucent, blurred material and removes it again at the top. The selected link follows the linked section occupying the largest visible area; the brand returns to the top and clears the selection. Its feature cards show still previews, cycle every ten seconds, and transition smoothly through automatic and manual selection, with hover, pressed, and keyboard-focus feedback. The Customisable grid provides interactive blur choices, starting-angle slider, and switches; timing values are illustrations. Narrower windows show a MacBook viewing message.
 
 Open the DMG and drag Glissform into Applications. The beta is not Apple notarized, so macOS may block first launch; after a blocked attempt, use **System Settings → Privacy & Security → Open Anyway** if you trust the download. See [Apple's instructions](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac). Seamless Close needs Screen Recording permission. Future beta updates are checked through the app; Automatic updates controls whether they download and install automatically. The public DMG and signed update feed are live, while an upgrade against that public feed has not yet been physically verified. Lock Screen animation is not available; Settings shows it as a planned feature.
 
-Beta.2 adds an Esc return for Seamless Close and an email contact page. Beta.1 added signed updates and configurable Seamless Close blur strength. Earlier alpha releases introduced **Battery Ripple** and renamed **Infinite Screen** to **Seamless Close**. See the [changelog](CHANGELOG.md) for version-specific changes and ongoing limitations.
+Beta.3 repairs launch after the beta.2 packaging defect and improves update discovery. Beta.2 added an Esc return for Seamless Close and an email contact page. Beta.1 added signed updates and configurable Seamless Close blur strength. Earlier alpha releases introduced **Battery Ripple** and renamed **Infinite Screen** to **Seamless Close**. See the [changelog](CHANGELOG.md) for version-specific changes and ongoing limitations.
 
 ## Current features
 

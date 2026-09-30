@@ -22,6 +22,9 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate, SPUStandardUserDriverDeleg
         model.onAutomaticUpdatesEnabledChange = { [weak self] enabled in
             self?.controller.updater.automaticallyDownloadsUpdates = enabled
         }
+        if controller.updater.automaticallyChecksForUpdates {
+            controller.updater.checkForUpdatesInBackground()
+        }
     }
 
     func checkForUpdates() {
@@ -34,7 +37,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate, SPUStandardUserDriverDeleg
     }
 
     func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
-        showManualUpdateIfNeeded(item)
+        rememberAvailableUpdate(item)
     }
 
     func updaterDidNotFindUpdate(_ updater: SPUUpdater) {
@@ -52,23 +55,11 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate, SPUStandardUserDriverDeleg
                                                                forUpdate update: SUAppcastItem,
                                                                state: SPUUserUpdateState) {
         MainActor.assumeIsolated {
-            if handleShowingUpdate {
-                model.setAvailableUpdate(nil)
-            } else {
-                showManualUpdateIfNeeded(update)
-            }
+            rememberAvailableUpdate(update)
         }
     }
 
-    nonisolated func standardUserDriverWillFinishUpdateSession() {
-        MainActor.assumeIsolated { model.setAvailableUpdate(nil) }
-    }
-
-    private func showManualUpdateIfNeeded(_ item: SUAppcastItem) {
-        guard !model.automaticUpdatesEnabled else {
-            model.setAvailableUpdate(nil)
-            return
-        }
+    private func rememberAvailableUpdate(_ item: SUAppcastItem) {
         model.setAvailableUpdate(.init(version: item.displayVersionString,
                                        install: { [weak self] in self?.checkForUpdates() }))
     }

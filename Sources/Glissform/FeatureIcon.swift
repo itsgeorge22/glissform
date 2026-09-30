@@ -17,7 +17,7 @@ enum FeatureSymbol: String, CaseIterable {
     case automaticUpdates = "download"
 
     private static let images: [FeatureSymbol: NSImage] = Dictionary(uniqueKeysWithValues: allCases.map { symbol in
-        guard let url = Bundle.module.url(forResource: symbol.rawValue, withExtension: "svg", subdirectory: "FeatureIcons"),
+        guard let url = AppResource.url(symbol.rawValue, extension: "svg", subdirectory: "FeatureIcons"),
               let image = NSImage(contentsOf: url), image.isValid else {
             preconditionFailure("Missing or invalid feature icon: \(symbol.rawValue)")
         }

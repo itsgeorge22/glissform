@@ -64,6 +64,8 @@ jobs:
           trap 'hdiutil detach -quiet "$RUNNER_TEMP/glissform-mounted"' EXIT
           test -d "$RUNNER_TEMP/glissform-mounted/Glissform.app"
           test -L "$RUNNER_TEMP/glissform-mounted/Applications"
+          test -s "$RUNNER_TEMP/glissform-mounted/Glissform.app/Contents/Resources/Glissform_Glissform.bundle/Contents/Info.plist"
+          test -s "$RUNNER_TEMP/glissform-mounted/Glissform.app/Contents/Resources/Glissform_Glissform.bundle/Contents/Resources/FeatureIcons/monitor-display.svg"
           codesign --verify --strict "$RUNNER_TEMP/glissform-mounted/Glissform.app"
 
       - name: Install pinned Sparkle signing tool

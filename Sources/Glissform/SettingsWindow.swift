@@ -720,8 +720,8 @@ private final class PermissionPresentationState: ObservableObject {
 private enum BlurPreviewAssets {
     static let images: [BlurStrength: NSImage] = Dictionary(uniqueKeysWithValues:
         BlurStrength.allCases.map { strength in
-            guard let url = Bundle.module.url(forResource: "blur-\(strength.rawValue)",
-                                              withExtension: "png", subdirectory: "BlurPreviews"),
+            guard let url = AppResource.url("blur-\(strength.rawValue)",
+                                            extension: "png", subdirectory: "BlurPreviews"),
                   let image = NSImage(contentsOf: url), image.isValid else {
                 preconditionFailure("Missing \(strength.title) blur preview")
             }

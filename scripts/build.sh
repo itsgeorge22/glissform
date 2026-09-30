@@ -143,6 +143,31 @@ ditto "$SPARKLE_SOURCE" "$SPARKLE_FRAMEWORK"
 mkdir -p "$APP/Contents/Resources"
 rm -rf "$APP/Contents/Resources/Glissform_Glissform.bundle"
 ditto "$BIN_DIR/Glissform_Glissform.bundle" "$APP/Contents/Resources/Glissform_Glissform.bundle"
+# Some Xcode/SwiftPM versions emit package resources as a flat directory with
+# no bundle metadata. Bundle.module cannot load that layout in an installed app.
+RESOURCE_BUNDLE="$APP/Contents/Resources/Glissform_Glissform.bundle"
+if [[ ! -f "$RESOURCE_BUNDLE/Contents/Info.plist" ]]; then
+    RESOURCE_STAGE="$(mktemp -d "$PWD/build/resource-bundle.XXXXXX")"
+    ditto "$RESOURCE_BUNDLE" "$RESOURCE_STAGE/Resources"
+    rm -rf "$RESOURCE_BUNDLE"
+    mkdir -p "$RESOURCE_BUNDLE/Contents"
+    mv "$RESOURCE_STAGE/Resources" "$RESOURCE_BUNDLE/Contents/Resources"
+    rmdir "$RESOURCE_STAGE"
+    cat > "$RESOURCE_BUNDLE/Contents/Info.plist" <<'BUNDLE_PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>com.george.glissform.resources</string>
+<key>CFBundleName</key><string>Glissform_Glissform</string>
+<key>CFBundlePackageType</key><string>BNDL</string>
+</dict></plist>
+BUNDLE_PLIST
+fi
+if [[ ! -s "$RESOURCE_BUNDLE/Contents/Info.plist" ||
+      ! -s "$RESOURCE_BUNDLE/Contents/Resources/FeatureIcons/monitor-display.svg" ]]; then
+    echo "Glissform package resources are incomplete or not loadable as a bundle." >&2
+    exit 1
+fi
 ditto "$ICON_BUILD/Resources" "$APP/Contents/Resources"
 rm -f "$APP/Contents/Resources/Sparkle-LICENSE.txt"
 cp "$PWD/docs/SPARKLE_LICENSE.txt" "$APP/Contents/Resources/Sparkle-LICENSE.txt"
@@ -174,6 +199,7 @@ if [[ "$BUILD_VARIANT" == "--release" ]]; then
     /usr/libexec/PlistBuddy -c "Add :SURequireSignedFeed bool true" "$APP/Contents/Info.plist"
     /usr/libexec/PlistBuddy -c "Add :SUVerifyUpdateBeforeExtraction bool true" "$APP/Contents/Info.plist"
     /usr/libexec/PlistBuddy -c "Add :SUEnableAutomaticChecks bool true" "$APP/Contents/Info.plist"
+    /usr/libexec/PlistBuddy -c "Add :SUScheduledCheckInterval integer 3600" "$APP/Contents/Info.plist"
     /usr/libexec/PlistBuddy -c "Add :SUAutomaticallyUpdate bool false" "$APP/Contents/Info.plist"
     /usr/libexec/PlistBuddy -c "Add :SUEnableSystemProfiling bool false" "$APP/Contents/Info.plist"
 fi

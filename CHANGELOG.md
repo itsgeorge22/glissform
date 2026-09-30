@@ -4,6 +4,13 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+## 0.1.0-beta.3 — 2026-09-30
+
+Third beta: restore startup after the broken beta.2 package and improve update discovery.
+
+- Repair packaging of SwiftPM icon resources so installed builds can open Settings, and reject release DMGs that omit the loadable resource bundle. The published beta.2 DMG is affected; beta.3 replaces it without changing beta.2's tag or assets.
+- Check the signed update feed quietly when the release app starts and hourly while it stays open, so an available update can appear in the sidebar without using **Check for Updates…**. Keep the manual Update card visible after an update session ends until a later check finds no update. Automatic updates continue to download in the background and install on quit when macOS permits silent installation.
+
 ## 0.1.0-beta.2 — 2026-09-30
 
 Second beta: direct feedback by email, an Escape return during Seamless Close, clearer Settings cards, and website improvements.

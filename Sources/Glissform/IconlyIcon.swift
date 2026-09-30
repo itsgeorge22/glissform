@@ -23,7 +23,7 @@ enum IconlySymbol: String, CaseIterable {
 
     private static let images: [IconlyStyle: [IconlySymbol: NSImage]] = Dictionary(uniqueKeysWithValues: [IconlyStyle.outline, .bulk, .bold].map { style in
         (style, Dictionary(uniqueKeysWithValues: allCases.map { symbol in
-            guard let url = Bundle.module.url(forResource: symbol.rawValue, withExtension: "svg", subdirectory: "Iconly/\(style.rawValue)"),
+            guard let url = AppResource.url(symbol.rawValue, extension: "svg", subdirectory: "Iconly/\(style.rawValue)"),
                   let image = NSImage(contentsOf: url), image.isValid else {
                 preconditionFailure("Missing or invalid Iconly asset: \(style.rawValue)/\(symbol.rawValue)")
             }
@@ -36,8 +36,8 @@ enum IconlySymbol: String, CaseIterable {
     private static let cardImages: [ColorScheme: [IconlySymbol: NSImage]] = Dictionary(
         uniqueKeysWithValues: [(ColorScheme.light, "Light"), (.dark, "Dark")].map { scheme, folder in
             (scheme, Dictionary(uniqueKeysWithValues: [IconlySymbol.pause, .shieldDone, .shieldInfo].map { symbol in
-                guard let url = Bundle.module.url(forResource: symbol.rawValue, withExtension: "svg",
-                        subdirectory: "Iconly/CustomCards/\(folder)"),
+                guard let url = AppResource.url(symbol.rawValue, extension: "svg",
+                                                subdirectory: "Iconly/CustomCards/\(folder)"),
                       let image = NSImage(contentsOf: url), image.isValid else {
                     preconditionFailure("Missing Custom card icon: \(folder)/\(symbol.rawValue)")
                 }
