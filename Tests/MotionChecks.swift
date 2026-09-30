@@ -567,6 +567,49 @@ import Foundation
         }
         print("PASS: lower pause-return peak speed across shallow and deep folds")
 
+        for speed in [10.0, 40.0, 80.0] {
+            var continuation = OpeningContinuation()
+            let initialVelocity = -0.5 * speed * Double(degree)
+            continuation.begin(from: 10 * degree, velocity: initialVelocity,
+                               observedSpeed: speed)
+            precondition(abs(continuation.velocity - initialVelocity) < 0.000001,
+                         "Assisted opening must keep the exact velocity visible at takeover")
+            var previousFold = 10 * degree
+            var reachedMeasuredSpeed = false
+            for _ in 0..<900 where continuation.active {
+                let fold = continuation.step(elapsed: 1.0 / 120)
+                let visibleSpeed = -continuation.velocity
+                precondition(fold >= 0 && fold <= previousFold,
+                             "Assisted opening must stay monotonic through flat")
+                precondition(visibleSpeed >= 0 && visibleSpeed <= speed * Double(degree) + 0.000001,
+                             "Assisted opening must not exceed the measured hand speed")
+                if abs(visibleSpeed - speed * Double(degree)) < 0.000001 { reachedMeasuredSpeed = true }
+                previousFold = fold
+            }
+            precondition(reachedMeasuredSpeed && !continuation.active
+                         && previousFold == 0 && continuation.velocity == 0,
+                         "Assisted opening must reach hand speed, then end flat and at rest")
+        }
+        var sixtyHertz = OpeningContinuation(), oneTwentyHertz = OpeningContinuation()
+        sixtyHertz.begin(from: 10 * degree, velocity: -40 * Double(degree), observedSpeed: 80)
+        oneTwentyHertz.begin(from: 10 * degree, velocity: -40 * Double(degree), observedSpeed: 80)
+        for _ in 0..<6 { _ = sixtyHertz.step(elapsed: 1.0 / 60) }
+        for _ in 0..<12 { _ = oneTwentyHertz.step(elapsed: 1.0 / 120) }
+        precondition(abs(sixtyHertz.step(elapsed: 0) - oneTwentyHertz.step(elapsed: 0)) < 0.000001,
+                     "The continuation must have the same position at 60 and 120 Hz")
+        var fromRest = OpeningContinuation()
+        fromRest.begin(from: 84 * degree, velocity: 0, observedSpeed: 100)
+        precondition(fromRest.velocity == 0, "A cached image must not jump to the sensor speed")
+        _ = fromRest.step(elapsed: 1.0 / 120)
+        precondition(-fromRest.velocity < 5 * Double(degree),
+                     "A stationary cached image must ease into the measured pace")
+        for _ in 0..<239 where fromRest.active {
+            _ = fromRest.step(elapsed: 1.0 / 120)
+        }
+        precondition(!fromRest.active && fromRest.velocity == 0,
+                     "A cached image with no visible velocity must still finish promptly")
+        print("PASS: assisted opening blends into measured hand speed, finishes promptly, and is frame-rate independent")
+
         // Pause-to-resume uses a monotonic sample clock, not time since capture.
         func pausingMotion(duration: Double? = nil, enabled: Bool = true) -> ClosingMotion {
             var state = ClosingMotion()
@@ -899,6 +942,51 @@ import Foundation
         precondition(noRestore.update(angle: 80, time: 7.1) > 0,
                      "Reopening above the escaped angle must permit a new gesture")
         print("PASS: automatic rest learning, manual fallback, gesture lock, wake reference, sample gaps and pause latch")
+
+        var assist = OpeningAssist()
+        precondition(assist.observe(angle: 70, time: 0, referenceAngle: 90, active: true) == nil)
+        precondition(assist.observe(angle: 72, time: 0.1, referenceAngle: 90, active: true) == nil)
+        precondition(assist.observe(angle: 78, time: 0.2, referenceAngle: 90, active: true) == nil)
+        precondition(assist.observe(angle: 80, time: 0.3, referenceAngle: 90, active: true) == nil)
+        precondition(assist.observe(angle: 84, time: 0.4, referenceAngle: 90, active: true) == nil,
+                     "Six degrees remaining must still follow the physical lid")
+        let openingSpeed = assist.observe(angle: 85, time: 0.5, referenceAngle: 90, active: true)
+        precondition(openingSpeed != nil && abs(openingSpeed! - 25) < 0.01,
+                     "The final five degrees must inherit recent opening speed")
+        assist.reset()
+        for (angle, time) in [(85.0, 1.0), (86.0, 1.1), (85.0, 1.2), (86.0, 1.3)] {
+            precondition(assist.observe(angle: angle, time: time, referenceAngle: 90, active: true) == nil,
+                         "One-degree chatter must not trigger assisted opening")
+        }
+        precondition(assist.observe(angle: 87, time: 2.6, referenceAngle: 90, active: true) == nil,
+                     "A stale sensor gap must discard opening speed")
+
+        var assistedManual = ClosingMotion()
+        assistedManual.startAngle = 90
+        _ = assistedManual.update(angle: 100, time: 0)
+        _ = assistedManual.update(angle: 70, time: 0.1)
+        assistedManual.completeAssistedOpening(at: 86)
+        precondition(!assistedManual.active && assistedManual.desktopResumed,
+                     "An early finish must restore the live desktop")
+        for angle in [86.0, 85, 87, 90] {
+            precondition(assistedManual.update(angle: angle, time: 0.2) == 0 && !assistedManual.active,
+                         "A stationary or reclosed lid must not recapture below the manual start angle")
+        }
+        _ = assistedManual.update(angle: 91, time: 0.3)
+        precondition(assistedManual.update(angle: 80, time: 0.4) > 0,
+                     "Opening above the manual start must rearm the next gesture")
+        var assistedAutomatic = ClosingMotion()
+        assistedAutomatic.startAngle = 90
+        assistedAutomatic.automaticStartAngle = true
+        _ = assistedAutomatic.update(angle: 100, time: 0)
+        _ = assistedAutomatic.update(angle: 70, time: 0.1)
+        assistedAutomatic.completeAssistedOpening(at: 86)
+        precondition(assistedAutomatic.learnedStartAngle == 85 && assistedAutomatic.desktopResumed,
+                     "Automatic mode may learn the usable angle after an early finish")
+        precondition(assistedAutomatic.update(angle: 86, time: 0.2) == 0)
+        precondition(assistedAutomatic.update(angle: 84, time: 0.3) > 0,
+                     "Closing below the learned angle must rearm automatically")
+        print("PASS: speed-matched opening assist, chatter and stale-sample rejection, safe rearming")
         print("PASS: ordinary angles, closing progression, reversal, repeated closure, low-lid startup, wake reset, invalid angles")
     }
 }

@@ -256,8 +256,8 @@ enum DampedMotion {
     }
 }
 
-/// Return the desktop when the effect is disabled during a gesture. Manual
-/// reopening never uses this trajectory: it stays on MotionSmoothing through zero.
+/// Return the desktop when the effect is disabled during a gesture. Reopening
+/// follows MotionSmoothing until its final assisted handoff or physical endpoint.
 struct ProgrammaticReturn {
     private var origin = 0.0
     private var initialVelocity = 0.0
@@ -294,6 +294,97 @@ struct ProgrammaticReturn {
     }
 }
 
+/// Continues the rendered fold at the latest measured physical opening speed.
+/// The short speed blend preserves the velocity already visible on screen.
+struct OpeningContinuation {
+    private static let speedBlendDuration = 0.080
+    private var origin: Double = 0
+    private var initialSpeed: Double = 0
+    private var measuredSpeed: Double = 0
+    private var rampFraction: Double = 0
+    private var rampDuration: Double = 0
+    private var rampDistance: Double = 0
+    private var cruiseDuration: Double = 0
+    private var terminalDistance: Double = 0
+    private var terminalSpeed: Double = 0
+    private var terminalDuration: Double = 0
+    private var elapsed: Double = 0
+    private(set) var velocity: Double = 0
+    private(set) var active = false
+
+    mutating func begin(from fold: Float, velocity displayedVelocity: Double, observedSpeed: Double) {
+        origin = max(0, Double(fold))
+        initialSpeed = displayedVelocity.isFinite ? max(0, -displayedVelocity) : 0
+        let sensorSpeed = observedSpeed.isFinite ? min(120, max(1, observedSpeed)) : 1
+        measuredSpeed = sensorSpeed * .pi / 180
+        terminalDistance = min(origin * 0.15, 1.5 * .pi / 180)
+        let travelDistance = origin - terminalDistance
+        let blendDuration = Self.speedBlendDuration
+        let fullBlendDistance = blendDuration * (initialSpeed + measuredSpeed) * 0.5
+        if fullBlendDistance <= travelDistance {
+            rampFraction = 1
+        } else {
+            // For a shallow fold, stop the speed blend at the start of the
+            // final slowdown without skipping past the flat image.
+            var low = 0.0, high = 1.0
+            for _ in 0..<24 {
+                let middle = (low + high) * 0.5
+                if Self.blendDistance(at: middle, duration: blendDuration,
+                                      initial: initialSpeed, final: measuredSpeed) < travelDistance {
+                    low = middle
+                } else {
+                    high = middle
+                }
+            }
+            rampFraction = (low + high) * 0.5
+        }
+        rampDuration = blendDuration * rampFraction
+        rampDistance = Self.blendDistance(at: rampFraction, duration: blendDuration,
+                                          initial: initialSpeed, final: measuredSpeed)
+        terminalSpeed = initialSpeed + (measuredSpeed - initialSpeed) * Self.blend(at: rampFraction)
+        cruiseDuration = rampFraction == 1 ? max(0, travelDistance - rampDistance) / measuredSpeed : 0
+        terminalDuration = terminalDistance > 0
+            ? 2 * terminalDistance / max(terminalSpeed, 0.1 * .pi / 180) : 0
+        elapsed = 0
+        velocity = -initialSpeed
+        active = origin > 0
+    }
+
+    private static func blend(at fraction: Double) -> Double {
+        fraction * fraction * (3 - 2 * fraction)
+    }
+
+    private static func blendDistance(at fraction: Double, duration: Double,
+                                      initial: Double, final: Double) -> Double {
+        duration * (initial * fraction
+                    + (final - initial) * (pow(fraction, 3) - 0.5 * pow(fraction, 4)))
+    }
+
+    mutating func step(elapsed delta: Double) -> Float {
+        guard active else { return 0 }
+        if delta.isFinite { elapsed += max(0, delta) }
+        if elapsed < rampDuration {
+            let fraction = elapsed / Self.speedBlendDuration
+            let distance = Self.blendDistance(at: fraction, duration: Self.speedBlendDuration,
+                                               initial: initialSpeed, final: measuredSpeed)
+            velocity = -(initialSpeed + (measuredSpeed - initialSpeed) * Self.blend(at: fraction))
+            return Float(origin - distance)
+        }
+        if elapsed < rampDuration + cruiseDuration {
+            velocity = -measuredSpeed
+            return Float(origin - rampDistance - measuredSpeed * (elapsed - rampDuration))
+        }
+        let fraction = min(1, (elapsed - rampDuration - cruiseDuration) / terminalDuration)
+        if fraction == 1 {
+            active = false
+            velocity = 0
+            return 0
+        }
+        velocity = -terminalSpeed * (1 - fraction)
+        return Float(terminalDistance * (1 - fraction) * (1 - fraction))
+    }
+}
+
 /// A bounded quintic handoff that can preserve motion already on screen.
 struct HandoffTransition {
     enum Curve { case balanced, pauseRestoration }
@@ -315,8 +406,13 @@ struct HandoffTransition {
         origin = value
         initialVelocity = velocity.isFinite ? velocity : 0
         self.velocity = initialVelocity
+        let maximumDuration: Double
+        switch curve {
+        case .balanced: maximumDuration = 0.300
+        case .pauseRestoration: maximumDuration = 0.650
+        }
         transitionDuration = duration.isFinite
-            ? min(curve == .pauseRestoration ? 0.650 : 0.300, max(0.060, duration)) : Self.duration
+            ? min(maximumDuration, max(0.060, duration)) : Self.duration
         firstFrame = holdFirstFrame
         elapsed = 0
         active = true

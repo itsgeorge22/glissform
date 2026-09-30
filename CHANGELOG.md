@@ -4,6 +4,11 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+- Ease the default Regular Seamless Close blur at the start of a lid close, then bring it back to its previous strength by the deep fold. Update the matching Settings and website preview images; High and Subtle retain their existing blur.
+- Finish the final 5° of Seamless Close opening automatically when recent upward lid readings establish movement. Use the latest measured opening speed for the remaining fold, blend into that pace from the image's current motion, and slow only near flat. Rejoin the same screenshot if the lid reverses before completion, and keep the desktop accessible if the lid stops below the starting angle.
+- Gather a broad, soft white glow from all four screen edges during assisted opening. Ease it in slowly, accelerate into contact, and let it fade independently over the live desktop; release it smoothly if the lid reverses.
+- Restore the earlier short desktop-return click for assisted opening only. Play it once as the visible image reaches flat, keep playback off the render loop, and leave interrupted returns silent. Release mouse access as soon as the screenshot fades, while the glow finishes over the live desktop.
+
 ## 0.1.0-beta.3 — 2026-09-30
 
 Third beta: restore startup after the broken beta.2 package and improve update discovery.

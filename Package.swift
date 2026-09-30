@@ -14,7 +14,8 @@ let package = Package(
         ], resources: [
             .copy("Resources/Iconly"),
             .copy("Resources/FeatureIcons"),
-            .copy("Resources/BlurPreviews")
+            .copy("Resources/BlurPreviews"),
+            .copy("Resources/PauseRestored.wav")
         ])
     ]
 )

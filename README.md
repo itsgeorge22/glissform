@@ -19,7 +19,7 @@ Beta.3 repairs launch after the beta.2 packaging defect and improves update disc
 ## Current features
 
 - Experience a lid-driven desktop animation with a continuous perspective fold, an upper edge that narrows throughout closure, optional High, Regular, or Subtle blur (Regular by default), and shadow.
-- Reverse the effect by reopening the lid, including experimental opening after lid-close sleep using the same screenshot.
+- Reverse the effect by reopening the lid, including experimental opening after lid-close sleep using the same screenshot. In the unreleased source build, the visible image can finish the final 5° automatically at a pace based on recent lid movement, with a soft white edge glow that gathers toward flat and eases out over the live desktop. A short click marks that assisted connection.
 - Choose the starting angle manually or let a still-lid pause set it automatically, one degree below the held angle. Set a minimum lid angle for automatic detection, or set it to 0° to disable the threshold; **Begin at** remains the fallback until an angle is learned. Optionally restore desktop access after a pause. Set each wait independently from 0.5 to 10 seconds (1 second by default).
 - Keep Glissform running after its Settings window closes, with menu bar access by default.
 - Press Esc during Seamless Close to use the same fold-to-flat return as pause restoration, whether the pause feature is on or off. Reopen above the starting angle to start another gesture.
@@ -58,5 +58,7 @@ Local builds are **Glissform Dev**, with a red icon, separate app identity and s
 ## Credits and licensing
 
 The [LidAngleSensor project](https://github.com/samhenrigold/LidAngleSensor) and [Clamshell](https://github.com/danielradosa/clamshell) were consulted for the HID reports. Glissform's sensor implementation and visual effect were written independently. Updates use [Sparkle](https://sparkle-project.org/), whose [license and notices](docs/SPARKLE_LICENSE.txt) are included with the app. Some interface icons are by [Iconly](https://iconly.pro), used under the owner's paid license; see [provenance](docs/ICONLY.md). See [app artwork](Artwork/README.md) for the native icon sources.
+
+The assisted-opening click uses a trimmed version of [“Videogame Menu BUTTON CLICK” by Christopherderp](https://freesound.org/people/Christopherderp/sounds/342200/), licensed CC0.
 
 **No open-source license has been selected.** The source repository is private. Third-party assets retain their own terms.

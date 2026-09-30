@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let capture: DesktopScreenshotSource
     private let desktopAvailable: (CGDirectDisplayID) -> Bool
     private let screenAccessAllowed: () -> Bool
+    private let playAssistedConnectionSound: @MainActor () -> Void
     private let settingsModel = SettingsModel()
     private var appUpdates: AppUpdates?
     private var appDisplayName: String {
@@ -27,6 +28,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: OverlayWindow?
     private var renderer: EffectRenderer?
     private var motion = ClosingMotion()
+    private var openingAssist = OpeningAssist()
+    private var assistedOpeningPeakAngle: Double?
     private var observers: [NSObjectProtocol] = []
     private var lockObservers: [NSObjectProtocol] = []
     private var heartbeat: Timer?
@@ -79,10 +82,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     init(capture: DesktopScreenshotSource? = nil,
          desktopAvailable: @escaping (CGDirectDisplayID) -> Bool = DesktopAvailability.allowsCapture,
-         screenAccessAllowed: @escaping () -> Bool = CGPreflightScreenCaptureAccess) {
+         screenAccessAllowed: @escaping () -> Bool = CGPreflightScreenCaptureAccess,
+         playAssistedConnectionSound: @escaping @MainActor () -> Void = { OpeningConnectionSound.shared.play() }) {
         self.capture = capture ?? DesktopCapture()
         self.desktopAvailable = desktopAvailable
         self.screenAccessAllowed = screenAccessAllowed
+        self.playAssistedConnectionSound = playAssistedConnectionSound
         super.init()
     }
 
@@ -99,6 +104,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                   "lowBatteryRippleEnabled": true,
                                                   "runInBackground": true,
                                                   "showMenuBarIcon": true])
+        OpeningConnectionSound.shared.prepare()
         let storedAngle = UserDefaults.standard.double(forKey: "animationStartAngle")
         let startAngle = storedAngle.isFinite ? min(130, max(20, storedAngle)).rounded() : 100
         let animationEnabled = UserDefaults.standard.bool(forKey: "animationEnabled")
@@ -350,6 +356,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsModel.updateAngle(angle, time: time)
         if escapeReturning { return }
         guard settingsModel.animationEnabled else {
+            if assistedOpeningPeakAngle != nil {
+                assistedOpeningPeakAngle = nil
+                finishingGesture = false
+                cleanupTimer?.invalidate()
+                cleanupTimer = nil
+            }
             finishGesture()
             motion.reset()
             setStatus("Paused")
@@ -382,14 +394,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         guard !screenLocked, !sessionInactive else { return }
         guard ready else { return }
+        if let peak = assistedOpeningPeakAngle {
+            let highest = max(peak, angle)
+            assistedOpeningPeakAngle = highest
+            if angle < motion.activationAngle && highest - angle >= 1.5 {
+                // Reverse through the same captured image while it is still
+                // visible. The next sensor sample becomes the new lid target.
+                assistedOpeningPeakAngle = nil
+                openingAssist.reset()
+                finishingGesture = false
+                cleanupTimer?.invalidate()
+                cleanupTimer = nil
+                OpeningConnectionSound.shared.stop()
+                window?.ignoresMouseEvents = false
+                renderer?.beginAnimation(opening: openingGesture)
+                setStatus(openingGesture ? "Animating · Opening" : "Animating · Reopen to reverse")
+            } else {
+                return
+            }
+        }
         let progress = beganOpening ? currentProgress : motion.update(angle: angle, time: time)
         currentProgress = progress
+        let openingSpeed = openingAssist.observe(angle: angle, time: time,
+            referenceAngle: motion.activationAngle, active: motion.active)
         updateEscapeHotKey()
         settingsModel.updateLearnedStartAngle(motion.learnedStartAngle)
         sensor.setActivePolling(motion.active || earlyCaptureRequested || wakeOpening.pending
                                 || (hasSnapshot && !motion.desktopResumed))
         if motion.active || !finishingGesture || renderer?.isFinishingWithLid == true {
             renderer?.setLidAngle(angle, referenceAngle: motion.activationAngle, sampleTime: time)
+        }
+        if let openingSpeed, hasSnapshot, snapshotPresented, !finishingGesture {
+            assistedOpeningPeakAngle = angle
+            finishGesture(mode: .assisted, openingSpeed: openingSpeed)
+            setStatus("Finishing opening")
+            return
         }
         if !motion.active && !openingGesture && !wakeOpening.pending,
            let startAngle = motion.effectiveStartAngle, !motion.desktopResumed {
@@ -615,6 +654,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func presentPreparedSnapshot() {
         guard hasSnapshot, motion.active, !snapshotPresented, captureMayPresent() else { return }
         snapshotPresented = true
+        OpeningConnectionSound.shared.prepare()
         // The prepared screenshot retains the Dock and menu bar underneath.
         window?.pinToCurrentSpace()
         window?.level = NSWindow.Level(rawValue: NSWindow.Level.popUpMenu.rawValue + 1)
@@ -651,6 +691,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func revealOverlay() {
         window?.alphaValue = 1
+        window?.ignoresMouseEvents = false
         renderer?.beginAnimation(opening: openingGesture)
     }
 
@@ -698,15 +739,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setStatus("Desktop restored · Open above \(Int(rearmAngle))° to rearm")
     }
 
-    private func finishGesture(mode: EffectRenderer.CompletionMode = .disabled) {
+    private func finishGesture(mode: EffectRenderer.CompletionMode = .disabled,
+                               openingSpeed: Double = 0) {
         removeEscapeHotKey()
         guard hasSnapshot else { endGesture(); return }
         guard !finishingGesture else { return }
         finishingGesture = true
         let token = snapshotToken
-        renderer?.finishAnimation(mode) { [weak self] in
-            guard let self, self.finishingGesture, self.snapshotToken == token else { return }
-            self.endGesture()
+        renderer?.finishAnimation(mode, openingSpeed: openingSpeed,
+                                  onAssistedContact: mode == .assisted ? { [weak self] in
+                                      self?.playAssistedConnectionSound()
+                                  } : nil,
+                                  onLiveDesktop: mode == .assisted ? { [weak self] in
+                                      self?.window?.ignoresMouseEvents = true
+                                  } : nil) { [weak self] in
+            self?.completeGesture(mode: mode, token: token)
         }
         // Display callbacks can stop when occluded. Never leave a snapshot
         // blocking input indefinitely while waiting for a final frame.
@@ -714,20 +761,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Slow manual tracking can legitimately take more than 800 ms to settle.
         // Only extend its watchdog while rendered motion is actually advancing;
         // stopped callbacks still release input on the next watchdog tick.
-        let timer = Timer(timeInterval: 0.8, repeats: mode == .lid) { [weak self] _ in
+        let timer = Timer(timeInterval: 0.8, repeats: mode == .lid || mode == .assisted) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, self.finishingGesture, self.snapshotToken == token else { return }
                 if mode == .lid && self.renderer?.manualCompletionIsAdvancing == true { return }
-                self.endGesture()
+                if mode == .assisted && self.renderer?.assistedCompletionIsAdvancing == true { return }
+                self.completeGesture(mode: mode, token: token)
             }
         }
         cleanupTimer = timer
         RunLoop.main.add(timer, forMode: .common)
     }
 
+    private func completeGesture(mode: EffectRenderer.CompletionMode, token: Int) {
+        guard finishingGesture, snapshotToken == token else { return }
+        if mode == .assisted {
+            motion.completeAssistedOpening(at: lastLidAngle ?? motion.activationAngle)
+            settingsModel.updateLearnedStartAngle(motion.learnedStartAngle)
+            setStatus(motion.desktopResumed ? "Desktop restored" : "Ready")
+        }
+        endGesture()
+    }
+
     private func endGesture(retainingSnapshot: Bool = false) {
+        OpeningConnectionSound.shared.stop()
         removeEscapeHotKey()
         escapeReturning = false
+        assistedOpeningPeakAngle = nil
+        openingAssist.reset()
         if openingGesture && wakeOpening.pending { clearWakeTracking() }
         openingGesture = false
         finishingGesture = false
@@ -1187,6 +1248,8 @@ extension AppDelegate {
                   && feedbackDraft?.queryItems?.first?.value == expectedBody,
                   "Feedback draft must address support and include the current app and macOS versions")
         print("PASS: feedback draft includes the support address and current versions")
+        try check(Bundle.module.url(forResource: "PauseRestored", withExtension: "wav") != nil,
+                  "The original opening connection sound must be bundled")
         var storage: CVPixelBuffer?
         let attributes = [kCVPixelBufferMetalCompatibilityKey as String: true,
                           kCVPixelBufferIOSurfacePropertiesKey as String: [:]] as [String: Any]
@@ -1199,10 +1262,12 @@ extension AppDelegate {
 
         func makeGesture(screenAccessAllowed: @escaping () -> Bool = { true },
                          startGesture: Bool = true,
-                         resumeAfterPause: Bool = false) throws -> (AppDelegate, SyntheticCapture) {
+                         resumeAfterPause: Bool = false,
+                         playAssistedConnectionSound: @escaping @MainActor () -> Void = {}) throws -> (AppDelegate, SyntheticCapture) {
             let source = SyntheticCapture()
             let app = AppDelegate(capture: source, desktopAvailable: { _ in true },
-                                  screenAccessAllowed: screenAccessAllowed)
+                                  screenAccessAllowed: screenAccessAllowed,
+                                  playAssistedConnectionSound: playAssistedConnectionSound)
             let window = OverlayWindow(contentRect: NSRect(x: 16, y: 16, width: 64, height: 64))
             let view = MTKView(frame: NSRect(x: 0, y: 0, width: 64, height: 64))
             guard let renderer = EffectRenderer(view: view) else {
@@ -1246,7 +1311,9 @@ extension AppDelegate {
             // Pump synthetic rendering explicitly: MetalKit can suspend display
             // callbacks for a tiny/occluded window or a sleeping display. This
             // checks coordinator/GPU cleanup, not compositor frame delivery.
-            for _ in 0..<100 {
+            // The synthetic assisted path can start with no displayed velocity,
+            // so allow its slow fallback to reach flat before checking cleanup.
+            for _ in 0..<450 {
                 if !app.hasSnapshot { return }
                 if let view = app.window?.contentView as? MTKView, app.renderer?.isRendering == true {
                     app.renderer?.draw(in: view)
@@ -1715,6 +1782,151 @@ extension AppDelegate {
             print("PASS: continuous ordinary return interrupted by \(interruption)")
         }
 
+        func beginAssistedReturn(_ app: AppDelegate, _ source: SyntheticCapture) async throws {
+            try await waitForCapture(source)
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await app.snapshotTask?.value
+            try await Task.sleep(nanoseconds: 100_000_000)
+            try check(app.hasSnapshot && app.snapshotPresented,
+                      "Opening assist needs the visible closing screenshot")
+            let sampleTime = ProcessInfo.processInfo.systemUptime - 0.31
+            app.handleLidReading(70, time: sampleTime + 0.01)
+            app.handleLidReading(80, time: sampleTime + 0.11)
+            app.handleLidReading(90, time: sampleTime + 0.21)
+            try check(!app.finishingGesture,
+                      "The image must keep following the lid outside the last five degrees")
+            app.handleLidReading(95, time: sampleTime + 0.31)
+            try check(app.finishingGesture && app.assistedOpeningPeakAngle == 95
+                      && app.hasSnapshot && source.count == 1,
+                      "Opening into the final five degrees must start one assisted return")
+        }
+        do {
+            var connectionClicks = 0
+            let (app, source) = try makeGesture(playAssistedConnectionSound: { connectionClicks += 1 })
+            defer { app.shutdown(); app.window?.close() }
+            try await beginAssistedReturn(app, source)
+            app.handleLidReading(95)
+            try check(app.finishingGesture && source.count == 1,
+                      "Holding the lid during assisted return must not recapture")
+            app.handleLidReading(92)
+            try check(!app.finishingGesture && app.assistedOpeningPeakAngle == nil
+                      && app.hasSnapshot && app.motion.active && source.count == 1,
+                      "Reversal must rejoin the same captured gesture")
+            try check(connectionClicks == 0, "Reversal before contact must remain silent")
+            app.handleLidReading(100)
+            try await waitForCleanup(app)
+            try checkCleared(app)
+            print("PASS: assisted opening reverses through the same screenshot")
+        }
+        do {
+            var connectionClicks = 0
+            let (app, source) = try makeGesture(playAssistedConnectionSound: { connectionClicks += 1 })
+            defer { app.shutdown(); app.window?.close() }
+            try await beginAssistedReturn(app, source)
+            var desktopUsableDuringGlow = false
+            for _ in 0..<200 {
+                if app.hasSnapshot, app.renderer?.opacity == 0,
+                   app.window?.ignoresMouseEvents == true {
+                    desktopUsableDuringGlow = true
+                    break
+                }
+                if let view = app.window?.contentView as? MTKView, app.renderer?.isRendering == true {
+                    app.renderer?.draw(in: view)
+                }
+                try await Task.sleep(nanoseconds: 10_000_000)
+            }
+            try check(desktopUsableDuringGlow,
+                      "The live desktop must accept input while the connection glow fades")
+            try await waitForCleanup(app)
+            try checkCleared(app)
+            try check(connectionClicks == 1,
+                      "Assisted opening must play its connection sound once at visible contact")
+            try check(app.motion.desktopResumed, "Early completion must keep desktop access live")
+            app.handleLidReading(95)
+            app.handleLidReading(92)
+            try check(!app.motion.active && source.count == 1,
+                      "Stopping or closing below the manual start must not start another capture")
+            app.handleLidReading(101)
+            app.handleLidReading(80)
+            try await waitForCapture(source)
+            try check(source.count == 2,
+                      "Opening above the manual start must arm one fresh closing screenshot")
+            app.suspend()
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await app.snapshotTask?.value
+            try checkCleared(app)
+            print("PASS: assisted opening completes early and rearms safely")
+        }
+        do {
+            let (app, source) = try makeGesture()
+            defer { app.shutdown(); app.window?.close() }
+            try await waitForCapture(source)
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await app.snapshotTask?.value
+            try await Task.sleep(nanoseconds: 100_000_000)
+            let sampleTime = ProcessInfo.processInfo.systemUptime
+            app.handleLidReading(70, time: sampleTime - 1.51)
+            app.handleLidReading(80, time: sampleTime - 1.01)
+            app.handleLidReading(90, time: sampleTime - 0.51)
+            app.handleLidReading(95, time: sampleTime - 0.01)
+            try check(app.finishingGesture && app.assistedOpeningPeakAngle == 95,
+                      "Slow opening must also enter the assisted finish")
+            // Keep presenting frames while testing the slow finish. If an
+            // occluded synthetic window stops presenting, the watchdog is
+            // supposed to release it instead of waiting for this trajectory.
+            for _ in 0..<85 {
+                if let view = app.window?.contentView as? MTKView, app.renderer?.isRendering == true {
+                    app.renderer?.draw(in: view)
+                }
+                try await Task.sleep(nanoseconds: 10_000_000)
+            }
+            try check(app.hasSnapshot && app.finishingGesture,
+                      "The cleanup watchdog must allow a slow assisted finish to keep moving")
+            try await waitForCleanup(app)
+            try checkCleared(app)
+            print("PASS: slow assisted opening retains its image until the speed-matched finish")
+        }
+        do {
+            let (app, source) = try makeGesture(startGesture: false)
+            defer { app.shutdown(); app.window?.close() }
+            app.motion.automaticStartAngle = true
+            app.settingsModel.configure(animationEnabled: true, startAngle: 100,
+                                        screenCaptureAllowed: true, automaticStartAngle: true)
+            app.handleLidReading(110)
+            app.handleLidReading(80)
+            try await beginAssistedReturn(app, source)
+            try await waitForCleanup(app)
+            try check(app.motion.learnedStartAngle == 94
+                      && app.settingsModel.learnedStartAngle == 94,
+                      "Automatic mode must display the newly learned angle after early completion")
+            app.handleLidReading(93)
+            try await waitForCapture(source)
+            try check(source.count == 2,
+                      "Automatic mode must rearm on a real close below the learned angle")
+            app.suspend()
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await app.snapshotTask?.value
+            try checkCleared(app)
+            print("PASS: assisted opening updates automatic angle and rearms on closing")
+        }
+        for interruption in ["sleep", "display change", "quit", "lock"] {
+            let (app, source) = try makeGesture()
+            defer { app.shutdown(); app.window?.close() }
+            try await beginAssistedReturn(app, source)
+            switch interruption {
+            case "sleep": app.suspend()
+            case "display change": app.restart(startHardware: false)
+            case "lock": app.handleScreenLock(true)
+            default: app.shutdown()
+            }
+            try checkCleared(app)
+            print("PASS: assisted opening cleanup on \(interruption)")
+        }
+
         // Expire the still-lid timer through the real coordinator with fresh
         // synthetic timestamps, including captures that have not completed yet.
         for visible in [false, true] {
@@ -1996,14 +2208,41 @@ extension AppDelegate {
             wake.handleLidReading(100)
             try await Task.sleep(nanoseconds: 30_000_000)
             wake.handleLidReading(60)
-            try await Task.sleep(nanoseconds: 250_000_000)
+            for _ in 0..<25 {
+                if let view = wake.window?.contentView as? MTKView, wake.renderer?.isRendering == true {
+                    wake.renderer?.draw(in: view)
+                }
+                try await Task.sleep(nanoseconds: 10_000_000)
+            }
             try check(wake.hasSnapshot && !wake.finishingGesture && source.count == 1
                       && wake.renderer?.opacity == 1,
-                      "Reclosing during cached wake return must restore the same image and cancel cleanup")
+                      "Reclosing during cached wake return must restore the same image and cancel cleanup "
+                      + "(snapshot \(wake.hasSnapshot), finishing \(wake.finishingGesture), "
+                      + "captures \(source.count), opacity \(wake.renderer?.opacity ?? -1))")
             wake.handleLidReading(100)
             try await waitForCleanup(wake)
             try checkCleared(wake)
             print("PASS: cached-wake return can reverse without recapture or stale cleanup")
+        }
+        do {
+            let (wake, source) = try await makeWake()
+            defer { wake.shutdown(); wake.window?.close() }
+            await wake.snapshotTask?.value
+            try check(wake.hasSnapshot && wake.snapshotPresented,
+                      "Cached wake must reveal its retained screenshot before opening assist")
+            let sampleTime = ProcessInfo.processInfo.systemUptime - 0.31
+            wake.handleLidReading(70, time: sampleTime + 0.01)
+            wake.handleLidReading(80, time: sampleTime + 0.11)
+            wake.handleLidReading(90, time: sampleTime + 0.21)
+            try check(!wake.finishingGesture,
+                      "Cached wake must keep following the lid until five degrees remain")
+            wake.handleLidReading(95, time: sampleTime + 0.31)
+            try check(wake.finishingGesture && wake.assistedOpeningPeakAngle == 95
+                      && source.count == 1,
+                      "Cached wake must use the retained image for assisted opening")
+            try await waitForCleanup(wake)
+            try checkCleared(wake)
+            print("PASS: cached wake completes its final five degrees without another screenshot")
         }
         do {
             let (app, source) = try await makeWake()
@@ -2034,7 +2273,10 @@ extension AppDelegate {
         await app.snapshotTask?.value
         try check(app.hasSnapshot, "Synthetic screenshot must reach the real renderer")
         let initialFrames = app.renderer?.renderedFrameCount ?? 0
-        try await Task.sleep(nanoseconds: 100_000_000)
+        for _ in 0..<50 {
+            if (app.renderer?.renderedFrameCount ?? 0) > initialFrames + 1 { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
         try check((app.renderer?.renderedFrameCount ?? 0) > initialFrames + 1,
                   "The production display link must advance visible frames without manual pumping")
         try await Task.sleep(nanoseconds: 45_000_000)

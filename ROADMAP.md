@@ -50,6 +50,10 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 
 - [x] Owner approved the revised Seamless Close closing feel on the development Mac on 2026-09-28, including its stronger start and continuing later movement.
 - [x] Owner confirmed pauses, reopening, and Blur on/off with the revised geometry on the development Mac on 2026-09-28.
+- [x] Add an assisted finish for the last 5° of reopening, with reversal back into the same screenshot and safe rearming after an early return. After the owner found a visible-speed continuation too slow, use the latest measured lid pace and blend into it over the first 80 ms. The owner accepted this motion and requested the shorter 5° trigger. Synthetic motion and lifecycle checks cover the path.
+- [x] Add a broad white all-edge connection glow that eases in with the visible assisted fold and fades separately from the screenshot on reversal or desktop return. Synthetic motion and Metal checks cover the path.
+- [x] Restore the previously used short click at assisted contact without delaying rendering, and release mouse access when the image fades while the glow finishes. Synthetic cue and interruption checks cover the path.
+- [ ] Physically compare fast and slow assisted opening with the 5° trigger, connection glow and click, a stop in that region, a quick reversal, and another close from a partially open lid on the development Mac. Confirm the click feels aligned with contact and is silent on interrupted returns.
 
 - [x] Add **Detect starting angle** and implement resting-angle selection one degree below the held angle, **Begin at** fallback, gesture and wake reference locking, and adoption of a lower angle after eligible pause restoration. Its saved wait is independently adjustable from 0.5 to 10 seconds, defaulting to one second. A saved 20–130° detection threshold gates learning independently of **Begin at** and restores that fallback after a pause at or below the threshold; 0° disables the threshold.
 - [x] Let closing past the learned angle restart the animation after automatic pause restoration, without requiring the lid to open farther first.
@@ -61,7 +65,7 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 - [x] Measure finishing-blur frame pacing on the development Mac and remove a redundant alpha erosion and blend. Repeated instrumented closes reduced late render callbacks; the owner saw the same blur appearance but no clear change in feel. Motion timing and screenshot capture are unchanged.
 - [x] Complete local build, motion/capture/Metal/lifecycle/overlay regression checks, capture-metadata validation, and settings-window launch for these changes.
 - [x] Obtain owner approval of the top-bezel contact shadow on the development Mac and pass the local build and full regression suite after its tuning (2026-09-21).
-- [ ] Compare entrance, awake and cached-wake exit, deep-fold pause restoration, and material quality on the target Mac. Measure real sensor changes, presentation intervals, memory, and power before claiming an improvement in physical smoothness.
+- [ ] Compare entrance, awake and cached-wake exit, deep-fold pause restoration, and material quality on the target Mac. Include the adjusted Regular blur at 68°, 50°, and 25° from a 90° start. Measure real sensor changes, presentation intervals, memory, and power before claiming an improvement in physical smoothness.
 
 - [x] Prepare an initial wake-opening prototype with immediate reconnection, remaining-angle motion, bounded eligibility, local timing diagnostics, and synthetic cancellation checks.
 - [x] Correct loss of numeric wake eligibility when a lock/session notification follows sleep, and cover lock-before-wake, lock-after-wake, unlock with remaining motion, completed opening and timeout sequences in synthetic checks.

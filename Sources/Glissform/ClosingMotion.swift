@@ -142,6 +142,29 @@ struct ClosingMotion {
         return update(angle: angle, time: time)
     }
 
+    /// The visible return has finished before the lid reaches the old start
+    /// angle. Keep the desktop live at that position without recapturing it.
+    mutating func completeAssistedOpening(at angle: Double) {
+        guard angle.isFinite, let startAngle = effectiveStartAngle else { return }
+        active = false
+        clearPauseTracking()
+        clearRestingTracking()
+        if angle >= startAngle {
+            armed = true
+            return
+        }
+        armed = false
+        desktopResumed = true
+        desktopResumeRearmAngle = angle
+        desktopResumeCanRearmByClosing = automaticStartAngle && (20...130).contains(angle)
+            && angle > Self.validDetectionThreshold(automaticDetectionThreshold)
+        if desktopResumeCanRearmByClosing {
+            learnedStartAngle = automaticThreshold(below: angle)
+        } else if automaticStartAngle {
+            learnedStartAngle = nil
+        }
+    }
+
     mutating func update(angle: Double, time: Double = ProcessInfo.processInfo.systemUptime) -> Float {
         guard angle.isFinite, (0...180).contains(angle) else {
             clearPauseTracking()
@@ -212,5 +235,48 @@ struct ClosingMotion {
         guard active else { return 0 }
         let raw = min(1, max(0, (activationAngle - angle) / max(1, activationAngle - 4)))
         return Float(raw * raw * (3 - 2 * raw))
+    }
+}
+
+/// Uses recent upward sensor movement to start the final opening return.
+/// A small direction wobble cannot start it, and old samples cannot set speed.
+struct OpeningAssist {
+    static let remainingDegrees = 5.0
+    private var previous: (angle: Double, time: Double)?
+    private var rising: [(angle: Double, time: Double)] = []
+
+    mutating func reset() {
+        previous = nil
+        rising.removeAll(keepingCapacity: true)
+    }
+
+    mutating func observe(angle: Double, time: Double, referenceAngle: Double,
+                          active: Bool) -> Double? {
+        guard active, angle.isFinite, time.isFinite, referenceAngle.isFinite else {
+            reset()
+            return nil
+        }
+        defer { previous = (angle, time) }
+        guard let previous, time > previous.time, time - previous.time <= 1.25 else {
+            rising.removeAll(keepingCapacity: true)
+            return nil
+        }
+        let movement = angle - previous.angle
+        if movement < -0.25 {
+            rising.removeAll(keepingCapacity: true)
+            return nil
+        }
+        guard movement > 0.08 else { return nil }
+        if rising.isEmpty { rising.append(previous) }
+        rising.append((angle, time))
+        while rising.count > 2 && time - rising[0].time > 1.2 { rising.removeFirst() }
+        guard angle >= referenceAngle - Self.remainingDegrees, angle < referenceAngle,
+              let first = rising.first, angle - first.angle >= 1.5,
+              time > first.time else { return nil }
+        // The earlier samples establish direction; the most recent quarter
+        // second sets the pace when the hand reaches the assisted region.
+        let recent = rising.first(where: { $0.time < time && time - $0.time <= 0.25 })
+            ?? rising[rising.count - 2]
+        return min(120, (angle - recent.angle) / (time - recent.time))
     }
 }
