@@ -608,7 +608,131 @@ import Foundation
         }
         precondition(!fromRest.active && fromRest.velocity == 0,
                      "A cached image with no visible velocity must still finish promptly")
+        // Dense samples catch a sudden brake at the cruise/landing join even
+        // when position remains monotonic at display-frame intervals.
+        for (foldDegrees, entrySpeed, measuredSpeed) in [(5.0, 40.0, 40.0), (0.5, 20.0, 80.0)] {
+            var continuation = OpeningContinuation()
+            continuation.begin(from: Float(foldDegrees) * degree,
+                               velocity: -entrySpeed * Double(degree), observedSpeed: measuredSpeed)
+            let delta = foldDegrees < 1 ? 0.0000005 : 0.00005
+            var previousVelocity = continuation.velocity
+            var previousAcceleration = 0.0
+            var previousFold = Float(foldDegrees) * degree
+            var time = 0.0
+            var previousProgress: Float = 0
+            while continuation.active && time < 1 {
+                let fold = continuation.step(elapsed: delta)
+                let acceleration = (continuation.velocity - previousVelocity) / delta
+                precondition(abs(acceleration - previousAcceleration) < 2,
+                             "Assisted speed changes must join without a sudden acceleration step")
+                precondition(fold.isFinite && fold >= 0 && fold <= previousFold,
+                             "A shallow fast assist must reach flat without overshooting")
+                precondition(continuation.completionFraction >= previousProgress
+                             && continuation.completionFraction <= 1,
+                             "Connection timing must advance monotonically at every opening speed")
+                previousVelocity = continuation.velocity
+                previousAcceleration = acceleration
+                previousFold = fold
+                previousProgress = continuation.completionFraction
+                time += delta
+            }
+            precondition(!continuation.active && previousFold == 0
+                         && continuation.velocity == 0 && continuation.completionFraction == 1,
+                         "The refined landing must finish flat without a lingering motion tail")
+            if foldDegrees == 5 {
+                precondition(abs(time - 0.14375) < 0.0001,
+                             "Smoothing the landing must preserve the measured opening duration")
+            }
+        }
         print("PASS: assisted opening blends into measured hand speed, finishes promptly, and is frame-rate independent")
+
+        // The finish must carry a faster visible image even when the estimate
+        // trails an accelerating hand, including movement above the old cap.
+        for (entry, estimate, acceleration) in [(49.0, 45.0, 100.0), (180.0, 120.0, 0.0),
+                                                 (40.0, 40.0, 200.0), (20.0, 80.0, 50.0)] {
+            var continuation = OpeningContinuation()
+            continuation.begin(from: 10 * degree, velocity: -entry * Double(degree),
+                               acceleration: -acceleration * Double(degree), observedSpeed: estimate)
+            let entryVelocity = continuation.velocity
+            _ = continuation.step(elapsed: 0.000001)
+            let entryAcceleration = -(continuation.velocity - entryVelocity) / 0.000001 / Double(degree)
+            precondition(abs(entryAcceleration - acceleration) < 0.02,
+                         "The handoff must carry bounded opening acceleration instead of resetting it")
+            var previousFold = 10 * degree
+            var elapsed = 0.000001
+            while continuation.active && elapsed < 3 {
+                let fold = continuation.step(elapsed: 1.0 / 120)
+                elapsed += 1.0 / 120
+                precondition(fold.isFinite && fold >= 0 && fold <= previousFold,
+                             "Momentum must finish monotonically without overshooting")
+                if fold > 1.5 * degree {
+                    precondition(-continuation.velocity / Double(degree) >= entry - 0.0001,
+                                 "An older estimate must not brake the image before the landing")
+                }
+                previousFold = fold
+            }
+            precondition(!continuation.active && previousFold == 0 && continuation.velocity == 0,
+                         "Carried momentum must finish flat promptly")
+        }
+        // Replay the actual sensor -> smoothing -> takeover path with fractional
+        // and whole-degree input, varying acquisition/display phase and cadence.
+        for quantized in [false, true] {
+            for cadence in [1.0 / 60, 1.0 / 30, 0.100] {
+                for phase in [0.0, 0.004, 0.012] {
+                    var tracking = MotionSmoothing()
+                    var assist = OpeningAssist()
+                    var continuation = OpeningContinuation()
+                    tracking.reset(to: 20 * degree, at: 0)
+                    var sample = 0
+                    var pendingSpeed: Double?
+                    var started = false
+                    var previousVelocity = 0.0
+                    var previousFold = 20 * degree
+                    var entrySpeed = 0.0
+                    for frame in 0...180 {
+                        let time = Double(frame) / 60
+                        while phase + Double(sample) * cadence <= time {
+                            let acquired = phase + Double(sample) * cadence
+                            let raw = min(100, 80 + 10 * acquired + 50 * acquired * acquired)
+                            let angle = quantized ? raw.rounded(.down) : raw
+                            tracking.ingest(target: Float((100 - angle) * .pi / 180), at: acquired)
+                            if !started && pendingSpeed == nil {
+                                pendingSpeed = assist.observe(angle: angle, time: acquired,
+                                                              referenceAngle: 100, active: true)
+                            }
+                            sample += 1
+                        }
+                        let manualFold = tracking.step(at: time)
+                        if let speed = pendingSpeed {
+                            entrySpeed = -tracking.velocity / Double(degree)
+                            continuation.begin(from: manualFold, velocity: tracking.velocity,
+                                               acceleration: (tracking.velocity - previousVelocity) * 60,
+                                               observedSpeed: speed)
+                            precondition(continuation.step(elapsed: 0) == manualFold
+                                         && continuation.velocity == tracking.velocity,
+                                         "Takeover must consume the newest reading and keep the entire next lid frame")
+                            pendingSpeed = nil
+                            started = true
+                            previousFold = manualFold
+                        } else if started {
+                            let fold = continuation.step(elapsed: 1.0 / 60)
+                            precondition(fold.isFinite && fold >= 0 && fold <= previousFold,
+                                         "An accelerated replay must remain monotonic")
+                            if fold > min(previousFold, 1.5 * degree) {
+                                precondition(-continuation.velocity / Double(degree) >= 0.95 * entrySpeed,
+                                             "Takeover must not fall back to a much slower historical pace")
+                            }
+                            previousFold = fold
+                            if !continuation.active { break }
+                        }
+                        previousVelocity = tracking.velocity
+                    }
+                    precondition(started && !continuation.active && previousFold == 0,
+                                 "Every fractional/quantized accelerating replay must complete")
+                }
+            }
+        }
+        print("PASS: accelerated tracking handoff keeps the newest frame and bounded momentum without historical-speed braking")
 
         // Pause-to-resume uses a monotonic sample clock, not time since capture.
         func pausingMotion(duration: Double? = nil, enabled: Bool = true) -> ClosingMotion {
@@ -951,8 +1075,8 @@ import Foundation
         precondition(assist.observe(angle: 84, time: 0.4, referenceAngle: 90, active: true) == nil,
                      "Six degrees remaining must still follow the physical lid")
         let openingSpeed = assist.observe(angle: 85, time: 0.5, referenceAngle: 90, active: true)
-        precondition(openingSpeed != nil && abs(openingSpeed! - 25) < 0.01,
-                     "The final five degrees must inherit recent opening speed")
+        precondition(openingSpeed != nil && abs(openingSpeed! - 10) < 0.01,
+                     "The final five degrees must use the latest available pace, not older faster movement")
         assist.reset()
         for (angle, time) in [(85.0, 1.0), (86.0, 1.1), (85.0, 1.2), (86.0, 1.3)] {
             precondition(assist.observe(angle: angle, time: time, referenceAngle: 90, active: true) == nil,
@@ -960,6 +1084,23 @@ import Foundation
         }
         precondition(assist.observe(angle: 87, time: 2.6, referenceAngle: 90, active: true) == nil,
                      "A stale sensor gap must discard opening speed")
+
+        var fastAssist = OpeningAssist()
+        var fastSpeed: Double?
+        for (angle, time) in [(80.0, 0.0), (86.0, 1.0 / 30), (92.0, 2.0 / 30), (98.0, 0.1)] {
+            fastSpeed = fastAssist.observe(angle: angle, time: time, referenceAngle: 100, active: true)
+        }
+        precondition(fastSpeed != nil && abs(fastSpeed! - 180) < 0.01,
+                     "A real fast opening must not be forced down to the old 120-degree speed cap")
+        var acceleratingAssist = OpeningAssist()
+        var acceleratedSpeed: Double?
+        for frame in 0...15 {
+            let time = Double(frame) / 30
+            acceleratedSpeed = acceleratingAssist.observe(angle: 80 + 10 * time + 50 * time * time,
+                                                          time: time, referenceAngle: 100, active: true)
+        }
+        precondition(acceleratedSpeed != nil && acceleratedSpeed! > 55,
+                     "The pace estimate must follow recent acceleration instead of a quarter-second average")
 
         var assistedManual = ClosingMotion()
         assistedManual.startAngle = 90

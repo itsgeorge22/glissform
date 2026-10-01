@@ -1837,7 +1837,7 @@ extension AppDelegate {
                 try await Task.sleep(nanoseconds: 10_000_000)
             }
             try check(desktopUsableDuringGlow,
-                      "The live desktop must accept input while the connection glow fades")
+                      "The live desktop must accept input while the connection rim retracts")
             try await waitForCleanup(app)
             try checkCleared(app)
             try check(connectionClicks == 1,

@@ -273,10 +273,10 @@ struct OpeningAssist {
         guard angle >= referenceAngle - Self.remainingDegrees, angle < referenceAngle,
               let first = rising.first, angle - first.angle >= 1.5,
               time > first.time else { return nil }
-        // The earlier samples establish direction; the most recent quarter
-        // second sets the pace when the hand reaches the assisted region.
-        let recent = rising.first(where: { $0.time < time && time - $0.time <= 0.25 })
+        // The earlier samples establish direction; the most recent 80 ms
+        // sets the pace when the hand reaches the assisted region.
+        let recent = rising.first(where: { $0.time < time && time - $0.time <= 0.080 })
             ?? rising[rising.count - 2]
-        return min(120, (angle - recent.angle) / (time - recent.time))
+        return (angle - recent.angle) / (time - recent.time)
     }
 }

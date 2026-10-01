@@ -35,11 +35,17 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
     private var lastDrawTime: TimeInterval?
     private var handoff = HandoffTransition()
     private var openingContinuation = OpeningContinuation()
-    private var connectionGlow: Float = 0
-    private var connectionGlowStartFold: Float = 0
+    private var pendingOpeningSpeed: Double?
+    private static let connectionGlowMaximumSpread: Float = 0.0253
+    private static let connectionGlowApproachIntensity: Float = 1
+    private static let connectionGlowContactIntensity: Float = 1.75
+    private var connectionGlowSpread: Float = 0
+    private var connectionGlowIntensity = EffectRenderer.connectionGlowApproachIntensity
     private var connectionGlowReleaseStart: Float = 0
+    private var connectionGlowReleaseIntensity = EffectRenderer.connectionGlowApproachIntensity
+    private var connectionGlowPulsing = false
     private var connectionGlowReleaseElapsed: Double = 0
-    private var connectionGlowReleaseDuration: Double = 0.14
+    private var connectionGlowReleaseDuration: Double = 0.24
     private var connectionGlowReleasing = false
     private var programmaticReturn = ProgrammaticReturn()
     private var completionMode: CompletionMode?
@@ -96,6 +102,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         assistedContactPending = false
         onLiveDesktop = nil
         openingContinuation = OpeningContinuation()
+        pendingOpeningSpeed = nil
         // Reclosing during manual completion is still the same lid gesture.
         // Keep its filter and any existing entrance handoff exactly as they are.
         if !interruptedLidCompletion && (!opening || interruptedReturn) {
@@ -116,21 +123,23 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         self.onLiveDesktop = mode == .assisted ? onLiveDesktop : nil
         assistedContactPending = false
         fadingOut = false
+        pendingOpeningSpeed = nil
         switch mode {
         case .lid:
             // Zero is an ordinary sensor target. Do not restart the trajectory,
             // change its damping, or detach the final degree from the lid.
             break
         case .assisted:
-            // Carry the latest measured lid pace through the same projection
-            // and material, blending from the velocity already visible.
-            openingContinuation.begin(from: renderedFold, velocity: renderedVelocity,
-                                      observedSpeed: openingSpeed)
-            connectionGlowStartFold = max(renderedFold, 0.0001)
-            connectionGlow = 0
+            // The trigger's newest reading has been ingested, but has not yet
+            // been drawn. Present that last lid-driven frame before taking its
+            // position, speed and acceleration into the continuation.
+            pendingOpeningSpeed = openingSpeed
+            openingContinuation = OpeningContinuation()
+            connectionGlowSpread = 0
+            connectionGlowIntensity = Self.connectionGlowApproachIntensity
             connectionGlowReleaseStart = 0
+            connectionGlowPulsing = false
             connectionGlowReleasing = false
-            handoff = HandoffTransition()
         case .pause:
             releaseConnectionGlow()
             openingContinuation = OpeningContinuation()
@@ -155,12 +164,18 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         if duration == 0 { opacity = target }
     }
 
-    private func releaseConnectionGlow(duration: Double = 0.14) {
-        connectionGlowStartFold = 0
-        connectionGlowReleaseStart = connectionGlow
+    private func releaseConnectionGlow(duration: Double = 0.24, pulseAtContact: Bool = false) {
+        connectionGlowReleaseStart = connectionGlowSpread
+        connectionGlowReleaseIntensity = connectionGlowIntensity
+        connectionGlowPulsing = pulseAtContact
         connectionGlowReleaseElapsed = 0
         connectionGlowReleaseDuration = duration
         connectionGlowReleasing = true
+    }
+
+    private static func glowEase(_ fraction: Float) -> Float {
+        let t = min(1, max(0, fraction))
+        return min(1, max(0, t * t * t * (10 + t * (-15 + 6 * t))))
     }
 
     private func scheduleSettling() {
@@ -352,9 +367,12 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         fadingOut = false
         handoff = HandoffTransition()
         openingContinuation = OpeningContinuation()
-        connectionGlow = 0
-        connectionGlowStartFold = 0
+        pendingOpeningSpeed = nil
+        connectionGlowSpread = 0
+        connectionGlowIntensity = Self.connectionGlowApproachIntensity
         connectionGlowReleaseStart = 0
+        connectionGlowReleaseIntensity = Self.connectionGlowApproachIntensity
+        connectionGlowPulsing = false
         connectionGlowReleaseElapsed = 0
         connectionGlowReleasing = false
         programmaticReturn = ProgrammaticReturn()
@@ -417,28 +435,59 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
     private func advanceMotion(at now: Double) {
         let elapsed = max(0, now - (lastDrawTime ?? now))
         lastDrawTime = now
-        let followsLid = !ending || isFinishingWithLid
+        let previousVelocity = renderedVelocity
+        let followsLid = !ending || isFinishingWithLid || pendingOpeningSpeed != nil
         let followingFold = followsLid ? smoothing.step(at: now) : 0
         let followingVelocity = followsLid ? smoothing.velocity : 0
         if completionMode == .disabled {
             renderedFold = programmaticReturn.step(elapsed: elapsed)
             renderedVelocity = programmaticReturn.velocity
-        } else if completionMode == .assisted {
+        } else if completionMode == .assisted && pendingOpeningSpeed == nil {
             renderedFold = openingContinuation.step(elapsed: elapsed)
             renderedVelocity = openingContinuation.velocity
         } else {
             renderedFold = handoff.step(toward: followingFold, velocity: followingVelocity, elapsed: elapsed)
             renderedVelocity = handoff.active ? handoff.velocity : followingVelocity
         }
+        let renderedAcceleration = elapsed > 0 && elapsed <= 0.100
+            ? (renderedVelocity - previousVelocity) / elapsed : 0
+        if let speed = pendingOpeningSpeed {
+            openingContinuation.begin(from: renderedFold, velocity: renderedVelocity,
+                                      acceleration: renderedAcceleration, observedSpeed: speed)
+            pendingOpeningSpeed = nil
+            handoff = HandoffTransition()
+        }
         if completionMode == .assisted && !connectionGlowReleasing {
-            let fraction = min(1, max(0, 1 - renderedFold / max(connectionGlowStartFold, 0.0001)))
-            // Ease in through the remaining fold, then accelerate into contact.
-            connectionGlow = pow(fraction, 2.1)
+            let t = openingContinuation.completionFraction
+            // Spread inward at the original brightness before the extra pulse.
+            // Distribute the entrance through the whole assisted finish,
+            // with zero speed and acceleration at both ends.
+            let ease = Self.glowEase(t)
+            connectionGlowSpread = Self.connectionGlowMaximumSpread * ease
         } else if connectionGlowReleasing && connectionGlowReleaseStart > 0 {
             connectionGlowReleaseElapsed += elapsed
             let t = Float(min(1, connectionGlowReleaseElapsed / connectionGlowReleaseDuration))
-            let ease = t * t * (3 - 2 * t)
-            connectionGlow = connectionGlowReleaseStart * (1 - ease)
+            let ease = Self.glowEase(t)
+            // Keep the spatial retreat independent of the short contact pulse.
+            connectionGlowSpread = connectionGlowReleaseStart * (1 - ease)
+            if connectionGlowPulsing {
+                // A quick, rounded attack begins only once the image is flat.
+                // The light then settles back while the rim retreats outward.
+                let pulse: Float
+                if connectionGlowReleaseElapsed < 0.030 {
+                    pulse = Self.glowEase(Float(connectionGlowReleaseElapsed / 0.030))
+                } else {
+                    pulse = 1 - Self.glowEase(Float((connectionGlowReleaseElapsed - 0.030) / 0.160))
+                }
+                connectionGlowIntensity = Self.connectionGlowApproachIntensity
+                    + (Self.connectionGlowContactIntensity - Self.connectionGlowApproachIntensity) * pulse
+            } else {
+                // A reversal cancels any pending rise, gently settling the
+                // brightness already visible instead of replaying contact.
+                let settle = Self.glowEase(Float(connectionGlowReleaseElapsed / 0.080))
+                connectionGlowIntensity = Self.connectionGlowApproachIntensity
+                    + (connectionGlowReleaseIntensity - Self.connectionGlowApproachIntensity) * (1 - settle)
+            }
             if t == 1 { connectionGlowReleaseStart = 0 }
         }
         let atIdentity = renderedFold == 0 && renderedVelocity == 0 && !handoff.active
@@ -450,7 +499,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             fade(to: 0, duration: 0.050)
             if completionMode == .assisted {
                 assistedContactPending = onAssistedContact != nil
-                releaseConnectionGlow(duration: 0.30)
+                releaseConnectionGlow(duration: 0.40, pulseAtContact: true)
             }
         } else if fadeDuration > 0 {
             fadeElapsed += elapsed
@@ -463,13 +512,14 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
     private func render(to texture: MTLTexture, drawable: CAMetalDrawable? = nil, at now: Double) {
         guard now.isFinite, lastDrawTime.map({ now >= $0 }) ?? true else { return }
         renderedFrameCount += 1
-        let previousFold = renderedFold, previousOpacity = opacity
+        let previousFold = renderedFold, previousOpacity = opacity, previousGlow = connectionGlowSpread
+        let previousIntensity = connectionGlowIntensity
         advanceMotion(at: now)
         let displayedFold = renderedFold
         let finished = ending && fadingOut && opacity == 0
-            && (completionMode != .assisted || connectionGlow == 0)
+            && (completionMode != .assisted || connectionGlowSpread == 0)
         let settled = (!handoff.active && !ending && displayedFold == foldRadians && fadeDuration == 0
-                       && connectionGlow == 0)
+                       && connectionGlowSpread == 0)
             || finished || progress == 0
         let descriptor = MTLRenderPassDescriptor()
         descriptor.colorAttachments[0].texture = texture
@@ -477,7 +527,8 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         descriptor.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 0)
         descriptor.colorAttachments[0].storeAction = .store
         guard let command = encode(descriptor: descriptor, displayedFold: displayedFold, opacity: opacity) else { return }
-        if renderedFold != previousFold || opacity != previousOpacity {
+        if renderedFold != previousFold || opacity != previousOpacity || connectionGlowSpread != previousGlow
+            || connectionGlowIntensity != previousIntensity {
             lastMotionAdvanceTime = ProcessInfo.processInfo.systemUptime
         }
         let token = transitionGeneration
@@ -641,8 +692,8 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             encoder.setFragmentBytes(&dither, length: MemoryLayout<Float>.stride, index: 4)
             var alpha = opacity
             encoder.setFragmentBytes(&alpha, length: MemoryLayout<Float>.stride, index: 3)
-            var glow = SIMD4<Float>(connectionGlow, Float(target?.width ?? texture.width),
-                                    Float(target?.height ?? texture.height), 0)
+            var glow = SIMD4<Float>(connectionGlowSpread, Float(target?.width ?? texture.width),
+                                    Float(target?.height ?? texture.height), connectionGlowIntensity)
             encoder.setFragmentBytes(&glow, length: MemoryLayout<SIMD4<Float>>.stride, index: 6)
             encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         }
@@ -1019,47 +1070,125 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         }
         print("PASS: final manual degree and reclose match uninterrupted lid tracking; fade waits for flat")
 
+        for displayRate in [60.0, 120.0] {
+            for quantized in [false, true] {
+                for phase in [0.0, 0.004, 0.012] {
+                    renderer.pauseSnapshot()
+                    renderer.renderedFold = 20 * degree
+                    renderer.smoothing.reset(to: 20 * degree, at: 0)
+                    renderer.lastDrawTime = 0
+                    var sample = 0
+                    var requested = false
+                    var entrySpeed = 0.0
+                    var assist = OpeningAssist()
+                    var previousFold = 20 * degree
+                    for frame in 0...Int(3 * displayRate) {
+                        let time = Double(frame) / displayRate
+                        var requestedThisFrame = false
+                        while phase + Double(sample) / 30 <= time {
+                            let acquired = phase + Double(sample) / 30
+                            let raw = min(100, 80 + 10 * acquired + 50 * acquired * acquired)
+                            let angle = quantized ? raw.rounded(.down) : raw
+                            renderer.foldRadians = Float((100 - angle) * .pi / 180)
+                            renderer.smoothing.ingest(target: renderer.foldRadians, at: acquired)
+                            if !requested, let speed = assist.observe(angle: angle, time: acquired,
+                                                                     referenceAngle: 100, active: true) {
+                                renderer.finishAnimation(.assisted, openingSpeed: speed) {}
+                                requested = true
+                                requestedThisFrame = true
+                            }
+                            sample += 1
+                        }
+                        var uninterrupted = renderer.smoothing
+                        let manualFold = uninterrupted.step(at: time)
+                        renderer.advanceMotion(at: time)
+                        if requestedThisFrame {
+                            try check(renderer.renderedFold == manualFold
+                                      && renderer.renderedVelocity == uninterrupted.velocity,
+                                      "An accelerating takeover must draw the newest lid frame before continuing")
+                            entrySpeed = -renderer.renderedVelocity
+                        } else if requested {
+                            try check(renderer.renderedFold >= 0 && renderer.renderedFold <= previousFold,
+                                      "A renderer handoff replay must finish without overshoot")
+                            if renderer.renderedFold > 1.5 * degree {
+                                try check(-renderer.renderedVelocity >= 0.95 * entrySpeed,
+                                          "An accelerating renderer handoff must not brake toward a lagging estimate")
+                            }
+                            if renderer.renderedFold == 0 { break }
+                        }
+                        previousFold = renderer.renderedFold
+                    }
+                    try check(requested && renderer.renderedFold == 0,
+                              "Each accelerating renderer replay must reach flat")
+                }
+            }
+        }
+        print("PASS: accelerated 60/120 Hz renderer handoff preserves the newest lid frame and opening momentum")
+
         func assistedFold(visibleSpeed: Double, measuredSpeed: Double, after duration: Double) throws -> Float {
             renderer.pauseSnapshot()
-            renderer.foldRadians = 10 * degree
-            renderer.renderedFold = 10 * degree
-            renderer.renderedVelocity = -visibleSpeed * Double(degree)
-            renderer.smoothing.reset(to: 10 * degree, at: 0)
-            renderer.lastDrawTime = 0
+            renderer.renderedFold = Float(10 + visibleSpeed * 0.5) * degree
+            renderer.smoothing.reset(to: renderer.renderedFold, at: -0.5)
+            renderer.lastDrawTime = -0.5
+            for frame in 1...60 {
+                let time = -0.5 + Double(frame) / 120
+                renderer.foldRadians = Float(10 - visibleSpeed * time) * degree
+                renderer.smoothing.ingest(target: renderer.foldRadians, at: time)
+                renderer.advanceMotion(at: time)
+            }
+            let entryVelocity = renderer.renderedVelocity
+            var uninterrupted = renderer.smoothing
+            let nextManualFold = uninterrupted.step(at: 1.0 / 120)
             renderer.finishAnimation(.assisted, openingSpeed: measuredSpeed) {}
-            try check(renderer.connectionGlow == 0,
+            try check(renderer.connectionGlowSpread == 0,
                       "The opening glow must begin at zero at the assist handoff")
             var previousGlow: Float = 0
             var reachedFlat = false
-            try check(abs(renderer.renderedVelocity + visibleSpeed * Double(degree)) < 0.000001,
-                      "Assisted opening must enter at its existing displayed velocity")
+            var contactTime: Double?
+            var peakIntensity = connectionGlowApproachIntensity
+            try check(renderer.renderedVelocity == entryVelocity,
+                      "Requesting an assist must keep the existing displayed velocity")
             for frame in 1...Int(duration * 120) {
                 renderer.advanceMotion(at: Double(frame) / 120)
                 let frameSpeed = -renderer.renderedVelocity
                 if !reachedFlat {
-                    try check(renderer.connectionGlow + 0.000001 >= previousGlow,
-                              "The opening glow must build with the remaining visible fold")
+                    try check(renderer.connectionGlowSpread + 0.000001 >= previousGlow,
+                              "The connection rim must spread inward during assisted opening")
                     if renderer.renderedFold == 0 {
-                        try check(renderer.connectionGlow == 1,
-                                  "The opening glow must peak at flat before releasing")
+                        try check(renderer.connectionGlowSpread == connectionGlowMaximumSpread,
+                                  "The connection rim must reach its full width at flat")
+                        contactTime = Double(frame) / 120
                         reachedFlat = true
+                    } else {
+                        try check(renderer.connectionGlowIntensity == 1
+                                  && !renderer.connectionGlowPulsing,
+                                  "The approach must retain the original full brightness without pulsing before flat")
                     }
                 } else {
-                    try check(renderer.connectionGlow <= previousGlow + 0.000001,
-                              "The connection glow must ease out after the image reaches flat")
+                    try check(renderer.connectionGlowSpread <= previousGlow + 0.000001,
+                              "The connection rim must retreat outward after the image reaches flat")
                 }
-                previousGlow = renderer.connectionGlow
+                previousGlow = renderer.connectionGlowSpread
+                peakIntensity = max(peakIntensity, renderer.connectionGlowIntensity)
+                if let contactTime, Double(frame) / 120 > contactTime + 0.22 {
+                    try check(renderer.connectionGlowIntensity == connectionGlowApproachIntensity,
+                              "The contact pulse must settle back before the spatial retreat finishes")
+                }
                 try check(frameSpeed >= 0
-                          && frameSpeed <= max(measuredSpeed, visibleSpeed) * Double(degree) + 0.000001,
-                          "The assisted renderer must stay within its entry and measured speeds")
+                          && frameSpeed <= 1.25 * max(measuredSpeed * Double(degree),
+                                                     -uninterrupted.velocity, -entryVelocity) + 0.000001,
+                          "Carried acceleration must stay within its bounded momentum allowance")
                 if frame == 1 {
-                    try check(abs(frameSpeed / Double(degree) - visibleSpeed) < 3,
-                              "The first assisted frame must not jump to the measured speed")
+                    try check(renderer.renderedFold == nextManualFold
+                              && renderer.renderedVelocity == uninterrupted.velocity,
+                              "The first assisted frame must match continued lid tracking exactly")
                 }
             }
-            if duration >= 0.5 {
-                try check(reachedFlat && renderer.opacity == 0 && renderer.connectionGlow == 0,
-                          "The desktop and glow must complete their separate fades")
+            if duration >= 0.65 {
+                try check(reachedFlat && renderer.opacity == 0 && renderer.connectionGlowSpread == 0,
+                          "The desktop fade and rim retreat must both complete")
+                try check(peakIntensity > 1.7,
+                          "A completed connection must produce a brief intense light pulse")
             }
             return renderer.renderedFold
         }
@@ -1067,21 +1196,45 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         let slowOpening = try assistedFold(visibleSpeed: 20, measuredSpeed: 10, after: 0.1)
         try check(fastOpening >= 0 && fastOpening < slowOpening && slowOpening < 10 * degree,
                   "Assisted opening must use measured hand speed, not the slower displayed speed")
-        _ = try assistedFold(visibleSpeed: 20, measuredSpeed: 80, after: 0.5)
+        _ = try assistedFold(visibleSpeed: 20, measuredSpeed: 80, after: 0.65)
         _ = try assistedFold(visibleSpeed: 20, measuredSpeed: 40, after: 0.05)
         let beforeReversal = renderer.renderedFold
-        let glowBeforeReversal = renderer.connectionGlow
+        let glowBeforeReversal = renderer.connectionGlowSpread
         try check(glowBeforeReversal > 0, "The assisted opening must show a growing glow before reversal")
         renderer.beginAnimation()
-        try check(renderer.connectionGlow == glowBeforeReversal,
+        try check(renderer.connectionGlowSpread == glowBeforeReversal,
                   "Reversal must not snap the opening glow away")
         renderer.setLidAngle(75, referenceAngle: 90, sampleTime: 0.06)
         for frame in 8...48 { renderer.advanceMotion(at: Double(frame) / 120) }
         try check(!renderer.ending && renderer.opacity == 1
                   && renderer.renderedFold > beforeReversal,
                   "A reversal during assisted opening must rejoin the captured image")
-        try check(renderer.connectionGlow == 0,
+        try check(renderer.connectionGlowSpread == 0,
                   "The opening glow must release smoothly after reversal")
+        try check(!renderer.connectionGlowPulsing
+                  && renderer.connectionGlowIntensity == connectionGlowApproachIntensity,
+                  "A pre-contact reversal must never produce a connection pulse")
+        _ = try assistedFold(visibleSpeed: 20, measuredSpeed: 80, after: 0.1)
+        var pulseFrame = 12
+        while pulseFrame < 120 && renderer.connectionGlowIntensity == connectionGlowApproachIntensity {
+            pulseFrame += 1
+            renderer.advanceMotion(at: Double(pulseFrame) / 120)
+        }
+        try check(renderer.connectionGlowIntensity > connectionGlowApproachIntensity,
+                  "The contact pulse must be visible before checking its interruption")
+        renderer.beginAnimation()
+        renderer.setLidAngle(75, referenceAngle: 90, sampleTime: Double(pulseFrame + 1) / 120)
+        var previousIntensity = renderer.connectionGlowIntensity
+        for frame in (pulseFrame + 1)...(pulseFrame + 48) {
+            renderer.advanceMotion(at: Double(frame) / 120)
+            try check(renderer.connectionGlowIntensity <= previousIntensity + 0.000001
+                      && !renderer.connectionGlowPulsing,
+                      "Reversing during contact must cancel the pulse without another rise")
+            previousIntensity = renderer.connectionGlowIntensity
+        }
+        try check(renderer.connectionGlowIntensity == connectionGlowApproachIntensity
+                  && renderer.connectionGlowSpread == 0,
+                  "An interrupted contact pulse must settle and retreat completely")
         print("PASS: assisted opening blends into measured lid speed and rejoins the same image on reversal")
     }
 
@@ -1174,16 +1327,25 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         guard stride(from: 0, to: identity.count, by: 4).allSatisfy({ identity[$0] == 64 }) else {
             throw failure("Dithering must leave the zero-angle image unchanged")
         }
-        renderer.connectionGlow = 0.5
+        renderer.connectionGlowSpread = connectionGlowMaximumSpread
+        renderer.connectionGlowIntensity = connectionGlowApproachIntensity
+        let approachingGlow = try render(degrees: 0)
+        renderer.connectionGlowIntensity = 1
+        renderer.connectionGlowSpread = connectionGlowMaximumSpread / 3
         let gatheringGlow = try render(degrees: 0)
-        renderer.connectionGlow = 1
+        renderer.connectionGlowSpread = connectionGlowMaximumSpread
         let connectedGlow = try render(degrees: 0)
+        renderer.connectionGlowIntensity = connectionGlowContactIntensity
+        let pulseGlow = try render(degrees: 0)
+        renderer.connectionGlowIntensity = 1
         let halfImageGlow = try render(degrees: 0, opacity: 0.5)
         let liveDesktopGlow = try render(degrees: 0, opacity: 0)
-        renderer.connectionGlow = 0
+        renderer.connectionGlowSpread = connectionGlowMaximumSpread / 1000
+        let subpixelGlow = try render(degrees: 0, opacity: 0)
+        renderer.connectionGlowSpread = 0
         let clearedGlow = try render(degrees: 0, opacity: 0)
-        for (x, y) in [(20, height / 2), (width - 21, height / 2),
-                       (width / 2, 20), (width / 2, height - 21)] {
+        for (x, y) in [(0, height / 2), (width - 1, height / 2),
+                       (width / 2, 0), (width / 2, height - 1)] {
             let offset = (y * width + x) * 4
             guard identity[offset] < gatheringGlow[offset],
                   gatheringGlow[offset] < connectedGlow[offset],
@@ -1201,14 +1363,41 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
                 throw failure("Connection glow must keep its brightness through the desktop handoff")
             }
         }
+        for x in [0, 1, 3, 6] {
+            let narrowSample = (height / 2 * width + x) * 4
+            let wideSample = (height / 2 * width + 3 * x + 1) * 4
+            guard abs(Int(gatheringGlow[narrowSample]) - Int(connectedGlow[wideSample])) <= 1 else {
+                throw failure("Changing rim width must preserve the light profile without an opacity fade")
+            }
+        }
         let center = (height / 2 * width + width / 2) * 4
-        let broadEdge = (height / 2 * width + 120) * 4
+        let nearEdge = (height / 2 * width + 2) * 4
+        let softShoulder = (height / 2 * width + 10) * 4
+        let beyondRim = (height / 2 * width + 48) * 4
         guard connectedGlow[center] == identity[center]
-              && connectedGlow[broadEdge] > identity[broadEdge] + 20
+              && connectedGlow[nearEdge] < 160
+              && connectedGlow[softShoulder] > identity[softShoulder] + 20
+              && connectedGlow[beyondRim] == identity[beyondRim]
               && connectedGlow[(height / 2 * width) * 4] < 150
+              && pulseGlow[(height / 2 * width) * 4] < 190
+              && approachingGlow == connectedGlow
+              && pulseGlow[softShoulder] > connectedGlow[softShoulder] + 15
               && liveDesktopGlow[center + 3] == 0
+              && subpixelGlow.allSatisfy({ $0 == 0 })
               && clearedGlow.allSatisfy({ $0 == 0 }) else {
-            throw failure("Connection glow must be soft, broad, clear at center, and transparent after release")
+            throw failure("The soft inner glow must remain visible and pulse at contact without a pure white outline")
+        }
+        // Each field is smooth across the corner diagonal; a nearest-edge
+        // distance produces a visible slope change as the closest side flips.
+        let cornerY = 10
+        let diagonal = (cornerY * width + cornerY) * 4
+        let beforeDiagonal = diagonal - 2 * 4
+        let afterDiagonal = diagonal + 2 * 4
+        let cornerCurvature = abs(2 * Int(connectedGlow[diagonal])
+                                  - Int(connectedGlow[beforeDiagonal]) - Int(connectedGlow[afterDiagonal]))
+        guard cornerCurvature <= 3,
+              connectedGlow[diagonal] <= connectedGlow[(height / 2 * width) * 4] else {
+            throw failure("The connection glow must merge smoothly at corners without a brighter hotspot")
         }
         let provider = CGDataProvider(data: Data(connectedGlow) as CFData)!
         let preview = CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32,
@@ -1461,14 +1650,25 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
     }
     float4 connectionEdgeGlow(float3 color, float opacity, float2 pixel, float4 glow) {
         if (glow.x <= 0.0f) return layerColor(color, opacity);
-        // A wide, soft halo has no hard rim. Pixel distance gives each edge
-        // the same reach, including on a wide display.
-        float2 edge = min(pixel, glow.yz - pixel);
-        float distance = max(0.0f, min(edge.x, edge.y));
-        float spread = mix(55.0f, 190.0f, glow.x);
-        float halo = exp(-pow(distance / spread, 1.4f))
-                   * (1.0f - smoothstep(1.7f, 2.5f, distance / spread));
-        float light = 0.30f * glow.x * halo;
+        // Only the soft inner glow remains; there is no bright line at the
+        // bezel. All four edges share the same reach
+        // relative to the display; smooth union keeps the corners continuous.
+        // Allow subpixel widths so the rim can move fully beyond the bezel.
+        // A one-pixel minimum would make its first and last frame pop.
+        float spread = max(0.0001f, glow.x * min(glow.y, glow.z));
+        float4 distance = max(float4(0.0f), float4(pixel, glow.yz - pixel)) / spread;
+        float4 shoulderDistance = distance / 0.42f;
+        float4 shoulder = exp(-shoulderDistance * shoulderDistance);
+        float4 spill = exp(-distance * distance)
+                    * (1.0f - smoothstep(1.8f, 2.7f, distance));
+        float4 edges = 0.24f * shoulder + 0.08f * spill;
+        float4 transmission = 1.0f - edges;
+        float halo = 1.0f - transmission.x * transmission.y * transmission.z * transmission.w;
+        // Unit intensity keeps the original soft glow. The contact boost
+        // strengthens that light without adding an outline.
+        float boostedHalo = glow.w <= 1.0f ? halo
+            : 1.0f - pow(1.0f - saturate(halo), glow.w);
+        float light = 0.985f * boostedHalo;
         // Composite in encoded color so the halo retains the same apparent
         // brightness as the screenshot fades to the live desktop underneath.
         float3 encoded = select(color * 12.92f,

@@ -294,14 +294,14 @@ struct ProgrammaticReturn {
     }
 }
 
-/// Continues the rendered fold at the latest measured physical opening speed.
-/// The short speed blend preserves the velocity already visible on screen.
+/// Carries visible opening momentum into the assisted finish. An older sensor
+/// estimate cannot lower the cruising speed; bounded acceleration joins it softly.
 struct OpeningContinuation {
     private static let speedBlendDuration = 0.080
     private var origin: Double = 0
     private var initialSpeed: Double = 0
+    private var initialAcceleration: Double = 0
     private var measuredSpeed: Double = 0
-    private var rampFraction: Double = 0
     private var rampDuration: Double = 0
     private var rampDistance: Double = 0
     private var cruiseDuration: Double = 0
@@ -312,76 +312,88 @@ struct OpeningContinuation {
     private(set) var velocity: Double = 0
     private(set) var active = false
 
-    mutating func begin(from fold: Float, velocity displayedVelocity: Double, observedSpeed: Double) {
-        origin = max(0, Double(fold))
+    var completionFraction: Float {
+        let duration = rampDuration + cruiseDuration + terminalDuration
+        return duration > 0 ? Float(min(1, elapsed / duration)) : 1
+    }
+
+    mutating func begin(from fold: Float, velocity displayedVelocity: Double,
+                        acceleration displayedAcceleration: Double = 0, observedSpeed: Double) {
+        origin = fold.isFinite ? max(0, Double(fold)) : 0
         initialSpeed = displayedVelocity.isFinite ? max(0, -displayedVelocity) : 0
-        let sensorSpeed = observedSpeed.isFinite ? min(120, max(1, observedSpeed)) : 1
-        measuredSpeed = sensorSpeed * .pi / 180
+        let sensorSpeed = observedSpeed.isFinite ? max(1, observedSpeed) : 1
+        measuredSpeed = max(initialSpeed, sensorSpeed * .pi / 180)
+        // Display-to-display acceleration can include sensor quantization. Carry
+        // its sign, but bound the extra momentum to 25% of the entry/measured
+        // pace, and a pre-existing slowdown to a small dip before cruising.
+        let acceleration = displayedAcceleration.isFinite ? -displayedAcceleration : 0
+        initialAcceleration = min(0.5 * measuredSpeed / Self.speedBlendDuration,
+                                  max(-0.25 * initialSpeed / Self.speedBlendDuration, acceleration))
         terminalDistance = min(origin * 0.15, 1.5 * .pi / 180)
         let travelDistance = origin - terminalDistance
-        let blendDuration = Self.speedBlendDuration
-        let fullBlendDistance = blendDuration * (initialSpeed + measuredSpeed) * 0.5
-        if fullBlendDistance <= travelDistance {
-            rampFraction = 1
-        } else {
-            // For a shallow fold, stop the speed blend at the start of the
-            // final slowdown without skipping past the flat image.
-            var low = 0.0, high = 1.0
-            for _ in 0..<24 {
+        rampDuration = Self.speedBlendDuration
+        if blendDistance(duration: rampDuration) > travelDistance {
+            // Fit the entire acceleration-aware blend into a shallow fold;
+            // truncating it would introduce another acceleration discontinuity.
+            var low = 0.0, high = rampDuration
+            for _ in 0..<40 {
                 let middle = (low + high) * 0.5
-                if Self.blendDistance(at: middle, duration: blendDuration,
-                                      initial: initialSpeed, final: measuredSpeed) < travelDistance {
-                    low = middle
-                } else {
-                    high = middle
-                }
+                if blendDistance(duration: middle) < travelDistance { low = middle }
+                else { high = middle }
             }
-            rampFraction = (low + high) * 0.5
+            rampDuration = (low + high) * 0.5
         }
-        rampDuration = blendDuration * rampFraction
-        rampDistance = Self.blendDistance(at: rampFraction, duration: blendDuration,
-                                          initial: initialSpeed, final: measuredSpeed)
-        terminalSpeed = initialSpeed + (measuredSpeed - initialSpeed) * Self.blend(at: rampFraction)
-        cruiseDuration = rampFraction == 1 ? max(0, travelDistance - rampDistance) / measuredSpeed : 0
-        terminalDuration = terminalDistance > 0
-            ? 2 * terminalDistance / max(terminalSpeed, 0.1 * .pi / 180) : 0
+        terminalSpeed = cruisingSpeed(duration: rampDuration)
+        rampDistance = blendDistance(duration: rampDuration)
+        cruiseDuration = max(0, travelDistance - rampDistance) / terminalSpeed
+        terminalDuration = terminalDistance > 0 ? 2 * terminalDistance / terminalSpeed : 0
         elapsed = 0
         velocity = -initialSpeed
         active = origin > 0
     }
 
-    private static func blend(at fraction: Double) -> Double {
-        fraction * fraction * (3 - 2 * fraction)
+    private func cruisingSpeed(duration: Double) -> Double {
+        // This also keeps a positive entry acceleration monotonic all the way
+        // into cruising instead of accelerating and then braking in the blend.
+        max(measuredSpeed, initialSpeed + 0.5 * max(0, initialAcceleration) * duration)
     }
 
-    private static func blendDistance(at fraction: Double, duration: Double,
-                                      initial: Double, final: Double) -> Double {
-        duration * (initial * fraction
-                    + (final - initial) * (pow(fraction, 3) - 0.5 * pow(fraction, 4)))
+    private func blendDistance(duration: Double) -> Double {
+        duration * (0.5 * (initialSpeed + cruisingSpeed(duration: duration))
+                    + 0.1 * initialAcceleration * duration)
     }
 
     mutating func step(elapsed delta: Double) -> Float {
         guard active else { return 0 }
         if delta.isFinite { elapsed += max(0, delta) }
         if elapsed < rampDuration {
-            let fraction = elapsed / Self.speedBlendDuration
-            let distance = Self.blendDistance(at: fraction, duration: Self.speedBlendDuration,
-                                               initial: initialSpeed, final: measuredSpeed)
-            velocity = -(initialSpeed + (measuredSpeed - initialSpeed) * Self.blend(at: fraction))
-            return Float(origin - distance)
+            let t = elapsed / rampDuration
+            let blend = pow(t, 3) * (10 - 15 * t + 6 * t * t)
+            let tangent = t - 6 * pow(t, 3) + 8 * pow(t, 4) - 3 * pow(t, 5)
+            let difference = terminalSpeed - initialSpeed
+            velocity = -(initialSpeed + difference * blend
+                         + initialAcceleration * rampDuration * tangent)
+            let distance = rampDuration * (initialSpeed * t
+                + difference * pow(t, 4) * (2.5 - 3 * t + t * t)
+                + initialAcceleration * rampDuration
+                    * (0.5 * t * t - 1.5 * pow(t, 4) + 1.6 * pow(t, 5) - 0.5 * pow(t, 6)))
+            return Float(max(0, origin - distance))
         }
         if elapsed < rampDuration + cruiseDuration {
-            velocity = -measuredSpeed
-            return Float(origin - rampDistance - measuredSpeed * (elapsed - rampDuration))
+            velocity = -terminalSpeed
+            return Float(max(0, origin - rampDistance - terminalSpeed * (elapsed - rampDuration)))
         }
-        let fraction = min(1, (elapsed - rampDuration - cruiseDuration) / terminalDuration)
+        let fraction = terminalDuration > 0
+            ? min(1, (elapsed - rampDuration - cruiseDuration) / terminalDuration) : 1
         if fraction == 1 {
             active = false
             velocity = 0
             return 0
         }
-        velocity = -terminalSpeed * (1 - fraction)
-        return Float(terminalDistance * (1 - fraction) * (1 - fraction))
+        // Keep the gentle landing with continuous speed and acceleration.
+        let remaining = 1 - fraction
+        velocity = -terminalSpeed * pow(remaining, 3) * (1 + 3 * fraction + 6 * fraction * fraction)
+        return Float(terminalDistance * pow(remaining, 4) * (1 + 2 * fraction + 2 * fraction * fraction))
     }
 }
 
