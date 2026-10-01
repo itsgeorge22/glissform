@@ -6,7 +6,7 @@ New experiences should feel native, have a clear purpose, stay lightweight, and 
 
 Glissform is a small passion project. The owner's intended price is $1.90, with occasional improvements and new features after launch. Keep release preparation proportional to that scope; broad hardware certification, formal performance studies, and a fixed tester cohort are not prerequisites.
 
-## Public beta — 0.1.0-beta.1
+## Public beta — 0.1.0-beta.4
 
 The first feature, Seamless Close, implements screenshot-based closing animation with continuous hinge perspective and upper-edge narrowing through the full gesture, steadier adaptive smoothing, optional full-image blur and shadow, awake reversal, cached post-sleep opening, native settings with a configurable starting angle, optional desktop restoration after an adjustable still-lid pause, menu bar controls, and lifecycle cleanup. On 2026-09-21, the owner confirmed correct smoothness, speed, abrupt lid stops, reversals, and opening after sleep without locking on the development Mac. On 2026-09-28, the owner confirmed the revised geometry and Blur on/off during everyday gestures, plus the requested Space and sleep/wake checks. Locked-screen animation remains unavailable. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
 
@@ -96,6 +96,7 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 - [x] Bundle interface vectors locally, using supplied feature icons for Seamless Close and Battery Ripple and Iconly Bold / Regular for supporting controls. Retain Iconly Bulk, Outline, and the previous Custom mix as alternatives with live switching in developer builds.
 
 - [x] Establish shared spacing, typography, surfaces, permission-state colours, and control feedback across settings and About.
+- [x] Add a manual update-check button to the right of the app identity in Privacy & About, using the existing updater and its availability state.
 
 - [x] Show missing screen access on the main page, briefly confirm detected grants, and keep persistent access status and management in Privacy & About.
 
@@ -132,6 +133,12 @@ Keep this a practical release check for a small passion project:
 - Provide a usable installation and permission flow for an ad-hoc signed download, with honest tested-hardware and known-limitation notes.
 
 The broader investigations below and above are follow-up work, not a requirement to complete every roadmap item before beta. Other additional features are not required for launch; improve the app incrementally after release.
+
+## Beta.4 — 0.1.0-beta.4
+
+- [x] Prepare build 15 with refined opening and connection feedback, updated defaults, and the About update-check button.
+- [ ] Verify the published beta.4 prerelease page, exact tag, DMG, checksum and signed update feed.
+- [ ] Physically compare the final glow rhythm and verify a beta.3-to-beta.4 Sparkle upgrade on the development Mac.
 
 ## Beta.3 — 0.1.0-beta.3
 

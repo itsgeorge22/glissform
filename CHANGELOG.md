@@ -4,24 +4,28 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
-- Refine the connection glow into a wider pearl bloom with continuous, softly joined corners. Ease its visibility in, build brightness over the final 65 ms before the click peak, then release through a short, tapered afterglow. Keep the crest in place and fade the light over 320 ms with only a gentle width contraction, avoiding a separate inward wave or a bright pinch at the bezel. Apply the same rhythm to assisted opening, Pause and Esc, keeping the scheduled click peak and desktop-return timing. Physical feel remains pending owner review.
+## 0.1.0-beta.4 — 2026-10-01
 
-- Default Seamless Close’s Begin at angle to 90° and enable Resume desktop after pause for new settings and Reset to defaults. Preserve previously saved choices.
+### Added
 
-- Add one saved **Connection effect** switch in Seamless Close Settings, using the supplied four-corner icon, to control the glow and click together for assisted opening, Pause and Esc. It defaults to on and resets to on. Turning it off cancels current feedback without changing the desktop return; disabled feedback does not start audio.
+- Add **Check for Updates…** to the right of the logo, name and version in Privacy & About. Use the existing updater and disable the button while a check is unavailable and in Dev builds.
+- Add one saved **Connection effect** switch for the glow and click together across assisted opening, Pause and Esc. It defaults to on and resets to on; disabling it cancels feedback while preserving the desktop return.
 
-- Restore responsive starts on repeated lid closes by preparing the screenshot and its first frame before starting connection audio. Preserve the closing motion and shared click/glow peak scheduling; canceled captures never warm audio.
+### Improved
 
-- Keep the scheduled Pause return click playing when tiny lid movements rearm automatic angle detection. Ignore redundant finish requests without canceling the ongoing feedback; explicit disable, reclose and lifecycle interruptions still cancel audio.
+- Carry recent opening speed and bounded acceleration through the final 5° assisted return, retaining the gentle landing and same-screenshot reversal.
+- Refine the connection glow into a wider pearl bloom with softly joined corners, a short brightness lead-in to the click peak, and a tapered 320 ms fading release. Keep the diffuse crest stationary to make the connection one smooth gesture.
+- Give Pause and Esc the same glow and click during their final 5° of visible return. Restore mouse access after the screenshot’s 50 ms fade while the glow finishes.
+- Schedule the click’s strongest sample and glow peak against one clock with output-latency compensation. Prepare audio after screenshot and first-frame preparation, let successful playback finish naturally, and cancel pending playback on interruption.
+- Restore responsive repeated-close starts by keeping audio startup out of screenshot acquisition. Preserve a scheduled Pause click through tiny lid movements when automatic angle detection rearms.
+- Default **Begin at** to 90° and **Resume desktop after pause** to on for new settings and Reset to defaults, preserving saved preferences.
+- Ease Regular blur at the beginning of a lid close and restore its previous strength by the deep fold. High and Subtle retain their existing blur.
 
-- Synchronize the shared return click’s strongest sample with the glow’s brightness peak using one clock and the audio output’s reported latency. Prepare audio during the gesture, schedule ahead of contact, and let successful playback finish naturally. If output is late, move the pulse and audible peak together without holding the desktop return. Cancel pending audio on interruption and bound cleanup if callbacks stop. Preserve visible cached-wake images when Esc starts its return. Frame-clock checks cover 60/120 Hz and slow startup; three development-Mac Bluetooth playback trials completed, while physical peak alignment still needs comparison.
+### Validation and limitations
 
-- Give Resume desktop after pause and manual Esc return the same inward edge glow, connection brightness pulse and short click as assisted reopening. Show the glow only during the final 5° of the visible fold-to-flat return, including returns that start within that range. Preserve their return motion, release mouse access after the image's 50 ms fade while the glow finishes over the live desktop, and keep canceled or pending captures silent. Extend cleanup only while the return/glow is advancing; stalled callbacks still release the desktop.
-
-- Ease the default Regular Seamless Close blur at the start of a lid close, then bring it back to its previous strength by the deep fold. Update the matching Settings and website preview images; High and Subtle retain their existing blur.
-- Finish the final 5° of Seamless Close opening automatically when recent upward lid readings establish movement. Draw the newest lid-driven frame before takeover, carry the image's speed and bounded acceleration, and use the latest 80 ms of available upward readings without slowing toward an older estimate or a 120°/s cap. Keep the gentle final slowdown. Accelerating fractional/whole-degree replays and renderer checks cover the handoff; physical comparison remains pending. Rejoin the same screenshot if the lid reverses before completion, and keep the desktop accessible if the lid stops below the starting angle.
-- Gather a soft inner glow along all four screen edges during assisted opening, pause restoration and Esc return, without a pure white outline. Ease its width inward from the bezel toward the automatic finish, then retract it outward over the live desktop. Ease the glow into a brief, stronger pulse at the scheduled contact click; cancel any further rise on reversal. Blend the glow smoothly through the corners and fade it during the gentle retreat after contact. Scale its reach with the display and retract it smoothly if the lid reverses.
-- Restore the earlier short desktop-return click for assisted opening, pause restoration and Esc return. Schedule it once to peak with the connection glow, keep playback off the render loop, and cancel pending playback on interruption. Release mouse access as soon as the screenshot fades, while the glow finishes over the live desktop.
+- The development builds and targeted dark/light glow render reviews passed. Local regression tests were skipped for the latest glow and About-button refinements at the user’s request; the release workflow runs its required CI-safe checks.
+- The owner confirmed improved repeated-close starts on the development Mac. Three Bluetooth playback trials completed with the earlier shared-clock audio implementation; physical audible/visible peak alignment remains unverified.
+- Physical acceptance of the final glow rhythm, broader interruption paths, and the beta.3-to-beta.4 Sparkle upgrade remains pending. Compatibility beyond the development Mac is unverified.
 
 ## 0.1.0-beta.3 — 2026-09-30
 

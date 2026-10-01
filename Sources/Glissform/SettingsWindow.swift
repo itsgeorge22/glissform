@@ -63,6 +63,8 @@ final class SettingsModel: ObservableObject {
     }
     @Published private(set) var automaticUpdatesEnabled = false
     @Published private(set) var availableUpdate: AvailableUpdate?
+    @Published private(set) var canCheckForUpdates = false
+    var onCheckForUpdates: (() -> Void)?
     var isDevelopmentBuild: Bool {
         Bundle.main.object(forInfoDictionaryKey: "GlissformDeveloperTools") as? Bool == true
     }
@@ -120,6 +122,15 @@ final class SettingsModel: ObservableObject {
 
     func setAvailableUpdate(_ update: AvailableUpdate?) {
         availableUpdate = update
+    }
+
+    func syncCanCheckForUpdates(_ available: Bool) {
+        canCheckForUpdates = available
+    }
+
+    func checkForUpdates() {
+        guard canCheckForUpdates else { return }
+        onCheckForUpdates?()
     }
 
     func refreshLaunchAtLogin() {
@@ -1601,6 +1612,15 @@ private struct AboutSettingsView: View {
                         Text("\(Bundle.main.object(forInfoDictionaryKey: "GlissformVersion") as? String ?? "Development")")
                             .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
                     }
+                    Spacer(minLength: SettingsDesign.Spacing.controls)
+                    Button("Check for Updates…") { model.checkForUpdates() }
+                        .buttonStyle(FeedbackButtonStyle(kind: .filled))
+                        .fixedSize()
+                        .disabled(!model.canCheckForUpdates)
+                        .modifier(SettingsActionCursor(isActionEnabled: model.canCheckForUpdates))
+                        .help(model.isDevelopmentBuild
+                              ? "Release updates are available only in Glissform."
+                              : "Check for a newer version of Glissform.")
                 }
                 VStack(spacing: SettingsDesign.Spacing.cards) {
                     privacyCard

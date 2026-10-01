@@ -6,6 +6,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate, SPUStandardUserDriverDeleg
     private let model: SettingsModel
     private var controller: SPUStandardUpdaterController!
     private var automaticUpdateObservation: NSKeyValueObservation?
+    private var canCheckObservation: NSKeyValueObservation?
 
     init(model: SettingsModel) {
         self.model = model
@@ -21,6 +22,13 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate, SPUStandardUserDriverDeleg
         }
         model.onAutomaticUpdatesEnabledChange = { [weak self] enabled in
             self?.controller.updater.automaticallyDownloadsUpdates = enabled
+        }
+        model.onCheckForUpdates = { [weak self] in self?.checkForUpdates() }
+        canCheckObservation = controller.updater.observe(\.canCheckForUpdates,
+                                                        options: [.initial, .new]) { [weak self] updater, _ in
+            Task { @MainActor [weak self] in
+                self?.model.syncCanCheckForUpdates(updater.canCheckForUpdates)
+            }
         }
         if controller.updater.automaticallyChecksForUpdates {
             controller.updater.checkForUpdatesInBackground()
