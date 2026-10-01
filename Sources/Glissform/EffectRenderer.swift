@@ -11,7 +11,7 @@ import MetalPerformanceShaders
 final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegate {
     enum CompletionMode {
         case lid, assisted, pause, disabled
-        var hasConnectionFeedback: Bool { self == .assisted || self == .pause }
+        var hasConnectionFeedback: Bool { self != .disabled }
     }
     private weak var view: MTKView?
     private let device: MTLDevice
@@ -42,6 +42,9 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
     private static let connectionGlowMaximumSpread: Float = 0.032
     private static let connectionGlowApproachIntensity: Float = 1
     private static let connectionGlowContactIntensity: Float = 1.75
+    // The final damped tail is already visually flat. Mark contact without
+    // clipping that tail or waiting for its much stricter numerical snap.
+    private static let lidConnectionFold = Float(0.1 * Double.pi / 180)
     private var connectionFeedbackActive = false
     var connectionEffectEnabled = true {
         didSet {
@@ -161,7 +164,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         self.onLiveDesktop = mode.hasConnectionFeedback ? onLiveDesktop : nil
         fadingOut = false
         pendingOpeningSpeed = nil
-        pauseGlowRange = mode == .pause
+        pauseGlowRange = mode == .pause || mode == .lid
             ? min(max(0, renderedFold), Float(OpeningAssist.remainingDegrees * .pi / 180)) : 0
         if connectionFeedbackActive {
             connectionGlowSpread = 0
@@ -495,6 +498,24 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         render(to: update.drawable.texture, drawable: update.drawable, at: update.targetPresentationTimestamp)
     }
 
+    private func lidConnectionTime(after now: Double) -> Double? {
+        guard foldRadians == 0 else { return nil }
+        if renderedFold <= Self.lidConnectionFold && renderedVelocity <= 0 { return now }
+        // Only forecast feedback. Value copies leave the visible smoothing,
+        // velocity and entrance handoff untouched. A reclose cancels the cue.
+        var projectedSmoothing = smoothing
+        var projectedHandoff = handoff
+        let frame = 1 / Double(frameRate)
+        for index in 1...Int(ceil(2 / frame)) {
+            let time = now + Double(index) * frame
+            let target = projectedSmoothing.step(at: time)
+            let fold = projectedHandoff.step(toward: target,
+                velocity: projectedSmoothing.velocity, elapsed: frame)
+            if fold <= Self.lidConnectionFold && projectedHandoff.velocity <= 0 { return time }
+        }
+        return nil
+    }
+
     private func advanceMotion(at now: Double) {
         let elapsed = max(0, now - (lastDrawTime ?? now))
         lastDrawTime = now
@@ -520,12 +541,24 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             pendingOpeningSpeed = nil
             handoff = HandoffTransition()
         }
-        if connectionFeedbackActive && connectionPeakTime == nil {
-            let remaining = completionMode == .assisted
-                ? openingContinuation.remainingDuration : handoff.remainingDuration
+        let atIdentity = renderedFold == 0 && renderedVelocity == 0 && !handoff.active
+            && (completionMode != .disabled || !programmaticReturn.active)
+            && (!isFinishingWithLid || foldRadians == 0)
+        let atConnection = atIdentity || (isFinishingWithLid && foldRadians == 0
+            && renderedFold <= Self.lidConnectionFold && renderedVelocity <= 0)
+        // A sensor sample may jump past the assisted region. Keep the ordinary
+        // lid trajectory intact and mark its visually flat contact without
+        // waiting through the tiny, still-moving numerical settling tail.
+        // Queue audio during the return so output lead time is absorbed before
+        // contact instead of holding a dim rim over an already-flat image.
+        let lidContact = connectionFeedbackActive && connectionPeakTime == nil && isFinishingWithLid
+            ? lidConnectionTime(after: now) : nil
+        if connectionFeedbackActive && connectionPeakTime == nil && (!isFinishingWithLid || lidContact != nil) {
+            let remaining = isFinishingWithLid ? max(0, (lidContact ?? now) - now) : (completionMode == .assisted
+                ? openingContinuation.remainingDuration : handoff.remainingDuration)
             // Target an actual display frame, including the pulse's rounded attack.
             let frame = 1 / Double(frameRate)
-            let contact = now + ceil(remaining / frame) * frame
+            let contact = isFinishingWithLid ? (lidContact ?? now) : now + ceil(remaining / frame) * frame
             let peak = contact + ceil(ConnectionFeedbackTiming.attack / frame) * frame
             connectionPeakTime = peak
             if let schedule = onConnectionSchedule {
@@ -544,8 +577,12 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             let t: Float
             if completionMode == .assisted {
                 t = openingContinuation.completionFraction
+            } else if isFinishingWithLid && atConnection {
+                // A very shallow gesture can already be flat on its first
+                // return frame. It still has one visible connection to mark.
+                t = 1
             } else {
-                // Pause/Escape may start at a deep fold. Keep the glow hidden
+                // Lid/Pause/Escape may start at a deep fold. Keep the glow hidden
                 // until only five visible degrees remain; shallow returns use
                 // their smaller starting fold so the glow still begins at zero.
                 t = pauseGlowRange > 0
@@ -593,16 +630,13 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             }
             if t == 1 { connectionGlowReleaseStart = 0 }
         }
-        let atIdentity = renderedFold == 0 && renderedVelocity == 0 && !handoff.active
-            && (completionMode != .disabled || !programmaticReturn.active)
-            && (!isFinishingWithLid || foldRadians == 0)
+        if ending, atConnection, connectionFeedbackActive, !connectionGlowReleasing {
+            releaseConnectionGlow(duration: ConnectionFeedbackTiming.retreat, pulseAtContact: true)
+        }
         if ending, atIdentity, !fadingOut {
             // Reveal live pixels only after geometry and material reach identity.
             fadingOut = true
             fade(to: 0, duration: 0.050)
-            if connectionFeedbackActive {
-                releaseConnectionGlow(duration: ConnectionFeedbackTiming.retreat, pulseAtContact: true)
-            }
         } else if fadeDuration > 0 {
             fadeElapsed += elapsed
             let t = min(1, fadeElapsed / fadeDuration)
@@ -1381,15 +1415,72 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
                       && renderer.opacity == 0 && renderer.connectionGlowSpread == 0,
                       "Pause and Escape must keep their return timing, click-aligned peak and 320 ms fading release")
         }
-        for mode in [CompletionMode.lid, .disabled] {
+        do {
             renderer.pauseSnapshot()
             renderer.lastDrawTime = 0
-            renderer.finishAnimation(mode) {}
+            renderer.finishAnimation(.disabled) {}
             renderer.advanceMotion(at: 1)
             try check(renderer.connectionGlowSpread == 0 && !renderer.connectionGlowPulsing,
-                      "Ordinary manual completion and disabling must not gain connection feedback")
+                      "Disabling must not gain connection feedback")
         }
-        for mode in [CompletionMode.pause, .assisted] {
+        for fps in [60.0, 120.0] {
+            for fold in [0.0, 2.0, 20.0] {
+                renderer.pauseSnapshot()
+                renderer.frameRate = Float(fps)
+                renderer.renderedFold = Float(fold) * degree
+                renderer.foldRadians = renderer.renderedFold
+                renderer.smoothing.reset(to: renderer.renderedFold, at: 0)
+                renderer.lastDrawTime = 0
+                renderer.setLidAngle(100, referenceAngle: 100, sampleTime: 1 / fps)
+                var uninterrupted = renderer.smoothing
+                var schedules = 0
+                var scheduledAt: Double?
+                var requestedPeak: Double?
+                var contactTime: Double?
+                var identityTime: Double?
+                var glowBeforeContact = false
+                var peakIntensity: Float = 1
+                renderer.finishAnimation(.lid, onConnectionSchedule: { peak, reply in
+                    schedules += 1
+                    scheduledAt = renderer.lastDrawTime
+                    requestedPeak = peak
+                    reply(peak)
+                }) {}
+                for frame in 1...Int(fps * 2) {
+                    let time = Double(frame) / fps
+                    let expectedFold = uninterrupted.step(at: time)
+                    renderer.advanceMotion(at: time)
+                    try check(renderer.renderedFold == expectedFold
+                              && renderer.renderedVelocity == uninterrupted.velocity,
+                              "Fast-opening feedback must preserve every frame of the existing lid smoothing")
+                    if renderer.renderedFold >= 5 * degree {
+                        try check(renderer.connectionGlowSpread == 0,
+                                  "Fast-opening glow must stay hidden outside the final five visible degrees")
+                    }
+                    if renderer.renderedFold > Self.lidConnectionFold {
+                        try check(!renderer.connectionGlowPulsing,
+                                  "Fast-opening feedback must not pulse before visible contact")
+                        glowBeforeContact = glowBeforeContact || renderer.connectionGlowSpread > 0
+                    } else if contactTime == nil {
+                        contactTime = time
+                    }
+                    if renderer.renderedFold == 0 && identityTime == nil { identityTime = time }
+                    peakIntensity = max(peakIntensity, renderer.connectionGlowIntensity)
+                }
+                try check(contactTime != nil && identityTime != nil && scheduledAt != nil && requestedPeak != nil
+                          && (fold == 0 || glowBeforeContact) && schedules == 1
+                          && peakIntensity > 1.7 && renderer.opacity == 0 && renderer.connectionGlowSpread == 0,
+                          "Fast opening must gather, pulse once at contact, fade and release at 60/120 Hz")
+                try check(abs(requestedPeak! - contactTime! - ConnectionFeedbackTiming.attack) <= 1 / fps,
+                          "Fast-opening feedback must target visible contact, not the invisible settling tail")
+                if fold > 0 {
+                    try check(scheduledAt! < contactTime! && contactTime! < identityTime!,
+                              "Fast opening must queue audio ahead of visible contact while preserving the remaining motion")
+                }
+            }
+        }
+        print("PASS: skipped-angle feedback queues ahead of visible contact without changing the smoothing tail")
+        for mode in [CompletionMode.lid, .pause, .assisted] {
             var motion: [[Float]] = []
             for enabled in [true, false] {
                 renderer.pauseSnapshot()
@@ -1401,10 +1492,13 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
                 var schedules = 0
                 renderer.finishAnimation(mode, openingSpeed: 30,
                     onConnectionSchedule: { peak, reply in schedules += 1; reply(peak) }) {}
+                if mode == .lid {
+                    renderer.setLidAngle(100, referenceAngle: 100, sampleTime: 0)
+                }
                 var frames: [Float] = []
                 for frame in 1...120 {
                     renderer.advanceMotion(at: Double(frame) / 120)
-                    frames += [renderer.renderedFold, renderer.opacity]
+                    frames += [renderer.renderedFold, Float(renderer.renderedVelocity), renderer.opacity]
                     if !enabled {
                         try check(renderer.connectionGlowSpread == 0 && !renderer.connectionGlowPulsing,
                                   "Connection effect off must suppress glow throughout the return")
@@ -1432,7 +1526,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
                   "A late audio reply after disabling must not revive glow on immediate re-enable")
         print("PASS: one connection switch suppresses glow/audio without changing return motion")
         for fps in [60.0, 120.0] {
-            for mode in [CompletionMode.pause, .assisted] {
+            for mode in [CompletionMode.lid, .pause, .assisted] {
                 for latency in [0.0, 0.160, 0.300] {
                     for startup in [0.0, 0.520] {
                         renderer.pauseSnapshot()
@@ -1450,6 +1544,9 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
                             reply = completion
                             scheduleCount += 1
                         }) {}
+                        if mode == .lid {
+                            renderer.setLidAngle(100, referenceAngle: 100, sampleTime: 0)
+                        }
                         var brightest: Float = 0
                         var brightestTime = 0.0
                         var flatTime: Double?
@@ -1468,9 +1565,9 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
                                 brightest = renderer.connectionGlowIntensity
                                 brightestTime = time
                             }
-                            if renderer.renderedFold > 0 {
+                            if renderer.renderedFold > (mode == .lid ? Self.lidConnectionFold : 0) {
                                 try check(renderer.connectionGlowIntensity < connectionGlowContactIntensity,
-                                          "The anticipated bloom must not peak before flat contact")
+                                          "The anticipated bloom must not peak before visible contact")
                             }
                             if renderer.connectionSchedulePending
                                 || time < (renderer.connectionPeakTime ?? time) - ConnectionFeedbackTiming.glowAttack {

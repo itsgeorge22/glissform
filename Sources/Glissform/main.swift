@@ -772,7 +772,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Inactive lid readings can request .lid during a Pause return (including
         // tiny upward jitter that rearms automatic angle detection). An ignored
         // request must not cancel the click belonging to the continuing return.
-        if mode == .lid { connectionSound.stop() }
         finishingGesture = true
         let token = snapshotToken
         renderer?.finishAnimation(mode, openingSpeed: openingSpeed,
@@ -1896,32 +1895,68 @@ extension AppDelegate {
                 print("PASS: \(visible ? "visible snapshot cleanup" : "delayed snapshot cancellation") on \(interruption)")
             }
         }
-        for visible in [false, true] {
-            let (app, source) = try makeGesture()
-            defer { app.shutdown(); app.window?.close() }
-            try await waitForCapture(source)
-            let task = app.snapshotTask
-            if visible {
-                try await Task.sleep(nanoseconds: 50_000_000)
+        for (automatic, overshoot) in [(false, 0.0), (false, 8.0), (true, 0.0), (true, 8.0)] {
+            for visible in [false, true] {
+                var clicks = 0
+                let (app, source) = try makeGesture(startGesture: false, playConnectionSound: { clicks += 1 })
+                defer { app.shutdown(); app.window?.close() }
+                let started = ProcessInfo.processInfo.systemUptime
+                if automatic {
+                    app.motion.automaticStartAngle = true
+                    app.settingsModel.configure(animationEnabled: true, startAngle: 100,
+                        screenCaptureAllowed: true, resumeAfterPause: false, automaticStartAngle: true)
+                    for frame in 0...20 {
+                        app.handleLidReading(110, time: started - 1 + Double(frame) / 20)
+                    }
+                    try check(app.motion.learnedStartAngle == 109,
+                              "Fast automatic reopening must use a real learned reference")
+                } else {
+                    app.handleLidReading(110, time: started)
+                }
+                app.handleLidReading(80, time: started)
+                let reference = app.motion.activationAngle
+                let finalAngle = reference + overshoot
+                try await waitForCapture(source)
+                let task = app.snapshotTask
+                if visible {
+                    try await Task.sleep(nanoseconds: 50_000_000)
+                    source.pending?.resume(returning: buffer)
+                    source.pending = nil
+                    await task?.value
+                    try await Task.sleep(nanoseconds: 45_000_000)
+                    try check(app.hasSnapshot && app.window!.alphaValue > 0,
+                              "Fast return test needs a visible snapshot")
+                }
+                let sampleTime = ProcessInfo.processInfo.systemUptime - 0.05
+                for (index, angle) in [80.0, reference - 10, reference - 6, finalAngle].enumerated() {
+                    app.handleLidReading(angle, time: sampleTime + Double(index) / 60)
+                }
+                if visible {
+                    try check(app.finishingGesture && app.renderer?.isFinishingWithLid == true
+                              && app.assistedOpeningPeakAngle == nil,
+                              "Skipping the assisted region must keep the existing lid-driven return")
+                    app.handleLidReading(finalAngle)
+                }
                 source.pending?.resume(returning: buffer)
                 source.pending = nil
                 await task?.value
-                try await Task.sleep(nanoseconds: 45_000_000)
-                try check(app.hasSnapshot && app.window!.alphaValue > 0,
-                          "Manual return test needs a visible snapshot")
+                if visible {
+                    try await waitForConnectionDesktop(app)
+                    try await waitForCleanup(app)
+                }
+                try checkCleared(app)
+                let sound = app.connectionSound as! SyntheticSound
+                try check(clicks == (visible ? 1 : 0) && sound.scheduledPeaks.count == (visible ? 1 : 0)
+                          && source.count == 1,
+                          "Skipped-angle feedback must occur once for visible returns, without recapture; pending captures stay silent")
+                print("PASS: \(visible ? "visible" : "pending") fast \(automatic ? "learned" : "manual") return to \(finalAngle) degrees")
             }
-            app.handleLidReading(100)
-            source.pending?.resume(returning: buffer)
-            source.pending = nil
-            await task?.value
-            if visible { try await waitForCleanup(app) }
-            try checkCleared(app)
-            print("PASS: \(visible ? "visible" : "pending") manual return")
         }
         // The longer ordinary return must remain cancellable while its
         // snapshot is visible, including callbacks queued before cancellation.
-        for interruption in ["sleep", "display change", "quit"] {
-            let (app, source) = try makeGesture()
+        for interruption in ["reclose", "sleep", "Space change", "display change", "lock", "quit"] {
+            var clicks = 0
+            let (app, source) = try makeGesture(playConnectionSound: { clicks += 1 })
             defer { app.shutdown(); app.window?.close() }
             try await waitForCapture(source)
             try await Task.sleep(nanoseconds: 50_000_000)
@@ -1932,16 +1967,24 @@ extension AppDelegate {
             app.handleLidReading(100)
             try check(app.finishingGesture, "Reopening must begin the ordinary return")
             switch interruption {
+            case "reclose":
+                app.handleLidReading(80)
+                try check(!app.finishingGesture && app.hasSnapshot && app.motion.active && source.count == 1,
+                          "Reclosing must rejoin the same smoothed gesture without recapturing")
+                app.suspend()
             case "sleep": app.suspend()
+            case "Space change": app.handleActiveSpaceChange()
             case "display change": app.restart(startHardware: false)
+            case "lock": app.handleScreenLock(true)
             default: app.shutdown()
             }
             try await Task.sleep(nanoseconds: 180_000_000)
             try checkCleared(app)
+            try check(clicks == 0, "An interrupted fast-opening approach must stay silent")
             print("PASS: continuous ordinary return interrupted by \(interruption)")
         }
 
-        for mode in ["Pause", "Esc", "assisted"] {
+        for mode in ["Pause", "Esc", "assisted", "lid"] {
             var clicks = 0
             let (app, source) = try makeGesture(startGesture: false,
                                               playConnectionSound: { clicks += 1 })
@@ -1955,6 +1998,7 @@ extension AppDelegate {
             await app.snapshotTask?.value
             try await Task.sleep(nanoseconds: 100_000_000)
             if mode == "Esc" { app.exitSeamlessClose() }
+            else if mode == "lid" { app.handleLidReading(100) }
             else { app.finishGesture(mode: mode == "Pause" ? .pause : .assisted, openingSpeed: 30) }
             try await waitForCleanup(app)
             let sound = app.connectionSound as! SyntheticSound

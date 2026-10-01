@@ -4,6 +4,11 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+### Fixed
+
+- Keep the connection glow and click when a quick reopening skips sensor readings inside the final 5° and reaches or passes the starting angle. Preserve ordinary lid-driven smoothing and gather the glow during the final visible 5°. Pending captures stay silent and interruptions cancel feedback.
+- Remove the fast-opening feedback wait through the nearly invisible smoothing tail: forecast visible contact using copies of the existing motion state, queue the click during the return, and begin the glow pulse within 0.1° of flat without altering motion or screenshot fade timing. The owner confirmed feedback appears with speakers and AirPods in both angle modes, but reported delayed contact on the earlier correction; physical acceptance of this timing refinement remains pending.
+
 ## 0.1.0-beta.5 — 2026-10-01
 
 ### Fixed
