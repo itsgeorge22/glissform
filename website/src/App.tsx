@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react';
+import SeamlessCloseSection from './SeamlessCloseSection';
 
 const asset = (name: string) => '/assets/' + name;
 const downloadUrl = '/downloads/Glissform-0.1.0-beta.5.dmg';
@@ -131,28 +132,28 @@ function CustomizationGrid() {
 
   return <div className="customization-grid">
     <article className="content-card blur-card">
-      <div className="card-copy"><h3>Just the right amount of blur</h3><p>Choose Subtle, Regular or High. Or turn blur off entirely.</p></div>
+      <div className="card-copy"><h3>Blur, Just As You Like It.</h3><p>Choose Subtle, Regular or High. Or turn blur off entirely.</p></div>
       <div className="blur-choices" aria-label="Blur strength">
         {blurChoices.map((choice) => <button className={'blur-choice' + (blur === choice.id ? ' blur-choice--selected' : '')} type="button" aria-pressed={blur === choice.id} onClick={() => setBlur(choice.id)} key={choice.id}><span className="blur-choice__image"><img src={asset(choice.image)} alt="" /></span><span>{choice.label}</span></button>)}
       </div>
     </article>
     <article className="content-card angle-card">
-      <div className="card-copy"><h3>Start at just<br />the right angle</h3><p>Choose when Seamless Close begins, or use your current lid position.</p></div>
+      <div className="card-copy"><h3>Start At Just<br />The Right Angle.</h3><p>Choose when Seamless Close begins, or use your current lid position.</p></div>
       <div className="angle-illustration">
         <div className="angle-illustration__value"><label htmlFor="starting-angle">Begin at</label><strong>{angle}°</strong></div>
         <input id="starting-angle" className="angle-illustration__range" type="range" min="60" max="120" step="1" value={angle} aria-valuetext={`${angle} degrees`} onChange={(event) => setAngle(Number(event.target.value))} style={{ '--angle-progress': `${(angle - 60) / 60 * 100}%` } as CSSProperties} />
       </div>
     </article>
     <article className="content-card settings-card">
-      <div className="card-copy"><h3>Finds your angle.<br />Automatically</h3><p>Let a still lid set the starting point. Choose how long to wait.</p></div>
+      <div className="card-copy"><h3>Your Angle.<br />Found Automatically.</h3><p>Let a still lid set the starting point. Choose how long to wait.</p></div>
       <div className="settings-card__rows"><SettingRow label="Detect starting angle" switchValue={detectAngle} onSwitch={setDetectAngle} /><SettingRow label="Wait time" value="1.0 s" muted={!detectAngle} /></div>
     </article>
     <article className="content-card settings-card">
-      <div className="card-copy"><h3>Pause.<br />Your desktop returns</h3><p>Hold the lid still to restore the desktop. Set the pause delay to suit you.</p></div>
+      <div className="card-copy"><h3>Pause.<br />Your Desktop Returns.</h3><p>Hold the lid still to restore the desktop. Set the pause delay to suit you.</p></div>
       <div className="settings-card__rows"><SettingRow label="Pause to return" switchValue={pauseReturn} onSwitch={setPauseReturn} /><SettingRow label="Wait time" value="0.5 s" muted={!pauseReturn} /></div>
     </article>
     <article className="content-card settings-card">
-      <div className="card-copy"><h3>Your moments.<br />Your choice</h3><p>Enable each battery alert separately. Preview either ripple in app.</p></div>
+      <div className="card-copy"><h3>Your Alerts.<br />Your Choice.</h3><p>Enable each battery alert separately. Preview either ripple in app.</p></div>
       <div className="settings-card__rows"><SettingRow label="Power connection" switchValue={powerConnection} onSwitch={setPowerConnection} /><SettingRow label="Battery at 20%" switchValue={batteryLow} onSwitch={setBatteryLow} /></div>
     </article>
   </div>;
@@ -210,17 +211,17 @@ function FeatureShowcase() {
 }
 
 const conveniences = [
-  { icon: 'login.svg', title: 'Ready when you are', copy: 'Open Glissform when you sign in. Your preferences remain saved every time.' },
-  { icon: 'menubar.svg', title: 'A click away', copy: 'Access settings and feature controls directly from your menu bar.' },
-  { icon: 'background.svg', title: 'In the background', copy: 'Close the app but keep effects active. Decide if you want to run it.' },
-  { icon: 'updates.svg', title: 'Updates, your way', copy: 'Install automatically or tap the update button when a new release is ready.' },
+  { icon: 'login.svg', title: ['Ready When', 'You Are.'], copy: 'Open Glissform when you sign in. Your preferences remain saved every time.' },
+  { icon: 'menubar.svg', title: ['Settings Just', 'A Click Away.'], copy: 'Access settings and feature controls directly from your menu bar.' },
+  { icon: 'background.svg', title: ['Runs Quietly', 'In The Background.'], copy: 'Close the app but keep effects active. Decide if you want to run it.' },
+  { icon: 'updates.svg', title: ['Your Updates.', 'Your Choice.'], copy: 'Install automatically or tap the update button when a new release is ready.' },
 ];
 
 const faq = [
-  { question: 'Will it work on my MacBook?', answer: 'Glissform requires macOS 15 or later. Seamless Close also needs a compatible lid-angle sensor. Testing so far is on a MacBook Air M5 15-inch.' },
-  { question: 'Why does it ask for screen access?', answer: 'Seamless Close uses a temporary screenshot to animate your desktop. It stays in memory and is never uploaded. Battery Ripple does not need screen access.' },
-  { question: 'What can I customize?', answer: 'Adjust blur, starting angle, detection time and pause timing. Choose your battery alerts, preview their effects, and decide how Glissform runs and updates.' },
-  { question: 'How do I get new versions?', answer: 'The app checks for releases. Enable Automatic updates for background downloads and installation on quit, or install from the in-app Update button.' },
+  { question: 'Will It Work On My MacBook?', answer: 'Glissform requires macOS 15 or later. Seamless Close also needs a compatible lid-angle sensor. Testing so far is on a MacBook Air M5 15-inch.' },
+  { question: 'Why Does It Ask For Screen Access?', answer: 'Seamless Close uses a temporary screenshot to animate your desktop. It stays in memory and is never uploaded. Battery Ripple does not need screen access.' },
+  { question: 'What Can I Customize?', answer: 'Adjust blur, starting angle, detection time and pause timing. Choose your battery alerts, preview their effects, and decide how Glissform runs and updates.' },
+  { question: 'How Do I Get New Versions?', answer: 'The app checks for releases. Enable Automatic updates for background downloads and installation on quit, or install from the in-app Update button.' },
 ];
 
 function App() {
@@ -230,48 +231,50 @@ function App() {
       <main>
         <section className="hero shell" aria-labelledby="hero-title">
           <div className="hero__content">
-            <h1 id="hero-title">Beautifully Polished<br />Everyday Mac Moments</h1>
+            <h1 id="hero-title">Everyday Mac Moments.<br />Beautifully Polished.</h1>
             <p>Subtle animations and thoughtful improvements<br />for the way you use your MacBook.</p>
             <DownloadLink />
           </div>
           <FeatureShowcase />
         </section>
 
+        <SeamlessCloseSection />
+
         <section className="section section--personalization shell" id="customise" aria-label="Personalization">
-          <SectionIntro title={['Easy To Customise.', 'Make It Feel Like Yours']} copy={['Choose the look, the timing, and the moments you want to see.', 'Small adjustments that make each experience feel like yours.']} />
+          <SectionIntro title={['Easy To Customise.', 'Make It Feel Like Yours.']} copy={['Choose the look, the timing, and the moments you want to see.', 'Small adjustments that make each experience feel like yours.']} />
           <CustomizationGrid />
         </section>
 
         <section className="section section--conveniences shell" id="everyday" aria-label="Everyday controls">
-          <SectionIntro title={['Feels At Home.', 'Stays Out Of Your Way']} copy={['Choose how Glissform starts, runs, and stays up to date.', 'Everyday controls, right where you need them.']} />
+          <SectionIntro title={['Feels At Home.', 'Stays Out Of Your Way.']} copy={['Choose how Glissform starts, runs, and stays up to date.', 'Everyday controls, right where you need them.']} />
           <div className="conveniences-grid">
-            {conveniences.map((item) => <article className="convenience" key={item.title}><img src={asset(item.icon)} width="32" height="32" alt="" /><h3>{item.title}</h3><p>{item.copy}</p></article>)}
+            {conveniences.map((item) => <article className="convenience" key={item.icon}><img src={asset(item.icon)} width="32" height="32" alt="" /><h3><span>{item.title[0]}</span><span>{item.title[1]}</span></h3><p>{item.copy}</p></article>)}
           </div>
         </section>
 
         <section className="privacy-panel shell" id="privacy" aria-labelledby="privacy-title">
-          <div className="privacy-panel__intro"><span className="privacy-panel__icon"><img src={asset('privacy-shield.svg')} width="34" height="40" alt="" /></span><h2 id="privacy-title">Your Screen<br />Stays Yours</h2><p>Personal moments deserve privacy. Glissform keeps your screen images on your Mac.</p></div>
+          <div className="privacy-panel__intro"><span className="privacy-panel__icon"><img src={asset('privacy-shield.svg')} width="34" height="40" alt="" /></span><h2 id="privacy-title">Your Screen<br />Stays Yours.</h2><p>Personal moments deserve privacy. Glissform keeps your screen images on your Mac.</p></div>
           <div className="privacy-panel__facts">
-            <div><h3>No continuous recording.</h3><p>One temporary screenshot powers each gesture.</p></div>
-            <div><h3>No saved or shared screenshots.</h3><p>Screen images stay in memory. They are never saved or sent.</p></div>
-            <div><h3>No analytics.</h3><p>The app connects to this site for update checks and downloads.</p></div>
+            <div><h3>No Continuous Recording.</h3><p>One temporary screenshot powers each gesture.</p></div>
+            <div><h3>No Saved Or Shared Screenshots.</h3><p>Screen images stay in memory. They are never saved or sent.</p></div>
+            <div><h3>No Analytics.</h3><p>The app connects to this site for update checks and downloads.</p></div>
           </div>
         </section>
 
         <section className="section section--future shell" id="more-to-come" aria-label="More to come">
-          <SectionIntro title={['More To Come.', 'Already In The Making']} copy={['We’re working on new features for everyday Mac moments.', 'Thoughtful additions, with the same attention to detail.']} />
+          <SectionIntro title={['More To Come.', 'Already In The Making.']} copy={['We’re working on new features for everyday Mac moments.', 'Thoughtful additions, with the same attention to detail.']} />
           <img className="future-field" src={asset('future-field.svg?v=figma-282')} width="1128" height="282" alt="" />
         </section>
 
         <section className="section section--faq shell" id="good-to-know" aria-labelledby="faq-title">
-          <div className="faq-intro"><h2 id="faq-title">Good To Know</h2><p>A few practical details before you try it.</p></div>
+          <div className="faq-intro"><h2 id="faq-title">Good To Know.</h2><p>A few practical details before you try it.</p></div>
           <div className="faq-list">
             {faq.map((item) => <div className="faq-item" key={item.question}><h3>{item.question}</h3><p>{item.answer}</p></div>)}
-            <div className="faq-item"><h3>Will macOS ask me to approve it?</h3><p>The beta is not Apple notarized yet. After a blocked first launch, open System Settings → Privacy &amp; Security and choose Open Anyway if you trust the download.</p></div>
+            <div className="faq-item"><h3>Will macOS Ask Me To Approve It?</h3><p>The beta is not Apple notarized yet. After a blocked first launch, open System Settings → Privacy &amp; Security and choose Open Anyway if you trust the download.</p></div>
           </div>
         </section>
 
-        <section className="download-panel shell" aria-labelledby="download-title"><h2 id="download-title">Make Your Mac Feel More Yours</h2><p>Try Glissform for MacBook. Available now in public beta.</p><DownloadLink /></section>
+        <section className="download-panel shell" aria-labelledby="download-title"><h2 id="download-title">Make Your Mac Feel More Yours.</h2><p>Try Glissform for MacBook. Available now in public beta.</p><DownloadLink /></section>
       </main>
       <footer className="site-footer shell"><Brand /><span>© 2026 Glissform</span></footer>
     </div>

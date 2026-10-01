@@ -4,8 +4,26 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+- Remove website brand-logo CSS corner rounding and use transparency-aware shadows in the navbar and footer to eliminate the rectangular corner artifact.
+
+- Move the approved website source into the separate private `glissform-website` repository and verify GitHub Actions production deployment, preserving app downloads and the update feed.
+
+### Added
+
+- Reveal “A little magic. Every time you close.” behind the website MacBook as its lid lowers. Keep the existing lid motion, camera movement, scroll distance and timing intact. Published to glissform.app on 2026-10-01.
+- Add the Figma Seamless Close website section with one large centred MacBook and no card or stage indicator. Pin the scene while scrolling down physically folds the lid shut, with an eased landing, subtle camera tilt, aluminium back, keyboard deck, contact shadow and coordinated desktop perspective and blur. Keep it closed at the end and reopen only on upward scrolling. Use bundled artwork only, keep the following section below the scene, fit shorter desktop viewports, and show an unpinned still preview for Reduce Motion or unavailable graphics. Published to glissform.app on 2026-10-01.
+
+### Improved
+
+- Replace the website MacBook’s separate CSS 3D surfaces and wallpaper worker with one WebGL2 scene. Keep the existing shell geometry, 78 unlabeled keycaps, Touch ID, camera notch, materials, lid/camera motion, text reveal and scroll timing. Render the wallpaper into the same GPU context and use depth testing to keep it behind the bezel and opaque lid. Preserve native sticky positioning and an unpinned still fallback. Earlier optimizations did not resolve owner-reported Safari lag. Published to glissform.app on 2026-10-01 after owner approval; the live single-canvas renderer and matching production bundles were verified. Dedicated Safari performance testing of the rewrite remains unverified.
+- Polish website headlines by capitalizing every word, using consistent periods and clearer control descriptions; remove the Seamless Close eyebrow. Give all four everyday-control titles deliberate two-line breaks without isolated final words. Keep feature names as labels and FAQ headings as questions. Published to glissform.app on 2026-10-01.
+- Round the website MacBook’s lower enclosure inward toward its underside, continuing the curve around the front corners and keeping the feet attached to the inset bottom. Published to glissform.app on 2026-10-01.
+- Refine the website’s MacBook illustration using Apple’s silver MacBook Air references: slimmer display borders and front edge, a detailed 78-key keyboard with Touch ID, a larger trackpad, camera lens, hinge, feet, opening recess and reflective lid mark. Keep the approved scroll motion and timing. Published to glissform.app on 2026-10-01.
+
 ### Fixed
 
+- Correct the upside-down Apple mark on the website MacBook lid. Published to glissform.app on 2026-10-01.
+- Close the white gaps around the website MacBook’s outer lid and between its keyboard deck and front edge with continuous rounded aluminium walls. Soften the bright edge outlines while preserving the scroll motion. Published to glissform.app on 2026-10-01.
 - Keep the connection glow and click when a quick reopening skips sensor readings inside the final 5° and reaches or passes the starting angle. Preserve ordinary lid-driven smoothing and gather the glow during the final visible 5°. Pending captures stay silent and interruptions cancel feedback.
 - Remove the fast-opening feedback wait through the nearly invisible smoothing tail: forecast visible contact using copies of the existing motion state, queue the click during the return, and begin the glow pulse within 0.1° of flat without altering motion or screenshot fade timing. The owner confirmed feedback appears with speakers and AirPods in both angle modes, but reported delayed contact on the earlier correction; physical acceptance of this timing refinement remains pending.
 

@@ -25,7 +25,7 @@ a { color: $blue; }
 a:focus-visible, button:focus-visible { outline: 3px solid #1459d5; outline-offset: 4px; }
 h1, h2, h3, p { margin: 0; }
 .shell { width: min(1128px, calc(100% - 28px)); margin-inline: auto; }
-.desktop-site { position: relative; overflow: hidden; }
+.desktop-site { position: relative; overflow: clip; }
 
 .brand {
   display: inline-flex;
@@ -36,7 +36,7 @@ h1, h2, h3, p { margin: 0; }
   letter-spacing: -1px;
   white-space: nowrap;
 
-  img { display: block; width: 32px; height: 32px; border-radius: 2px; box-shadow: 0 0 12px #00000029; }
+  img { display: block; width: 32px; height: 32px; filter: drop-shadow(0 0 12px #00000029); }
 
   &--link {
     border-radius: 6px;
@@ -189,6 +189,302 @@ h1, h2, h3, p { margin: 0; }
   display: grid;
   grid-template-columns: 359px minmax(0, 1fr);
   gap: 24px;
+}
+
+.seamless-section {
+  padding-block: 104px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 48px;
+
+  &__intro { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  .seamless-section__intro p { margin-top: 0; }
+  &__track { width: 100%; }
+  &__track--animated > .seamless-section__scene {
+    position: sticky;
+    top: var(--scene-top);
+  }
+  &__scene {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 32px;
+  }
+  &__footnote { color: $muted; font-size: 16px; line-height: 24px; text-align: center; }
+}
+
+.seamless-macbook {
+  --hardware-left: 39.13px;
+  // Keep the entire device and footnote visible below the fixed navbar,
+  // including shorter MacBook viewports. The Figma device is 900 × 583.043.
+  width: min(900px, calc((100svh - 168px) * 900 / 583.043));
+  aspect-ratio: 900 / 583.043;
+  position: relative;
+
+  &__drawing {
+    position: absolute;
+    width: 900px;
+    height: 583.043px;
+    transform: scale(var(--macbook-scale, 1));
+    transform-origin: top left;
+  }
+  &__gpu { position: absolute; left: 0; top: -20px; width: 900px; height: 623.043px; display: none; pointer-events: none; }
+  &--webgl &__gpu { display: block; }
+  &--webgl &__camera, &--webgl &__contact-shadow { display: none !important; }
+  &__camera {
+    position: absolute;
+    z-index: 1;
+    inset: 0;
+    perspective: 10000px;
+    perspective-origin: 50% var(--hardware-depth);
+    transform: translateY(var(--device-lift, 0px));
+  }
+  &__reveal {
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100px;
+    margin: 0;
+    color: $ink;
+    font-size: 56px;
+    font-weight: 600;
+    line-height: 1.14;
+    letter-spacing: -1.7px;
+    text-align: center;
+    pointer-events: none;
+    opacity: var(--reveal-opacity, 0);
+    span { color: $muted; }
+  }
+  &__hardware, &__lid {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 900px;
+    height: var(--hardware-depth);
+    transform-style: preserve-3d;
+    transform-origin: 50% 100%;
+  }
+  &__hardware { transform: rotateX(var(--view-angle, 0deg)); }
+  &__lid { transform: rotateX(var(--lid-angle, 0deg)); }
+  &__front {
+    position: absolute;
+    inset: 0;
+    // The display, bezel and notch are one painted face of the 3D lid.
+    // Flatten them so Safari cannot composite the canvas above the notch.
+    transform-style: flat;
+    transform: translateZ(.1px);
+  }
+  &__back, &__deck, &__shell, &__contact-shadow { display: none; }
+  &__bezel {
+    position: absolute;
+    left: var(--hardware-left);
+    top: 0;
+    width: var(--hardware-width);
+    height: var(--hardware-depth);
+    border: 1.5px solid #929497;
+    border-radius: var(--hardware-radius);
+    background: linear-gradient(105deg, #191a1c, #070809 28%, #111214 74%, #1c1d1f);
+    box-shadow: inset 0 0 0 1.5px #050506, 0 0 0 .5px #cdd0d3;
+  }
+  &__screen {
+    position: absolute;
+    z-index: 1;
+    left: 50.13px;
+    top: 11px;
+    width: 799.739px;
+    height: 518.826px;
+    border-radius: 13px 13px 3px 3px;
+    overflow: hidden;
+    background: #000;
+  }
+  &__front, &__bezel, &__screen, &__notch, &__still {
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+  &__still { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  &__still { object-fit: cover; }
+  &__notch {
+    position: absolute;
+    z-index: 2;
+    top: 9px;
+    left: 407px;
+    width: 86px;
+    height: 21px;
+    border-radius: 0 0 7px 7px;
+    background: #090a0c;
+    &::before, &::after { content: ''; position: absolute; top: 5px; width: 3px; height: 3px; border-radius: 50%; background: #17191c; }
+    &::before { left: 24px; }
+    &::after { right: 25px; }
+  }
+  &__lens {
+    position: absolute;
+    top: 3px;
+    left: 40px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 38% 30%, #32566a, #101c29 38%, #030507 70%);
+    box-shadow: 0 0 0 1px #202228, inset 0 .5px 1px #789dbb80;
+  }
+  &__base {
+    position: absolute;
+    top: 547.83px;
+    left: var(--hardware-left);
+    width: var(--hardware-width);
+    height: 17px;
+    border: 1px solid #a4a7ab;
+    border-top-color: #f7f8f9;
+    border-radius: 2px 2px 11px 11px;
+    background: linear-gradient(#f0f1f2 0%, #c5c8cb 20%, #b3b6ba 64%, #90949a 92%, #d5d7da 100%);
+    box-shadow: 0 1px 1px #32394130, inset 0 1px #fff;
+    &::before, &::after { content: ''; position: absolute; bottom: -3px; width: 42px; height: 3px; background: #4a4d52; border-radius: 0 0 4px 4px; }
+    &::before { left: 44px; }
+    &::after { right: 44px; }
+  }
+  &__opening {
+    position: absolute;
+    left: calc(50% - 50px);
+    top: -1px;
+    width: 100px;
+    height: 6px;
+    border-radius: 0 0 10px 10px;
+    background: linear-gradient(#74787d, #aeb2b6 70%, #d7dadd);
+    box-shadow: 0 1px #f6f7f880;
+  }
+
+  &--animated {
+    &:not(.seamless-macbook--back-facing) .seamless-macbook__back { display: none; }
+    &.seamless-macbook--back-facing .seamless-macbook__front { display: none; }
+    .seamless-macbook__reveal { display: block; }
+    .seamless-macbook__shell {
+      display: block;
+      position: absolute;
+      inset: 0;
+      transform-style: preserve-3d;
+      pointer-events: none;
+      span {
+        position: absolute;
+        left: 0;
+        top: 0;
+        transform-origin: 0 0;
+        background: linear-gradient(#b9bec3, #d1d4d7 22%, #aeb3b8 70%, #90969c);
+      }
+    }
+    .seamless-macbook__lid > .seamless-macbook__shell { left: var(--hardware-left); }
+    .seamless-macbook__back {
+      display: block;
+      position: absolute;
+      left: var(--hardware-left);
+      width: var(--hardware-width);
+      height: var(--hardware-depth);
+      border-radius: var(--hardware-radius);
+      background: radial-gradient(ellipse at 25% 12%, #ffffff45, transparent 65%), linear-gradient(120deg, #c4c7ca, #e0e2e4 35%, #cbced1 72%, #b5b9bd);
+      border: 1px solid #b1b5b9;
+      box-shadow: inset 0 0 0 1px #e0e2e455, inset 0 -2px 3px #72777d45;
+      transform: rotateY(180deg) translateZ(6px);
+      -webkit-backface-visibility: hidden;
+      backface-visibility: hidden;
+    }
+    .seamless-macbook__lid-mark {
+      position: absolute;
+      left: calc(50% - 39px);
+      top: calc(50% - 45px);
+      width: 78px;
+      height: 90px;
+      background: linear-gradient(120deg, #80858b, #ecedef 38%, #f7f8f9 50%, #a6abb0 68%, #797f86);
+      mask: url('/assets/macbook-lid-mark.svg') center / contain no-repeat;
+    }
+    .seamless-macbook__deck {
+      display: block;
+      position: absolute;
+      left: var(--hardware-left);
+      top: 3px;
+      width: var(--hardware-width);
+      height: var(--hardware-depth);
+      border-radius: var(--hardware-radius);
+      background: radial-gradient(ellipse at 45% 15%, #ffffff38, transparent 60%), linear-gradient(100deg, #b7bcc1, #d1d4d7 17%, #e0e2e4 50%, #c9cdd1 83%, #aeb4ba);
+      transform-origin: 50% 100%;
+      transform-style: preserve-3d;
+      transform: rotateX(-90deg);
+      box-shadow: inset 0 0 0 1px #a8aeb4;
+    }
+    .seamless-macbook__keyboard {
+      position: absolute;
+      left: 86px;
+      right: 86px;
+      bottom: 38px;
+      height: 252px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transform: rotateX(180deg);
+    }
+    .seamless-macbook__key-row { display: flex; gap: 6px; flex: 1; min-height: 0; }
+    .seamless-macbook__key {
+      position: relative;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #151719;
+      border-radius: 5px;
+      background: linear-gradient(145deg, #303236, #24262a 55%, #1d1f22);
+      box-shadow: 0 0 0 1.25px #777c80, 0 1.5px 1px #ffffff75, inset 0 1px .5px #575a604d, inset 0 -1px 1px #030405;
+    }
+    .seamless-macbook__key--touch-id::before { content: ''; width: 22px; height: 22px; border: 1px solid #60636a; border-radius: 50%; background: linear-gradient(135deg, #17191c, #33363b); box-shadow: inset 0 0 0 1px #111315; }
+    .seamless-macbook__key--space { background: linear-gradient(#2c2e32, #24262a); }
+    .seamless-macbook__arrows { display: flex; gap: 6px; flex: 3; align-items: flex-end; }
+    .seamless-macbook__arrows > .seamless-macbook__key { height: calc(50% - 2px); }
+    .seamless-macbook__arrow-pair { display: flex; flex-direction: column; height: 100%; flex: 1; gap: 4px; }
+    .seamless-macbook__key--arrow { border-radius: 3px; }
+    .seamless-macbook__hinge {
+      position: absolute;
+      left: 58px;
+      right: 58px;
+      bottom: 5px;
+      height: 12px;
+      border-radius: 6px;
+      background: linear-gradient(#181a1c, #34373b 40%, #111214 75%, #575c60);
+      box-shadow: 0 1px #eef0f3;
+    }
+    .seamless-macbook__trackpad {
+      position: absolute;
+      top: 31px;
+      left: calc(50% - 176px);
+      width: 352px;
+      height: 191px;
+      border: 1px solid #a1a6ac;
+      border-radius: 11px;
+      background: linear-gradient(110deg, #ced1d4, #d8dadd 55%, #c7cbcf);
+      box-shadow: 0 1px #f4f5f6b3, inset 0 1px 1px #858a9040;
+    }
+    .seamless-macbook__base {
+      top: calc(var(--hardware-depth) + 3px);
+      transform: translateZ(calc(var(--hardware-depth) + .1px));
+      transform-style: preserve-3d;
+      // The rounded shell supplies the front and side walls. Keep the recess
+      // and feet on this face without a second, disconnected bright outline.
+      border-color: transparent;
+      background: none;
+      box-shadow: none;
+      &::before, &::after { transform: translateZ(-12px); }
+    }
+    .seamless-macbook__contact-shadow {
+      display: block;
+      position: absolute;
+      left: 60px;
+      top: 558px;
+      width: 780px;
+      height: 18px;
+      border-radius: 50%;
+      background: #41464b;
+      filter: blur(10px);
+      opacity: var(--contact-opacity, .12);
+    }
+  }
 }
 
 .feature-selector { display: flex; flex-direction: column; gap: 16px; }
@@ -401,6 +697,7 @@ h1, h2, h3, p { margin: 0; }
 .convenience { min-width: 0; padding-inline: 32px; }
 .convenience img { display: block; width: 32px; height: 32px; margin-bottom: 24px; }
 .convenience h3, .privacy-panel__facts h3, .faq-item h3 { font-size: 20px; font-weight: 600; line-height: 28px; }
+.convenience h3 span { display: block; white-space: nowrap; }
 .convenience p, .privacy-panel__facts p, .faq-item p { margin-top: 8px; color: $muted; font-size: 16px; line-height: 24px; }
 
 .privacy-panel { margin-block: 104px; scroll-margin-top: 104px; padding: 56px 64px; display: grid; grid-template-columns: 392px minmax(0, 1fr); gap: 120px; border: 1px solid #d7e0ea; border-radius: 40px; background: #eef3f9; }
