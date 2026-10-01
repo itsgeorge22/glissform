@@ -137,7 +137,7 @@ The broader investigations below and above are follow-up work, not a requirement
 ## Beta.4 — 0.1.0-beta.4
 
 - [x] Prepare build 15 with refined opening and connection feedback, updated defaults, and the About update-check button.
-- [ ] Verify the published beta.4 prerelease page, exact tag, DMG, checksum and signed update feed.
+- [x] Verify the published beta.4 prerelease page, exact tag and target commit, public DMG, matching SHA-256 checksum and signed update feed on 2026-10-01. Update the website download to beta.4. Local release build and installer resource/signature checks passed; the release workflow’s CI-safe checks passed.
 - [ ] Physically compare the final glow rhythm and verify a beta.3-to-beta.4 Sparkle upgrade on the development Mac.
 
 ## Beta.3 — 0.1.0-beta.3
