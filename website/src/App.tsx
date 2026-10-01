@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 
 const asset = (name: string) => '/assets/' + name;
-const downloadUrl = '/downloads/Glissform-0.1.0-beta.4.dmg';
+const downloadUrl = '/downloads/Glissform-0.1.0-beta.5.dmg';
 
 function Brand({ homeLink = false }: { homeLink?: boolean }) {
   const icon = homeLink ? 'navbar-glissform-icon.png' : 'glissform-icon.png';

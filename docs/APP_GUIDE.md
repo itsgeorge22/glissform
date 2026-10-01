@@ -75,6 +75,8 @@ In beta.4, Pause and Esc returns use the same soft inward edge glow and short co
 
 Beta.4 has one **Connection effect** switch in Seamless Close Settings for the glow and click together. It is on by default, persists across launches, and Reset to defaults turns it back on. Turning it off removes current feedback and prevents audio startup while preserving assisted, Pause and Esc return motion. Re-enabling applies to the next return rather than replaying the current one.
 
+Beta.5 fixes a bundled-sound lookup crash in installed beta.4 apps when closing starts.
+
 Beta.4 prepares connection audio after the gesture’s screenshot and first frame are ready, keeping audio startup out of screenshot acquisition, and schedules the click’s strongest point to coincide with the glow’s brightness peak, compensating for the selected output’s reported latency. Successful playback finishes naturally instead of being cut off when the visual effect ends. If audio becomes ready late, the pulse shifts with it while the desktop still returns on its normal motion. The glow remains confined to the final 5° for Pause and Esc. Bluetooth timing can vary, and audio already buffered by a wireless device may outlast an abrupt cancellation; exact physical synchronization remains subject to device timing. Audio output stops after feedback or cancellation and no microphone is opened.
 
 In beta.4, **Begin at** defaults to 90° and **Resume desktop after pause** defaults to on. Reset to defaults restores both choices; existing saved values remain in use until changed or reset.

@@ -214,3 +214,11 @@ On 2026-10-01, three separate playback trials using the new production audio imp
 ### Beta.4 release verification — 2026-10-01
 
 The local release build and mounted installer passed version/build, signature and nested resource-bundle inspection. GitHub’s beta.4 packaging workflow completed successfully for tag `v0.1.0-beta.4` at `fd3f62f`, publishing a prerelease page, DMG, checksum and signed update feed. The public DMG checksum is `36d5676c3593a8653642a0554b5dae1877951e77d8c489400af49f1046145d2f`. The website download link now points to beta.4. Local regression tests were skipped at the user’s request; CI-safe checks passed. Physical acceptance of the final glow rhythm and a beta.3-to-beta.4 Sparkle upgrade remains pending.
+
+
+### Beta.5 release verification — 2026-10-01
+
+- Release build 16 passed locally. The published prerelease points to tag `v0.1.0-beta.5` at `b033d9d`, with crash-fix notes and both DMG/checksum assets.
+- The public DMG is 6,621,593 bytes, SHA-256 `70ad0492dcc04717d5a930364632e03e07abdb76b76ddcb54df935bd0aae6022`; the checksum and signed appcast entry agree. The mounted package reports beta.5 and passes strict signature verification.
+- An isolated diagnostic using the production audio preparation code and the published package's resources successfully loaded the click and started/stopped audio output. No local regression suite was run, following the owner's instruction.
+- The website serves the beta.5 download link. Physical lid acceptance and the beta.4-to-beta.5 Sparkle upgrade remain pending.
