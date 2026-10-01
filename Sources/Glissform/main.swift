@@ -1280,7 +1280,7 @@ extension AppDelegate {
                   && feedbackDraft?.queryItems?.first?.value == expectedBody,
                   "Feedback draft must address support and include the current app and macOS versions")
         print("PASS: feedback draft includes the support address and current versions")
-        try check(Bundle.module.url(forResource: "PauseRestored", withExtension: "wav") != nil,
+        try check(AppResource.url("PauseRestored", extension: "wav") != nil,
                   "The original opening connection sound must be bundled")
         var storage: CVPixelBuffer?
         let attributes = [kCVPixelBufferMetalCompatibilityKey as String: true,

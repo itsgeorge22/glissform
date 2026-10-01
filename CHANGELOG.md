@@ -4,6 +4,13 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+## 0.1.0-beta.5 — 2026-10-01
+
+### Fixed
+
+- Fix the installed beta.4 crash when closing begins: load the connection click through the same safe app-resource lookup as interface assets, rather than SwiftPM's fatal bundle accessor. Missing audio now follows the existing recoverable error path.
+- Verify the correction with a release build and an isolated packaged-app audio check that loads the original sample and starts/stops audio output successfully. Physical lid and Sparkle upgrade acceptance remains pending. Beta.5 replaces the affected beta.4 installer without changing its tag or assets.
+
 ## 0.1.0-beta.4 — 2026-10-01
 
 ### Added

@@ -134,7 +134,16 @@ Keep this a practical release check for a small passion project:
 
 The broader investigations below and above are follow-up work, not a requirement to complete every roadmap item before beta. Other additional features are not required for launch; improve the app incrementally after release.
 
+## Beta.5 — 0.1.0-beta.5
+
+- [x] Prepare build 16 with the installed-app connection audio resource fix.
+- [ ] Verify the published prerelease, installer, checksum, signed feed and website download.
+- [ ] Physically verify closing and the beta.4-to-beta.5 Sparkle upgrade.
+
 ## Beta.4 — 0.1.0-beta.4
+
+- [x] Diagnose the installed build 15 lid-close crash from three crash reports and replace the connection sound's fatal SwiftPM bundle lookup. The correction is included in beta.5.
+- [ ] Verify physical closing with the corrected installed app before marking recovery complete.
 
 - [x] Prepare build 15 with refined opening and connection feedback, updated defaults, and the About update-check button.
 - [x] Verify the published beta.4 prerelease page, exact tag and target commit, public DMG, matching SHA-256 checksum and signed update feed on 2026-10-01. Update the website download to beta.4. Local release build and installer resource/signature checks passed; the release workflow’s CI-safe checks passed.

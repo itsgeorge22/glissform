@@ -122,7 +122,7 @@ import OSLog
 
         private func startOutput() throws {
             if buffer == nil {
-                guard let url = Bundle.module.url(forResource: "PauseRestored", withExtension: "wav") else {
+                guard let url = AppResource.url("PauseRestored", extension: "wav") else {
                     throw NSError(domain: "Glissform.ConnectionSound", code: 1)
                 }
                 let file = try AVAudioFile(forReading: url)

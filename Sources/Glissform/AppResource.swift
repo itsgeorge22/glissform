@@ -1,7 +1,7 @@
 import Foundation
 
 enum AppResource {
-    static func url(_ name: String, extension fileExtension: String, subdirectory: String) -> URL? {
+    static func url(_ name: String, extension fileExtension: String, subdirectory: String = "") -> URL? {
         let bundleName = "Glissform_Glissform.bundle"
         let roots = [Bundle.main.resourceURL, Bundle.main.bundleURL, Bundle.main.executableURL?.deletingLastPathComponent()]
             .compactMap { $0 }
