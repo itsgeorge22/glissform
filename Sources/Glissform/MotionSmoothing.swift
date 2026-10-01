@@ -317,6 +317,8 @@ struct OpeningContinuation {
         return duration > 0 ? Float(min(1, elapsed / duration)) : 1
     }
 
+    var remainingDuration: Double { max(0, rampDuration + cruiseDuration + terminalDuration - elapsed) }
+
     mutating func begin(from fold: Float, velocity displayedVelocity: Double,
                         acceleration displayedAcceleration: Double = 0, observedSpeed: Double) {
         origin = fold.isFinite ? max(0, Double(fold)) : 0
@@ -412,6 +414,9 @@ struct HandoffTransition {
     private(set) var velocity: Double = 0
     private(set) var active = false
     private var firstFrame = false
+
+    var completionFraction: Float { Float(min(1, elapsed / transitionDuration)) }
+    var remainingDuration: Double { max(0, transitionDuration - elapsed) }
 
     mutating func begin(from value: Float, velocity: Double = 0, duration: Double = Self.duration,
                         holdFirstFrame: Bool = true, curve: Curve = .balanced) {

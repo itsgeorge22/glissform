@@ -19,7 +19,7 @@ final class SettingsModel: ObservableObject {
     }
     @Published var selectedPage: Page = .infiniteScreen
     @Published private(set) var animationEnabled = true
-    @Published private(set) var startAngle = 100.0
+    @Published private(set) var startAngle = 90.0
     @Published private(set) var automaticStartAngle = false
     @Published private(set) var automaticDetectionThreshold = 20.0
     var onAutomaticDetectionThresholdChange: ((Double) -> Void)?
@@ -37,10 +37,12 @@ final class SettingsModel: ObservableObject {
     var onAnimationEnabledChange: ((Bool) -> Void)?
     var onStartAngleChange: ((Double) -> Void)?
     var onAutomaticStartAngleChange: ((Bool) -> Void)?
-    @Published private(set) var resumeAfterPause = false
+    @Published private(set) var resumeAfterPause = true
     @Published private(set) var pauseDuration = 1.0
     var onResumeAfterPauseChange: ((Bool) -> Void)?
     var onPauseDurationChange: ((Double) -> Void)?
+    @Published private(set) var connectionEffectEnabled = true
+    var onConnectionEffectEnabledChange: ((Bool) -> Void)?
     @Published private(set) var blurEnabled = true
     var onBlurEnabledChange: ((Bool) -> Void)?
     @Published private(set) var blurStrength: BlurStrength = .defaultStrength
@@ -71,10 +73,10 @@ final class SettingsModel: ObservableObject {
     var onOpenPermissions: (() -> Void)?
 
     func configure(animationEnabled: Bool, startAngle: Double, screenCaptureAllowed: Bool,
-                   resumeAfterPause: Bool = false, automaticStartAngle: Bool = false,
+                   resumeAfterPause: Bool = true, automaticStartAngle: Bool = false,
                    pauseDuration: Double = 1, automaticAngleDuration: Double = 1,
                    automaticDetectionThreshold: Double = 20,
-                   blurEnabled: Bool = true, blurStrength: BlurStrength = .defaultStrength,
+                   connectionEffectEnabled: Bool = true, blurEnabled: Bool = true, blurStrength: BlurStrength = .defaultStrength,
                    chargingFeedbackEnabled: Bool = true, lowBatteryRippleEnabled: Bool = true,
                    runInBackground: Bool = true, showMenuBarIcon: Bool = true) {
         self.animationEnabled = animationEnabled
@@ -85,6 +87,7 @@ final class SettingsModel: ObservableObject {
         self.automaticDetectionThreshold = ClosingMotion.validDetectionThreshold(automaticDetectionThreshold)
         self.pauseDuration = ClosingMotion.validStillDuration(pauseDuration)
         self.automaticAngleDuration = ClosingMotion.validStillDuration(automaticAngleDuration)
+        self.connectionEffectEnabled = connectionEffectEnabled
         self.blurEnabled = blurEnabled
         self.blurStrength = blurStrength
         self.chargingFeedbackEnabled = chargingFeedbackEnabled
@@ -180,6 +183,12 @@ final class SettingsModel: ObservableObject {
         onAutomaticDetectionThresholdChange?(value)
     }
 
+    func setConnectionEffectEnabled(_ enabled: Bool) {
+        guard connectionEffectEnabled != enabled else { return }
+        connectionEffectEnabled = enabled
+        onConnectionEffectEnabledChange?(enabled)
+    }
+
     func setBlurEnabled(_ enabled: Bool) {
         guard blurEnabled != enabled else { return }
         blurEnabled = enabled
@@ -193,19 +202,20 @@ final class SettingsModel: ObservableObject {
     }
 
     var seamlessCloseHasCustomSettings: Bool {
-        !animationEnabled || startAngle != 100 || automaticStartAngle
+        !animationEnabled || startAngle != 90 || automaticStartAngle
             || automaticDetectionThreshold != 20 || automaticAngleDuration != 1
-            || resumeAfterPause || pauseDuration != 1 || !blurEnabled
+            || !resumeAfterPause || pauseDuration != 1 || !connectionEffectEnabled || !blurEnabled
             || blurStrength != .defaultStrength
     }
 
     func resetSeamlessCloseToDefaults() {
         setAutomaticStartAngle(false)
-        setStartAngle(100)
+        setStartAngle(90)
         setAutomaticDetectionThreshold(20)
         setAutomaticAngleDuration(1)
-        setResumeAfterPause(false)
+        setResumeAfterPause(true)
         setPauseDuration(1)
+        setConnectionEffectEnabled(true)
         setBlurEnabled(true)
         setBlurStrength(.defaultStrength)
         setAnimationEnabled(true)
@@ -759,6 +769,9 @@ private struct AnimationSettingsView: View {
                 .modifier(SettingsCardSurface())
             pauseControls
                 .modifier(SettingsCardSurface())
+            connectionEffectControls
+                .padding(SettingsDesign.Spacing.mainCardInsets)
+                .modifier(SettingsCardSurface())
             blurControls
                 .modifier(SettingsCardSurface())
             lockScreenSupport
@@ -859,12 +872,12 @@ private struct AnimationSettingsView: View {
                     .modifier(SettingsActionCursor(isActionEnabled: canUseCurrentAngle && !automaticAngleIsActive))
                     .help("Use the current lid angle. Open a little farther, then close to begin.")
                     Text("·").foregroundStyle(.tertiary)
-                    Button("Reset") { model.setStartAngle(100) }
+                    Button("Reset") { model.setStartAngle(90) }
                         .buttonStyle(FeedbackButtonStyle(kind: .link))
-                        .disabled(model.startAngle == 100 || automaticAngleIsActive)
-                        .modifier(SettingsActionCursor(isActionEnabled: model.startAngle != 100 && !automaticAngleIsActive))
-                        .help("Restore the default start angle of 100°")
-                        .accessibilityLabel("Reset start angle to 100 degrees")
+                        .disabled(model.startAngle == 90 || automaticAngleIsActive)
+                        .modifier(SettingsActionCursor(isActionEnabled: model.startAngle != 90 && !automaticAngleIsActive))
+                        .help("Restore the default start angle of 90°")
+                        .accessibilityLabel("Reset start angle to 90 degrees")
                     Spacer()
                     Text("130°").foregroundStyle(.secondary)
                 }
@@ -902,6 +915,17 @@ private struct AnimationSettingsView: View {
                             duration: model.pauseDuration,
                             setDuration: model.setPauseDuration)
                 .padding(SettingsDesign.Spacing.supportCardInsets)
+        }
+    }
+
+    private var connectionEffectControls: some View {
+        FeatureToggleRow(title: "Connection effect",
+                         detail: "Adds a soft edge glow and click when the desktop returns.",
+                         color: .feature,
+                         isEnabled: Binding(get: { model.connectionEffectEnabled },
+                                            set: { model.setConnectionEffectEnabled($0) }),
+                         preview: nil) {
+            FeatureIcon(.connectionEffect)
         }
     }
 

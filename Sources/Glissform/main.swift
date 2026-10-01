@@ -15,7 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let capture: DesktopScreenshotSource
     private let desktopAvailable: (CGDirectDisplayID) -> Bool
     private let screenAccessAllowed: () -> Bool
-    private let playAssistedConnectionSound: @MainActor () -> Void
+    private let connectionSound: ConnectionSoundPlayback
     private let settingsModel = SettingsModel()
     private var appUpdates: AppUpdates?
     private var appDisplayName: String {
@@ -83,20 +83,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     init(capture: DesktopScreenshotSource? = nil,
          desktopAvailable: @escaping (CGDirectDisplayID) -> Bool = DesktopAvailability.allowsCapture,
          screenAccessAllowed: @escaping () -> Bool = CGPreflightScreenCaptureAccess,
-         playAssistedConnectionSound: @escaping @MainActor () -> Void = { OpeningConnectionSound.shared.play() }) {
+         connectionSound: ConnectionSoundPlayback? = nil) {
         self.capture = capture ?? DesktopCapture()
         self.desktopAvailable = desktopAvailable
         self.screenAccessAllowed = screenAccessAllowed
-        self.playAssistedConnectionSound = playAssistedConnectionSound
+        self.connectionSound = connectionSound ?? OpeningConnectionSound.shared
         super.init()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        UserDefaults.standard.register(defaults: ["animationStartAngle": 100.0, "animationEnabled": true,
-                                                  "resumeAfterPause": false,
+        UserDefaults.standard.register(defaults: ["animationStartAngle": 90.0, "animationEnabled": true,
+                                                  "resumeAfterPause": true,
                                                   "seamlessClosePauseDuration": 1.0,
                                                   "seamlessCloseAutomaticAngleDuration": 1.0,
                                                   "seamlessCloseDetectionThreshold": 20.0,
+                                                  "seamlessCloseConnectionEffectEnabled": true,
                                                   "seamlessCloseBlurEnabled": true,
                                                   "seamlessCloseBlurStrength": BlurStrength.defaultStrength.rawValue,
                                                   "automaticStartAngleEnabled": false,
@@ -104,9 +105,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                   "lowBatteryRippleEnabled": true,
                                                   "runInBackground": true,
                                                   "showMenuBarIcon": true])
-        OpeningConnectionSound.shared.prepare()
         let storedAngle = UserDefaults.standard.double(forKey: "animationStartAngle")
-        let startAngle = storedAngle.isFinite ? min(130, max(20, storedAngle)).rounded() : 100
+        let startAngle = storedAngle.isFinite ? min(130, max(20, storedAngle)).rounded() : 90
         let animationEnabled = UserDefaults.standard.bool(forKey: "animationEnabled")
         motion.startAngle = startAngle
         motion.resumeAfterPause = UserDefaults.standard.bool(forKey: "resumeAfterPause")
@@ -150,6 +150,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             pauseDuration: motion.pauseDuration,
             automaticAngleDuration: motion.automaticAngleDuration,
             automaticDetectionThreshold: motion.automaticDetectionThreshold,
+            connectionEffectEnabled: UserDefaults.standard.bool(forKey: "seamlessCloseConnectionEffectEnabled"),
             blurEnabled: UserDefaults.standard.bool(forKey: "seamlessCloseBlurEnabled"),
             blurStrength: BlurStrength(rawValue: UserDefaults.standard.string(forKey: "seamlessCloseBlurStrength") ?? "") ?? .defaultStrength,
             chargingFeedbackEnabled: UserDefaults.standard.bool(forKey: "chargingFeedbackEnabled"),
@@ -182,6 +183,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         settingsModel.onAutomaticDetectionThresholdChange = { [weak self] angle in
             self?.applyAutomaticDetectionThreshold(angle)
+        }
+        settingsModel.onConnectionEffectEnabledChange = { [weak self] enabled in
+            self?.applyConnectionEffectEnabled(enabled)
         }
         settingsModel.onBlurEnabledChange = { [weak self] enabled in
             self?.applyBlurEnabled(enabled)
@@ -405,7 +409,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 finishingGesture = false
                 cleanupTimer?.invalidate()
                 cleanupTimer = nil
-                OpeningConnectionSound.shared.stop()
+                connectionSound.stop()
+                prepareConnectionSound()
                 window?.ignoresMouseEvents = false
                 renderer?.beginAnimation(opening: openingGesture)
                 setStatus(openingGesture ? "Animating · Opening" : "Animating · Reopen to reverse")
@@ -466,6 +471,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         if finishingGesture {
+            connectionSound.stop()
+            prepareConnectionSound()
             finishingGesture = false
             cleanupTimer?.invalidate()
             cleanupTimer = nil
@@ -515,6 +522,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             retryAfter = Date().addingTimeInterval(10)
             return
         }
+        effect.connectionEffectEnabled = settingsModel.connectionEffectEnabled
         effect.blurEnabled = settingsModel.blurEnabled
         effect.blurStrength = settingsModel.blurStrength
         overlay.contentView = view
@@ -590,6 +598,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
+    private func prepareConnectionSound() {
+        if settingsModel.connectionEffectEnabled { connectionSound.prepare() }
+    }
+
+    private func applyConnectionEffectEnabled(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: "seamlessCloseConnectionEffectEnabled")
+        renderer?.connectionEffectEnabled = enabled
+        if !enabled { connectionSound.stop() }
+    }
+
     private func prepareGestureSnapshot() {
         // Keep the separate charging overlay out of Seamless Close's one capture.
         chargingFeedback.stop()
@@ -633,6 +651,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                       ready, !sleeping, !quitting else { return }
                 guard captureMayPresent() else { discardCapture(); return }
                 hasSnapshot = true
+                // Starting audio alongside ScreenCaptureKit delayed repeated
+                // captures on the development Mac. Prepare the image first;
+                // audio can warm during motion without delaying its first frame.
+                prepareConnectionSound()
                 if timingEnabled {
                     animationLog.debug("prepared: opening=\(self.openingGesture), totalMs=\((ProcessInfo.processInfo.systemUptime - started) * 1000)")
                 }
@@ -654,7 +676,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func presentPreparedSnapshot() {
         guard hasSnapshot, motion.active, !snapshotPresented, captureMayPresent() else { return }
         snapshotPresented = true
-        OpeningConnectionSound.shared.prepare()
         // The prepared screenshot retains the Dock and menu bar underneath.
         window?.pinToCurrentSpace()
         window?.level = NSWindow.Level(rawValue: NSWindow.Level.popUpMenu.rawValue + 1)
@@ -732,7 +753,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func exitSeamlessClose() {
         guard motion.active else { return }
         let rearmAngle = motion.effectiveStartAngle ?? settingsModel.startAngle
-        cancelWake("Escape")
+        if snapshotPresented { clearWakeTracking() }
+        else { cancelWake("Escape") }
         motion.cancelUntilOpened(above: rearmAngle)
         escapeReturning = true
         finishGesture(mode: .pause)
@@ -742,30 +764,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func finishGesture(mode: EffectRenderer.CompletionMode = .disabled,
                                openingSpeed: Double = 0) {
         removeEscapeHotKey()
+        // Disabling is an explicit interruption even during an existing return.
+        if mode == .disabled { connectionSound.stop() }
         guard hasSnapshot else { endGesture(); return }
+        if mode.hasConnectionFeedback && !snapshotPresented { endGesture(); return }
         guard !finishingGesture else { return }
+        // Inactive lid readings can request .lid during a Pause return (including
+        // tiny upward jitter that rearms automatic angle detection). An ignored
+        // request must not cancel the click belonging to the continuing return.
+        if mode == .lid { connectionSound.stop() }
         finishingGesture = true
         let token = snapshotToken
         renderer?.finishAnimation(mode, openingSpeed: openingSpeed,
-                                  onAssistedContact: mode == .assisted ? { [weak self] in
-                                      self?.playAssistedConnectionSound()
+                                  onConnectionSchedule: mode.hasConnectionFeedback ? { [weak self] peak, completion in
+                                      self?.connectionSound.schedule(peakAt: peak, completion: completion)
                                   } : nil,
-                                  onLiveDesktop: mode == .assisted ? { [weak self] in
+                                  onLiveDesktop: mode.hasConnectionFeedback ? { [weak self] in
                                       self?.window?.ignoresMouseEvents = true
                                   } : nil) { [weak self] in
-            self?.completeGesture(mode: mode, token: token)
+            self?.completeGesture(mode: mode, token: token, completedNaturally: true)
         }
         // Display callbacks can stop when occluded. Never leave a snapshot
         // blocking input indefinitely while waiting for a final frame.
         cleanupTimer?.invalidate()
         // Slow manual tracking can legitimately take more than 800 ms to settle.
         // Only extend its watchdog while rendered motion is actually advancing;
-        // stopped callbacks still release input on the next watchdog tick.
-        let timer = Timer(timeInterval: 0.8, repeats: mode == .lid || mode == .assisted) { [weak self] _ in
+        // Connection feedback may continue over the live desktop for 400 ms;
+        // keep its retreat alive while frames advance. Stopped callbacks still
+        // release input on the next watchdog tick.
+        let timer = Timer(timeInterval: 0.8, repeats: mode == .lid || mode.hasConnectionFeedback) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, self.finishingGesture, self.snapshotToken == token else { return }
                 if mode == .lid && self.renderer?.manualCompletionIsAdvancing == true { return }
-                if mode == .assisted && self.renderer?.assistedCompletionIsAdvancing == true { return }
+                if mode.hasConnectionFeedback && self.renderer?.connectionCompletionIsAdvancing == true { return }
                 self.completeGesture(mode: mode, token: token)
             }
         }
@@ -773,18 +804,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         RunLoop.main.add(timer, forMode: .common)
     }
 
-    private func completeGesture(mode: EffectRenderer.CompletionMode, token: Int) {
+    private func completeGesture(mode: EffectRenderer.CompletionMode, token: Int, completedNaturally: Bool = false) {
         guard finishingGesture, snapshotToken == token else { return }
         if mode == .assisted {
             motion.completeAssistedOpening(at: lastLidAngle ?? motion.activationAngle)
             settingsModel.updateLearnedStartAngle(motion.learnedStartAngle)
             setStatus(motion.desktopResumed ? "Desktop restored" : "Ready")
         }
-        endGesture()
+        endGesture(allowSoundToFinish: mode.hasConnectionFeedback && completedNaturally)
     }
 
-    private func endGesture(retainingSnapshot: Bool = false) {
-        OpeningConnectionSound.shared.stop()
+    private func endGesture(retainingSnapshot: Bool = false, allowSoundToFinish: Bool = false) {
+        if allowSoundToFinish { connectionSound.finish() }
+        else { connectionSound.stop() }
         removeEscapeHotKey()
         escapeReturning = false
         assistedOpeningPeakAngle = nil
@@ -1214,7 +1246,7 @@ extension AppDelegate {
         let savedSettings = ["animationStartAngle", "animationEnabled", "automaticStartAngleEnabled",
                              "resumeAfterPause", "seamlessClosePauseDuration",
                              "seamlessCloseAutomaticAngleDuration", "seamlessCloseDetectionThreshold",
-                             "seamlessCloseBlurEnabled", "seamlessCloseBlurStrength",
+                             "seamlessCloseConnectionEffectEnabled", "seamlessCloseBlurEnabled", "seamlessCloseBlurStrength",
                              "runInBackground", "showMenuBarIcon"].map {
             ($0, UserDefaults.standard.object(forKey: $0))
         }
@@ -1260,14 +1292,46 @@ extension AppDelegate {
         memset(CVPixelBufferGetBaseAddress(buffer), 0, CVPixelBufferGetDataSize(buffer))
         CVPixelBufferUnlockBaseAddress(buffer, [])
 
+        final class SyntheticSound: ConnectionSoundPlayback {
+            var onPeak: @MainActor () -> Void
+            var task: Task<Void, Never>?
+            var stopped = false
+            var finished = false
+            var scheduledPeaks: [Double] = []
+            var readinessDelay = 0.0
+            var outputLatency = 0.0
+            var preparationCount = 0
+            init(onPeak: @escaping @MainActor () -> Void = {}) { self.onPeak = onPeak }
+            func prepare() { preparationCount += 1; stopped = false }
+            func schedule(peakAt time: Double, completion: @escaping @MainActor (Double?) -> Void) {
+                task?.cancel()
+                scheduledPeaks.append(time)
+                task = Task { @MainActor in
+                    do { try await Task.sleep(nanoseconds: UInt64(readinessDelay * 1_000_000_000)) }
+                    catch { return }
+                    guard !Task.isCancelled else { return }
+                    let plan = ConnectionFeedbackTiming.playback(requestedPeak: time,
+                        now: ProcessInfo.processInfo.systemUptime, latency: outputLatency, samplePeak: 116 / 44100.0)
+                    completion(plan.audiblePeak)
+                    let delay = max(0, plan.audiblePeak - ProcessInfo.processInfo.systemUptime)
+                    do { try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) }
+                    catch { return }
+                    guard !Task.isCancelled else { return }
+                    onPeak()
+                }
+            }
+            func finish() { finished = true }
+            func stop() { stopped = true; task?.cancel(); task = nil }
+        }
+
         func makeGesture(screenAccessAllowed: @escaping () -> Bool = { true },
                          startGesture: Bool = true,
                          resumeAfterPause: Bool = false,
-                         playAssistedConnectionSound: @escaping @MainActor () -> Void = {}) throws -> (AppDelegate, SyntheticCapture) {
+                         playConnectionSound: @escaping @MainActor () -> Void = {}) throws -> (AppDelegate, SyntheticCapture) {
             let source = SyntheticCapture()
             let app = AppDelegate(capture: source, desktopAvailable: { _ in true },
                                   screenAccessAllowed: screenAccessAllowed,
-                                  playAssistedConnectionSound: playAssistedConnectionSound)
+                                  connectionSound: SyntheticSound(onPeak: playConnectionSound))
             let window = OverlayWindow(contentRect: NSRect(x: 16, y: 16, width: 64, height: 64))
             let view = MTKView(frame: NSRect(x: 0, y: 0, width: 64, height: 64))
             guard let renderer = EffectRenderer(view: view) else {
@@ -1282,6 +1346,9 @@ extension AppDelegate {
             app.ready = true
             app.settingsModel.configure(animationEnabled: true, startAngle: 100,
                                         screenCaptureAllowed: true, resumeAfterPause: resumeAfterPause)
+            app.settingsModel.onConnectionEffectEnabledChange = { [weak app] enabled in
+                app?.applyConnectionEffectEnabled(enabled)
+            }
             app.motion.startAngle = 100
             app.motion.resumeAfterPause = resumeAfterPause
             if startGesture {
@@ -1307,6 +1374,18 @@ extension AppDelegate {
             }
             try check(false, "Gesture must request its screenshot")
         }
+        func waitForConnectionDesktop(_ app: AppDelegate) async throws {
+            for _ in 0..<200 {
+                if app.hasSnapshot, app.renderer?.opacity == 0,
+                   app.window?.ignoresMouseEvents == true { return }
+                if let view = app.window?.contentView as? MTKView, app.renderer?.isRendering == true {
+                    app.renderer?.draw(in: view)
+                }
+                try await Task.sleep(nanoseconds: 10_000_000)
+            }
+            try check(false, "Connection feedback must release mouse access while the glow retreats")
+        }
+
         func waitForCleanup(_ app: AppDelegate) async throws {
             // Pump synthetic rendering explicitly: MetalKit can suspend display
             // callbacks for a tiny/occluded window or a sleeping display. This
@@ -1381,7 +1460,10 @@ extension AppDelegate {
             }
             model.onBlurEnabledChange = { [weak app] enabled in app?.applyBlurEnabled(enabled) }
             model.onBlurStrengthChange = { [weak app] strength in app?.applyBlurStrength(strength) }
-            try check(!model.seamlessCloseHasCustomSettings && model.blurStrength == .regular,
+            model.configure(animationEnabled: true, startAngle: 90, screenCaptureAllowed: true)
+            app.motion.startAngle = 90
+            app.motion.resumeAfterPause = true
+            try check(model.resumeAfterPause && model.startAngle == 90 && !model.seamlessCloseHasCustomSettings && model.connectionEffectEnabled && model.blurStrength == .regular,
                       "Fresh Seamless Close settings must start at defaults")
             let chargingBefore = model.chargingFeedbackEnabled
             let backgroundBefore = model.runInBackground
@@ -1390,26 +1472,35 @@ extension AppDelegate {
             model.setAutomaticDetectionThreshold(80)
             model.setAutomaticAngleDuration(2)
             model.setAutomaticStartAngle(true)
-            model.setResumeAfterPause(true)
+            model.setResumeAfterPause(false)
             model.setPauseDuration(3)
+            model.setConnectionEffectEnabled(false)
+            try check(!UserDefaults.standard.bool(forKey: "seamlessCloseConnectionEffectEnabled")
+                      && app.renderer?.connectionEffectEnabled == false,
+                      "Connection effect off must be persisted and applied to rendering")
+            let restoredModel = SettingsModel()
+            restoredModel.configure(animationEnabled: true, startAngle: 100, screenCaptureAllowed: true,
+                connectionEffectEnabled: UserDefaults.standard.bool(forKey: "seamlessCloseConnectionEffectEnabled"))
+            try check(!restoredModel.connectionEffectEnabled, "Saved connection switch must restore on configuration")
             model.setBlurEnabled(false)
             model.setBlurStrength(.subtle)
             try check(model.seamlessCloseHasCustomSettings, "Changed controls must enable page reset")
             model.resetSeamlessCloseToDefaults()
             try check(!model.seamlessCloseHasCustomSettings && model.animationEnabled
-                      && model.startAngle == 100 && !model.automaticStartAngle
+                      && model.startAngle == 90 && !model.automaticStartAngle
                       && model.automaticDetectionThreshold == 20 && model.automaticAngleDuration == 1
-                      && !model.resumeAfterPause && model.pauseDuration == 1
-                      && model.blurEnabled && model.blurStrength == .regular,
+                      && model.resumeAfterPause && model.pauseDuration == 1
+                      && model.connectionEffectEnabled && model.blurEnabled && model.blurStrength == .regular,
                       "Reset must restore every Seamless Close control")
-            try check(app.motion.startAngle == 100 && !app.motion.automaticStartAngle
+            try check(app.motion.startAngle == 90 && !app.motion.automaticStartAngle
                       && app.motion.automaticDetectionThreshold == 20 && app.motion.automaticAngleDuration == 1
-                      && !app.motion.resumeAfterPause && app.motion.pauseDuration == 1
+                      && app.motion.resumeAfterPause && app.motion.pauseDuration == 1
+                      && app.renderer?.connectionEffectEnabled == true
                       && app.renderer?.blurEnabled == true && app.renderer?.blurStrength == .regular,
                       "Reset must update active motion and rendering")
             try check(UserDefaults.standard.bool(forKey: "animationEnabled"),
                       "Reset must save the Seamless Close switch default")
-            try check(UserDefaults.standard.double(forKey: "animationStartAngle") == 100,
+            try check(UserDefaults.standard.double(forKey: "animationStartAngle") == 90,
                       "Reset must save the start angle default")
             try check(!UserDefaults.standard.bool(forKey: "automaticStartAngleEnabled"),
                       "Reset must save the automatic detection switch default")
@@ -1417,9 +1508,11 @@ extension AppDelegate {
                       "Reset must save the detection threshold default")
             try check(UserDefaults.standard.double(forKey: "seamlessCloseAutomaticAngleDuration") == 1,
                       "Reset must save the detection wait default")
-            try check(!UserDefaults.standard.bool(forKey: "resumeAfterPause")
+            try check(UserDefaults.standard.bool(forKey: "resumeAfterPause")
                       && UserDefaults.standard.double(forKey: "seamlessClosePauseDuration") == 1,
                       "Reset must save pause defaults")
+            try check(UserDefaults.standard.bool(forKey: "seamlessCloseConnectionEffectEnabled"),
+                      "Reset must persist the enabled connection effect default")
             try check(UserDefaults.standard.bool(forKey: "seamlessCloseBlurEnabled")
                       && UserDefaults.standard.string(forKey: "seamlessCloseBlurStrength") == BlurStrength.regular.rawValue,
                       "Reset must save Blur defaults")
@@ -1653,7 +1746,9 @@ extension AppDelegate {
         }
         for pauseEnabled in [false, true] {
             for visible in [false, true] {
-                let (app, source) = try makeGesture(resumeAfterPause: pauseEnabled)
+                var connectionClicks = 0
+                let (app, source) = try makeGesture(resumeAfterPause: pauseEnabled,
+                                                  playConnectionSound: { connectionClicks += 1 })
                 defer { app.shutdown(); app.window?.close() }
                 try await waitForCapture(source)
                 let task = app.snapshotTask
@@ -1674,8 +1769,13 @@ extension AppDelegate {
                 source.pending?.resume(returning: buffer)
                 source.pending = nil
                 await task?.value
-                if visible { try await waitForCleanup(app) }
+                if visible {
+                    try await waitForConnectionDesktop(app)
+                    try await waitForCleanup(app)
+                }
                 try checkCleared(app)
+                try check(connectionClicks == (visible ? 1 : 0),
+                          "Escape must click once at visible contact and stay silent for a pending capture")
                 app.handleLidReading(70)
                 try check(source.count == 1 && !app.motion.active,
                           "Escape must not restart below Begin at")
@@ -1690,8 +1790,9 @@ extension AppDelegate {
                 print("PASS: Escape \(visible ? "animates visible" : "releases pending") capture with pause \(pauseEnabled ? "on" : "off") and requires reopening")
             }
         }
-        for interruption in ["sleep", "Space change", "quit"] {
-            let (app, source) = try makeGesture()
+        for interruption in ["sleep", "Space change", "display change", "lock", "quit"] {
+            var connectionClicks = 0
+            let (app, source) = try makeGesture(playConnectionSound: { connectionClicks += 1 })
             defer { app.shutdown(); app.window?.close() }
             try await waitForCapture(source)
             source.pending?.resume(returning: buffer)
@@ -1702,10 +1803,59 @@ extension AppDelegate {
             switch interruption {
             case "sleep": app.suspend()
             case "Space change": app.handleActiveSpaceChange()
+            case "display change": app.restart(startHardware: false)
+            case "lock": app.handleScreenLock(true)
             default: app.shutdown()
             }
             try checkCleared(app)
+            try await Task.sleep(nanoseconds: 50_000_000)
+            try check(connectionClicks == 0, "An interrupted Escape return must stay silent")
             print("PASS: Escape return cleanup on \(interruption)")
+        }
+        for interruption in ["sleep", "Space change", "display change", "lock", "quit"] {
+            var clicks = 0
+            let (app, source) = try makeGesture(playConnectionSound: { clicks += 1 })
+            defer { app.shutdown(); app.window?.close() }
+            try await waitForCapture(source)
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await app.snapshotTask?.value
+            try await Task.sleep(nanoseconds: 100_000_000)
+            app.exitSeamlessClose()
+            if let view = app.window?.contentView as? MTKView { app.renderer?.draw(in: view) }
+            let sound = app.connectionSound as! SyntheticSound
+            try check(sound.scheduledPeaks.count == 1, "Interruption must exercise an already scheduled click")
+            switch interruption {
+            case "sleep": app.suspend()
+            case "Space change": app.handleActiveSpaceChange()
+            case "display change": app.restart(startHardware: false)
+            case "lock": app.handleScreenLock(true)
+            default: app.shutdown()
+            }
+            try await Task.sleep(nanoseconds: 650_000_000)
+            try check(clicks == 0 && sound.stopped, "A canceled scheduled click must not fire later")
+            try checkCleared(app)
+            print("PASS: scheduled connection audio canceled by \(interruption)")
+        }
+        do {
+            var clicks = 0
+            let (app, source) = try makeGesture(playConnectionSound: { clicks += 1 })
+            defer { app.shutdown(); app.window?.close() }
+            try await waitForCapture(source)
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await app.snapshotTask?.value
+            try await Task.sleep(nanoseconds: 100_000_000)
+            let sound = app.connectionSound as! SyntheticSound
+            sound.readinessDelay = 0.520
+            sound.outputLatency = 0.300
+            app.exitSeamlessClose()
+            try await waitForConnectionDesktop(app)
+            try await waitForCleanup(app)
+            try check(clicks == 1 && sound.finished && !sound.stopped,
+                      "Fresh frames waiting for a slow output route must survive the 800 ms cleanup watchdog")
+            try checkCleared(app)
+            print("PASS: slow audio readiness keeps its paired pulse alive while desktop access returns")
         }
         // Resolve a capture *after* each interruption to prove stale work cannot reappear.
         // Also interrupt a revealed snapshot to verify overlay and GPU cleanup.
@@ -1715,6 +1865,9 @@ extension AppDelegate {
                 defer { app.shutdown(); app.window?.close() }
                 let task = app.snapshotTask
                 try await waitForCapture(source)
+                let sound = app.connectionSound as! SyntheticSound
+                try check(sound.preparationCount == 0,
+                          "Audio startup must not overlap pending screenshot acquisition")
                 if visible {
                     try await Task.sleep(nanoseconds: 50_000_000)
                     source.pending?.resume(returning: buffer)
@@ -1722,6 +1875,8 @@ extension AppDelegate {
                     await task?.value
                     try await Task.sleep(nanoseconds: 45_000_000)
                     try check(app.hasSnapshot && app.window!.alphaValue > 0, "Test snapshot must be visible")
+                    try check(sound.preparationCount == 1,
+                              "A prepared snapshot must warm audio once for connection feedback")
                 }
                 switch interruption {
                 case "reversal": app.handleLidReading(100)
@@ -1734,6 +1889,10 @@ extension AppDelegate {
                 await task?.value
                 if visible && interruption == "reversal" { try await waitForCleanup(app) }
                 try checkCleared(app)
+                if !visible {
+                    try check(sound.preparationCount == 0,
+                              "A canceled capture must not start audio when its stale result arrives")
+                }
                 print("PASS: \(visible ? "visible snapshot cleanup" : "delayed snapshot cancellation") on \(interruption)")
             }
         }
@@ -1782,6 +1941,49 @@ extension AppDelegate {
             print("PASS: continuous ordinary return interrupted by \(interruption)")
         }
 
+        for mode in ["Pause", "Esc", "assisted"] {
+            var clicks = 0
+            let (app, source) = try makeGesture(startGesture: false,
+                                              playConnectionSound: { clicks += 1 })
+            defer { app.shutdown(); app.window?.close() }
+            app.settingsModel.setConnectionEffectEnabled(false)
+            app.handleLidReading(110)
+            app.handleLidReading(80)
+            try await waitForCapture(source)
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await app.snapshotTask?.value
+            try await Task.sleep(nanoseconds: 100_000_000)
+            if mode == "Esc" { app.exitSeamlessClose() }
+            else { app.finishGesture(mode: mode == "Pause" ? .pause : .assisted, openingSpeed: 30) }
+            try await waitForCleanup(app)
+            let sound = app.connectionSound as! SyntheticSound
+            try check(clicks == 0 && sound.preparationCount == 0 && sound.scheduledPeaks.isEmpty,
+                      "Connection effect off must keep \(mode) returns silent without starting audio")
+            try checkCleared(app)
+            print("PASS: Connection effect off preserves \(mode) return without audio startup")
+        }
+        do {
+            var clicks = 0
+            let (app, source) = try makeGesture(playConnectionSound: { clicks += 1 })
+            defer { app.shutdown(); app.window?.close() }
+            try await waitForCapture(source)
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await app.snapshotTask?.value
+            try await Task.sleep(nanoseconds: 100_000_000)
+            app.exitSeamlessClose()
+            if let view = app.window?.contentView as? MTKView { app.renderer?.draw(in: view) }
+            let sound = app.connectionSound as! SyntheticSound
+            try check(sound.scheduledPeaks.count == 1, "Live switch check must start with a scheduled click")
+            app.settingsModel.setConnectionEffectEnabled(false)
+            app.settingsModel.setConnectionEffectEnabled(true)
+            try await waitForCleanup(app)
+            try check(clicks == 0 && sound.stopped && sound.scheduledPeaks.count == 1,
+                      "Disabling feedback must cancel its click; re-enabling must not replay the current return")
+            try checkCleared(app)
+            print("PASS: live connection switch cancels feedback without interrupting desktop return")
+        }
         func beginAssistedReturn(_ app: AppDelegate, _ source: SyntheticCapture) async throws {
             try await waitForCapture(source)
             source.pending?.resume(returning: buffer)
@@ -1803,7 +2005,7 @@ extension AppDelegate {
         }
         do {
             var connectionClicks = 0
-            let (app, source) = try makeGesture(playAssistedConnectionSound: { connectionClicks += 1 })
+            let (app, source) = try makeGesture(playConnectionSound: { connectionClicks += 1 })
             defer { app.shutdown(); app.window?.close() }
             try await beginAssistedReturn(app, source)
             app.handleLidReading(95)
@@ -1821,7 +2023,7 @@ extension AppDelegate {
         }
         do {
             var connectionClicks = 0
-            let (app, source) = try makeGesture(playAssistedConnectionSound: { connectionClicks += 1 })
+            let (app, source) = try makeGesture(playConnectionSound: { connectionClicks += 1 })
             defer { app.shutdown(); app.window?.close() }
             try await beginAssistedReturn(app, source)
             var desktopUsableDuringGlow = false
@@ -1867,24 +2069,29 @@ extension AppDelegate {
             source.pending = nil
             await app.snapshotTask?.value
             try await Task.sleep(nanoseconds: 100_000_000)
-            let sampleTime = ProcessInfo.processInfo.systemUptime
-            app.handleLidReading(70, time: sampleTime - 1.51)
-            app.handleLidReading(80, time: sampleTime - 1.01)
-            app.handleLidReading(90, time: sampleTime - 0.51)
-            app.handleLidReading(95, time: sampleTime - 0.01)
-            try check(app.finishingGesture && app.assistedOpeningPeakAngle == 95,
-                      "Slow opening must also enter the assisted finish")
+            // Seed a stationary five-degree frame. The watchdog test needs a
+            // known visible speed; sensor replay and takeover momentum have
+            // separate coverage and can legitimately finish this return sooner.
+            app.renderer?.pauseSnapshot()
+            app.renderer?.setLidAngle(95, referenceAngle: 100,
+                                      sampleTime: ProcessInfo.processInfo.systemUptime)
+            try await app.renderer?.prepareSnapshot(pixelBuffer: buffer)
+            app.renderer?.progress = 0.05
+            let slowStarted = ProcessInfo.processInfo.systemUptime
+            app.assistedOpeningPeakAngle = 95
+            app.finishGesture(mode: .assisted, openingSpeed: 5)
+            try check(app.finishingGesture, "Slow opening must enter the assisted finish")
             // Keep presenting frames while testing the slow finish. If an
             // occluded synthetic window stops presenting, the watchdog is
             // supposed to release it instead of waiting for this trajectory.
-            for _ in 0..<85 {
+            while ProcessInfo.processInfo.systemUptime - slowStarted < 0.85 {
                 if let view = app.window?.contentView as? MTKView, app.renderer?.isRendering == true {
                     app.renderer?.draw(in: view)
                 }
                 try await Task.sleep(nanoseconds: 10_000_000)
             }
             try check(app.hasSnapshot && app.finishingGesture,
-                      "The cleanup watchdog must allow a slow assisted finish to keep moving")
+                      "The cleanup watchdog must allow a slow assisted finish to keep moving; elapsed=\(ProcessInfo.processInfo.systemUptime - slowStarted), peaks=\((app.connectionSound as! SyntheticSound).scheduledPeaks.map { $0 - slowStarted }), natural=\((app.connectionSound as! SyntheticSound).finished), stopped=\((app.connectionSound as! SyntheticSound).stopped)")
             try await waitForCleanup(app)
             try checkCleared(app)
             print("PASS: slow assisted opening retains its image until the speed-matched finish")
@@ -1930,7 +2137,8 @@ extension AppDelegate {
         // Expire the still-lid timer through the real coordinator with fresh
         // synthetic timestamps, including captures that have not completed yet.
         for visible in [false, true] {
-            let (app, source) = try makeGesture()
+            var connectionClicks = 0
+            let (app, source) = try makeGesture(playConnectionSound: { connectionClicks += 1 })
             defer { app.shutdown(); app.window?.close() }
             try await waitForCapture(source)
             let pendingTask = app.snapshotTask
@@ -1949,8 +2157,13 @@ extension AppDelegate {
             source.pending?.resume(returning: buffer)
             source.pending = nil
             await pendingTask?.value
-            if visible { try await waitForCleanup(app) }
+            if visible {
+                try await waitForConnectionDesktop(app)
+                try await waitForCleanup(app)
+            }
             try checkCleared(app)
+            try check(connectionClicks == (visible ? 1 : 0),
+                      "Pause must click once at visible contact and stay silent for a pending capture")
             app.handleLidReading(70, time: 101)
             app.handleLidReading(100, time: 101.1)
             app.handleLidReading(80, time: 101.2)
@@ -1968,8 +2181,73 @@ extension AppDelegate {
             try checkCleared(app)
             print("PASS: pause restoration with \(visible ? "visible" : "pending") snapshot, below-threshold suppression, fresh rearm and sleep cleanup")
         }
-        for interruption in ["sleep", "display change", "quit"] {
-            let (app, source) = try makeGesture()
+        for outcome in ["complete", "disable", "reclose"] {
+            var clicks = 0
+            let (app, source) = try makeGesture(startGesture: false,
+                                              playConnectionSound: { clicks += 1 })
+            defer { app.shutdown(); app.window?.close() }
+            app.motion.automaticStartAngle = true
+            app.motion.resumeAfterPause = true
+            app.motion.pauseDuration = 0.5
+            app.settingsModel.configure(animationEnabled: true, startAngle: 100,
+                                        screenCaptureAllowed: true, resumeAfterPause: true,
+                                        automaticStartAngle: true, pauseDuration: 0.5)
+            let started = ProcessInfo.processInfo.systemUptime
+            for frame in 0...20 {
+                app.handleLidReading(110, time: started - 1 + Double(frame) / 20)
+            }
+            app.handleLidReading(80, time: started + 0.01)
+            try await waitForCapture(source)
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await app.snapshotTask?.value
+            try await Task.sleep(nanoseconds: 100_000_000)
+            for frame in 0...11 {
+                app.handleLidReading(80, time: started + 0.1 + Double(frame) * 0.05)
+            }
+            try check(app.finishingGesture && app.motion.desktopResumed
+                      && app.motion.learnedStartAngle == 79,
+                      "Automatic Pause must begin a visible return and learn the lower start angle")
+            if let view = app.window?.contentView as? MTKView { app.renderer?.draw(in: view) }
+            let sound = app.connectionSound as! SyntheticSound
+            try check(sound.scheduledPeaks.count == 1 && !sound.stopped,
+                      "Pause jitter check must exercise an already scheduled click")
+            app.handleLidReading(80.01, time: started + 0.66)
+            try check(!app.motion.desktopResumed && !app.motion.active && app.finishingGesture,
+                      "Fractional upward jitter must exercise the ignored lid-finish request")
+            try check(!sound.stopped && sound.scheduledPeaks.count == 1,
+                      "An ignored lid-finish request must preserve the scheduled Pause click")
+            if outcome == "complete" {
+                // Keep sensor delivery going throughout the return, as on hardware.
+                for frame in 0..<200 {
+                    if !app.finishingGesture { break }
+                    app.handleLidReading(frame.isMultiple(of: 2) ? 80.01 : 80.05,
+                                         time: started + 0.67 + Double(frame) / 30)
+                    if let view = app.window?.contentView as? MTKView { app.renderer?.draw(in: view) }
+                    try await Task.sleep(nanoseconds: 10_000_000)
+                }
+                try checkCleared(app)
+                try check(clicks == 1 && sound.finished && !sound.stopped,
+                          "Automatic Pause must click exactly once despite continuing sensor jitter")
+            } else {
+                if outcome == "disable" {
+                    app.settingsModel.setAnimationEnabled(false)
+                    app.handleLidReading(80.01, time: started + 0.67)
+                } else {
+                    app.handleLidReading(78, time: started + 0.67)
+                    try check(app.motion.active && app.hasSnapshot && source.count == 1,
+                              "A genuine reclose must reuse the captured image")
+                    app.suspend()
+                }
+                try await Task.sleep(nanoseconds: 650_000_000)
+                try check(clicks == 0 && sound.stopped,
+                          "Explicit interruption must still cancel the click after harmless jitter")
+            }
+            print("PASS: automatic Pause audio survives fractional lid jitter; outcome=\(outcome)")
+        }
+        for interruption in ["sleep", "display change", "Space change", "lock", "reversal", "quit"] {
+            var connectionClicks = 0
+            let (app, source) = try makeGesture(playConnectionSound: { connectionClicks += 1 })
             defer { app.shutdown(); app.window?.close() }
             try await waitForCapture(source)
             try await Task.sleep(nanoseconds: 50_000_000)
@@ -1983,10 +2261,19 @@ extension AppDelegate {
             switch interruption {
             case "sleep": app.suspend()
             case "display change": app.restart(startHardware: false)
+            case "Space change": app.handleActiveSpaceChange()
+            case "lock": app.handleScreenLock(true)
+            case "reversal":
+                app.handleLidReading(101, time: 101)
+                app.handleLidReading(80, time: 101.1)
+                try check(app.motion.active && app.hasSnapshot && source.count == 1,
+                          "A reclose during Pause must rejoin the same image without replaying feedback")
+                app.suspend()
             default: app.shutdown()
             }
             try await Task.sleep(nanoseconds: 180_000_000)
             try checkCleared(app)
+            try check(connectionClicks == 0, "An interrupted pause return must stay silent")
             print("PASS: pause return interrupted by \(interruption)")
         }
 
@@ -2036,6 +2323,25 @@ extension AppDelegate {
             try check(source.count == 1 && app.openingGesture && app.snapshotRequested,
                       "Wake must prepare the retained frame without capturing again")
             return (app, source)
+        }
+        do {
+            let (app, source) = try await makeWake()
+            defer { app.shutdown(); app.window?.close() }
+            await app.snapshotTask?.value
+            try check(app.snapshotPresented && app.openingGesture,
+                      "Cached-opening Escape needs the visible retained image")
+            let sound = app.connectionSound as! SyntheticSound
+            var clicks = 0
+            sound.onPeak = { clicks += 1 }
+            app.exitSeamlessClose()
+            try check(app.hasSnapshot && app.finishingGesture,
+                      "Escape must preserve the visible wake image for its return")
+            try await waitForConnectionDesktop(app)
+            try await waitForCleanup(app)
+            try check(clicks == 1 && sound.finished && !sound.stopped && source.count == 1,
+                      "A completed cached Escape must finish its one scheduled click without stopping or recapturing")
+            try checkCleared(app)
+            print("PASS: cached-opening Escape keeps one image and lets its scheduled click finish naturally")
         }
         for failure in [false, true] {
             let (app, source) = try makeGesture()

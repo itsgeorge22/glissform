@@ -8,6 +8,7 @@ enum FeatureSymbol: String, CaseIterable {
     case batteryAt20Percent = "low-battery"
     case infiniteScreen = "monitor-display"
     case automaticAngle = "scan-object"
+    case connectionEffect = "screen-size-2"
     case blur = "rain-drop"
     case sendFeedback = "messages"
     case general = "setting"
