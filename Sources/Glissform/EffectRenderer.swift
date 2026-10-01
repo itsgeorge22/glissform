@@ -39,7 +39,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
     private var handoff = HandoffTransition()
     private var openingContinuation = OpeningContinuation()
     private var pendingOpeningSpeed: Double?
-    private static let connectionGlowMaximumSpread: Float = 0.0253
+    private static let connectionGlowMaximumSpread: Float = 0.032
     private static let connectionGlowApproachIntensity: Float = 1
     private static let connectionGlowContactIntensity: Float = 1.75
     private var connectionFeedbackActive = false
@@ -56,11 +56,14 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             connectionGlowPulsing = false
             connectionGlowReleasing = false
             connectionGlowIntensity = Self.connectionGlowApproachIntensity
+            connectionGlowOpacity = 0
         }
     }
     private var pauseGlowRange: Float = 0
     private var connectionGlowSpread: Float = 0
     private var connectionGlowIntensity = EffectRenderer.connectionGlowApproachIntensity
+    private var connectionGlowOpacity: Float = 1
+    private var connectionGlowReleaseOpacity: Float = 1
     private var connectionGlowReleaseStart: Float = 0
     private var connectionGlowReleaseIntensity = EffectRenderer.connectionGlowApproachIntensity
     private var connectionGlowPulsing = false
@@ -163,6 +166,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         if connectionFeedbackActive {
             connectionGlowSpread = 0
             connectionGlowIntensity = Self.connectionGlowApproachIntensity
+            connectionGlowOpacity = 1
             connectionGlowReleaseStart = 0
             connectionGlowPulsing = false
             connectionGlowReleasing = false
@@ -204,6 +208,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
     private func releaseConnectionGlow(duration: Double = 0.24, pulseAtContact: Bool = false) {
         connectionGlowReleaseStart = connectionGlowSpread
         connectionGlowReleaseIntensity = connectionGlowIntensity
+        connectionGlowReleaseOpacity = connectionGlowOpacity
         connectionGlowPulsing = pulseAtContact
         connectionGlowReleaseElapsed = 0
         connectionGlowReleaseDuration = duration
@@ -215,6 +220,19 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         // Float quintic oscillate by a rounding step near its upper endpoint.
         let t = Double(min(1, max(0, fraction)))
         return Float(min(1, max(0, t * t * t * (10 + t * (-15 + 6 * t)))))
+    }
+
+    /// Releases promptly, then trails off with zero velocity at both ends.
+    private static func glowSettle(_ fraction: Double) -> Float {
+        let t = min(1, max(0, fraction))
+        return Float(pow(1 - t, 3) * (1 + 3 * t))
+    }
+
+    private static func glowPulse(timeFromPeak: Double) -> Float {
+        if timeFromPeak < 0 {
+            return glowEase(Float(1 + timeFromPeak / ConnectionFeedbackTiming.glowAttack))
+        }
+        return glowSettle(timeFromPeak / ConnectionFeedbackTiming.decay)
     }
 
     private func scheduleSettling() {
@@ -410,6 +428,8 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         pauseGlowRange = 0
         connectionGlowSpread = 0
         connectionGlowIntensity = Self.connectionGlowApproachIntensity
+        connectionGlowOpacity = 1
+        connectionGlowReleaseOpacity = 1
         connectionGlowReleaseStart = 0
         connectionGlowReleaseIntensity = Self.connectionGlowApproachIntensity
         connectionGlowPulsing = false
@@ -500,8 +520,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             pendingOpeningSpeed = nil
             handoff = HandoffTransition()
         }
-        if let schedule = onConnectionSchedule {
-            onConnectionSchedule = nil
+        if connectionFeedbackActive && connectionPeakTime == nil {
             let remaining = completionMode == .assisted
                 ? openingContinuation.remainingDuration : handoff.remainingDuration
             // Target an actual display frame, including the pulse's rounded attack.
@@ -509,13 +528,16 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             let contact = now + ceil(remaining / frame) * frame
             let peak = contact + ceil(ConnectionFeedbackTiming.attack / frame) * frame
             connectionPeakTime = peak
-            connectionSchedulePending = true
-            connectionScheduleRequestedAt = now
-            let token = transitionGeneration
-            schedule(peak) { [weak self] scheduledPeak in
-                guard let self, self.transitionGeneration == token, self.connectionFeedbackActive else { return }
-                self.connectionPeakTime = max(peak, scheduledPeak ?? peak)
-                self.connectionSchedulePending = false
+            if let schedule = onConnectionSchedule {
+                onConnectionSchedule = nil
+                connectionSchedulePending = true
+                connectionScheduleRequestedAt = now
+                let token = transitionGeneration
+                schedule(peak) { [weak self] scheduledPeak in
+                    guard let self, self.transitionGeneration == token, self.connectionFeedbackActive else { return }
+                    self.connectionPeakTime = max(peak, scheduledPeak ?? peak)
+                    self.connectionSchedulePending = false
+                }
             }
         }
         if connectionFeedbackActive && !connectionGlowReleasing {
@@ -529,10 +551,16 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
                 t = pauseGlowRange > 0
                     ? min(1, max(0, 1 - renderedFold / pauseGlowRange)) : handoff.completionFraction
             }
-            // Spread inward at the original brightness before the extra pulse,
-            // with zero speed and acceleration at the approach endpoints.
+            // Gather toward contact while the final part of the approach
+            // gently builds toward the same scheduled click peak.
             let ease = Self.glowEase(t)
             connectionGlowSpread = Self.connectionGlowMaximumSpread * ease
+            connectionGlowOpacity = ease
+            if let peak = connectionPeakTime, !connectionSchedulePending {
+                connectionGlowIntensity = Self.connectionGlowApproachIntensity
+                    + (Self.connectionGlowContactIntensity - Self.connectionGlowApproachIntensity)
+                    * Self.glowPulse(timeFromPeak: now - peak)
+            }
         } else if connectionGlowReleasing && connectionGlowReleaseStart > 0 {
             if connectionGlowPulsing, let peak = connectionPeakTime {
                 connectionGlowReleaseElapsed = connectionSchedulePending ? 0
@@ -541,27 +569,27 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
                 connectionGlowReleaseElapsed += elapsed
             }
             let t = Float(min(1, connectionGlowReleaseElapsed / connectionGlowReleaseDuration))
-            let ease = Self.glowEase(t)
-            // Keep the spatial retreat independent of the short contact pulse.
-            connectionGlowSpread = connectionGlowReleaseStart * (1 - ease)
+            let remaining = Self.glowSettle(Double(t))
+            // Let the light disappear while its footprint settles gently.
+            // Keeping some width at zero opacity avoids a bright final pinch.
+            connectionGlowSpread = t == 1 ? 0
+                : connectionGlowReleaseStart * (0.55 + 0.45 * remaining)
             if connectionGlowPulsing {
-                // A quick, rounded attack begins only once the image is flat.
-                // The light then settles back while the rim retreats outward.
-                let pulse: Float
-                if connectionGlowReleaseElapsed < ConnectionFeedbackTiming.attack {
-                    pulse = Self.glowEase(Float(connectionGlowReleaseElapsed / ConnectionFeedbackTiming.attack))
-                } else {
-                    pulse = 1 - Self.glowEase(Float((connectionGlowReleaseElapsed - ConnectionFeedbackTiming.attack)
-                                                   / ConnectionFeedbackTiming.decay))
-                }
+                let timeFromPeak = connectionPeakTime.map { now - $0 }
+                    ?? (connectionGlowReleaseElapsed - ConnectionFeedbackTiming.attack)
+                let pulse = connectionSchedulePending ? 0 : Self.glowPulse(timeFromPeak: timeFromPeak)
                 connectionGlowIntensity = Self.connectionGlowApproachIntensity
                     + (Self.connectionGlowContactIntensity - Self.connectionGlowApproachIntensity) * pulse
+                connectionGlowOpacity = connectionSchedulePending ? connectionGlowReleaseOpacity
+                    : connectionGlowReleaseOpacity * Self.glowSettle(
+                        max(0, timeFromPeak) / (connectionGlowReleaseDuration - ConnectionFeedbackTiming.attack))
             } else {
                 // A reversal cancels any pending rise, gently settling the
                 // brightness already visible instead of replaying contact.
                 let settle = Self.glowEase(Float(connectionGlowReleaseElapsed / 0.080))
                 connectionGlowIntensity = Self.connectionGlowApproachIntensity
                     + (connectionGlowReleaseIntensity - Self.connectionGlowApproachIntensity) * (1 - settle)
+                connectionGlowOpacity = connectionGlowReleaseOpacity * remaining
             }
             if t == 1 { connectionGlowReleaseStart = 0 }
         }
@@ -588,6 +616,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         renderedFrameCount += 1
         let previousFold = renderedFold, previousOpacity = opacity, previousGlow = connectionGlowSpread
         let previousIntensity = connectionGlowIntensity
+        let previousGlowOpacity = connectionGlowOpacity
         advanceMotion(at: now)
         let displayedFold = renderedFold
         let finished = ending && fadingOut && opacity == 0
@@ -602,7 +631,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         descriptor.colorAttachments[0].storeAction = .store
         guard let command = encode(descriptor: descriptor, displayedFold: displayedFold, opacity: opacity) else { return }
         if renderedFold != previousFold || opacity != previousOpacity || connectionGlowSpread != previousGlow
-            || connectionGlowIntensity != previousIntensity {
+            || connectionGlowIntensity != previousIntensity || connectionGlowOpacity != previousGlowOpacity {
             lastMotionAdvanceTime = ProcessInfo.processInfo.systemUptime
         }
         let token = transitionGeneration
@@ -759,6 +788,8 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             var glow = SIMD4<Float>(connectionGlowSpread, Float(target?.width ?? texture.width),
                                     Float(target?.height ?? texture.height), connectionGlowIntensity)
             encoder.setFragmentBytes(&glow, length: MemoryLayout<SIMD4<Float>>.stride, index: 6)
+            var glowOpacity = connectionGlowOpacity
+            encoder.setFragmentBytes(&glowOpacity, length: MemoryLayout<Float>.stride, index: 7)
             encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         }
         encoder.endEncoding()
@@ -1224,9 +1255,10 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
                         contactTime = Double(frame) / 120
                         reachedFlat = true
                     } else {
-                        try check(renderer.connectionGlowIntensity == 1
+                        try check(renderer.connectionGlowIntensity >= 1
+                                  && renderer.connectionGlowIntensity < connectionGlowContactIntensity
                                   && !renderer.connectionGlowPulsing,
-                                  "The approach must retain the original full brightness without pulsing before flat")
+                                  "Anticipation may build before flat, but the brightness peak must follow contact")
                     }
                 } else {
                     try check(renderer.connectionGlowSpread <= previousGlow + 0.000001,
@@ -1325,8 +1357,9 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
                     }
                     try check(renderer.connectionGlowSpread >= previousSpread,
                               "Pause and Escape must gather the same rim inward during the final five degrees")
-                    try check(renderer.connectionGlowIntensity == connectionGlowApproachIntensity,
-                              "Pause and Escape must keep approach brightness until contact")
+                    try check(renderer.connectionGlowIntensity >= connectionGlowApproachIntensity
+                              && renderer.connectionGlowIntensity < connectionGlowContactIntensity,
+                              "Pause and Escape may anticipate the click without peaking before contact")
                     if renderer.renderedFold == 0 {
                         contactTime = time
                         try check(renderer.connectionGlowPulsing
@@ -1346,7 +1379,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             try check(contactTime != nil && contactTime! <= 0.61
                       && glowVisibleBeforeContact && peakIntensity > 1.7 && desktopVisibleDuringRetreat
                       && renderer.opacity == 0 && renderer.connectionGlowSpread == 0,
-                      "Pause and Escape must keep their return timing, contact pulse and 400 ms retreat")
+                      "Pause and Escape must keep their return timing, click-aligned peak and 320 ms fading release")
         }
         for mode in [CompletionMode.lid, .disabled] {
             renderer.pauseSnapshot()
@@ -1436,8 +1469,13 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
                                 brightestTime = time
                             }
                             if renderer.renderedFold > 0 {
-                                try check(renderer.connectionGlowIntensity == 1,
-                                          "Scheduled audio must not pull the brightness pulse before flat contact")
+                                try check(renderer.connectionGlowIntensity < connectionGlowContactIntensity,
+                                          "The anticipated bloom must not peak before flat contact")
+                            }
+                            if renderer.connectionSchedulePending
+                                || time < (renderer.connectionPeakTime ?? time) - ConnectionFeedbackTiming.glowAttack {
+                                try check(renderer.connectionGlowIntensity == connectionGlowApproachIntensity,
+                                          "Anticipation must wait for audio readiness and its short lead-in window")
                             }
                         }
                         try check(scheduleCount == 1 && audiblePeak != nil && brightest > 1.7,
@@ -1556,6 +1594,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         }
         renderer.connectionGlowSpread = connectionGlowMaximumSpread
         renderer.connectionGlowIntensity = connectionGlowApproachIntensity
+        renderer.connectionGlowOpacity = 1
         let approachingGlow = try render(degrees: 0)
         renderer.connectionGlowIntensity = 1
         renderer.connectionGlowSpread = connectionGlowMaximumSpread / 3
@@ -1575,7 +1614,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
                        (width / 2, 0), (width / 2, height - 1)] {
             let offset = (y * width + x) * 4
             guard identity[offset] < gatheringGlow[offset],
-                  gatheringGlow[offset] < connectedGlow[offset],
+                  gatheringGlow[offset] <= connectedGlow[offset],
                   abs(Int(connectedGlow[offset]) - Int(connectedGlow[offset + 1])) <= 1,
                   abs(Int(connectedGlow[offset + 1]) - Int(connectedGlow[offset + 2])) <= 1 else {
                 throw failure("White connection glow must grow evenly from every screen edge")
@@ -1600,10 +1639,11 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         let center = (height / 2 * width + width / 2) * 4
         let nearEdge = (height / 2 * width + 2) * 4
         let softShoulder = (height / 2 * width + 10) * 4
-        let beyondRim = (height / 2 * width + 48) * 4
+        let beyondRim = (height / 2 * width + 96) * 4
         guard connectedGlow[center] == identity[center]
               && connectedGlow[nearEdge] < 160
               && connectedGlow[softShoulder] > identity[softShoulder] + 20
+              && connectedGlow[softShoulder] > gatheringGlow[softShoulder]
               && connectedGlow[beyondRim] == identity[beyondRim]
               && connectedGlow[(height / 2 * width) * 4] < 150
               && pulseGlow[(height / 2 * width) * 4] < 190
@@ -1875,27 +1915,34 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
                                       encoded > 0.04045f);
         return float4(forAttachment, opacity);
     }
-    float4 connectionEdgeGlow(float3 color, float opacity, float2 pixel, float4 glow) {
-        if (glow.x <= 0.0f) return layerColor(color, opacity);
+    float4 connectionEdgeGlow(float3 color, float opacity, float2 pixel, float4 glow, float glowOpacity) {
+        if (glow.x <= 0.0f || glowOpacity <= 0.0f) return layerColor(color, opacity);
         // Only the soft inner glow remains; there is no bright line at the
-        // bezel. All four edges share the same reach
-        // relative to the display; smooth union keeps the corners continuous.
+        // bezel. All four edges share the same reach relative to the display.
         // Allow subpixel widths so the rim can move fully beyond the bezel.
         // A one-pixel minimum would make its first and last frame pop.
         float spread = max(0.0001f, glow.x * min(glow.y, glow.z));
-        float4 distance = max(float4(0.0f), float4(pixel, glow.yz - pixel)) / spread;
-        float4 shoulderDistance = distance / 0.42f;
-        float4 shoulder = exp(-shoulderDistance * shoulderDistance);
-        float4 spill = exp(-distance * distance)
+        float2 edge = max(float2(0.0f), min(pixel, glow.yz - pixel)) / spread;
+        // A smooth distance field joins adjacent edges into one pool of light.
+        // Unlike adding four strips, it cannot overexpose their intersections.
+        float distance = edge.x * edge.y * rsqrt(dot(edge, edge) + 0.000001f);
+        if (distance >= 2.7f) return layerColor(color, opacity);
+        float pulse = saturate((glow.w - 1.0f) / 0.75f);
+        // The shoulder and diffuse crest open together at contact. Keeping
+        // the crest in place makes this one bloom instead of a second wave.
+        float shoulderDistance = distance / (0.42f + 0.12f * pulse);
+        float shoulder = exp(-shoulderDistance * shoulderDistance);
+        float spill = exp(-distance * distance)
                     * (1.0f - smoothstep(1.8f, 2.7f, distance));
-        float4 edges = 0.24f * shoulder + 0.08f * spill;
-        float4 transmission = 1.0f - edges;
-        float halo = 1.0f - transmission.x * transmission.y * transmission.z * transmission.w;
-        // Unit intensity keeps the original soft glow. The contact boost
-        // strengthens that light without adding an outline.
+        float crestDistance = (distance - 0.16f) / 0.38f;
+        float crest = exp(-crestDistance * crestDistance);
+        float halo = 0.24f * shoulder + (0.08f + 0.025f * pulse) * spill
+                   + 0.11f * pulse * crest;
+        // Transmittance keeps the layered bloom soft at every edge and blends
+        // the corners without a seam or a hard white outline.
         float boostedHalo = glow.w <= 1.0f ? halo
             : 1.0f - pow(1.0f - saturate(halo), glow.w);
-        float light = 0.985f * boostedHalo;
+        float light = 0.985f * boostedHalo * saturate(glowOpacity);
         // Composite in encoded color so the halo retains the same apparent
         // brightness as the screenshot fades to the live desktop underneath.
         float3 encoded = select(color * 12.92f,
@@ -1913,14 +1960,15 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
                                    constant float2 &eye [[buffer(2)]], constant float &opacity [[buffer(3)]],
                                    constant float &ditherScale [[buffer(4)]],
                                    constant float2 &imageShape [[buffer(5)]],
-                                   constant float4 &glow [[buffer(6)]]) {
+                                   constant float4 &glow [[buffer(6)]],
+                                   constant float &glowOpacity [[buffer(7)]]) {
         constexpr sampler sampling(coord::normalized, address::clamp_to_edge, filter::linear, mip_filter::linear);
         float theta = max(0.0f, uniforms.w);
         // Only the displayed angle controls effect strength; a raw sensor
         // threshold must never switch the shader on or off during a handoff.
         if (theta == 0.0f) {
             float3 flat = desktop.sample(sampling, in.uv, level(0)).rgb;
-            return connectionEdgeGlow(flat, opacity, in.position.xy, glow);
+            return connectionEdgeGlow(flat, opacity, in.position.xy, glow, glowOpacity);
         }
         float heightFromHinge = 1.0f - in.uv.y;
         // Trace to the original image plane. Retain a positive image response
@@ -2008,7 +2056,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
         float3 slope = select(float3(1.0f / 12.92f),
                              (2.4f / 1.055f) * pow(color, float3(1.4f / 2.4f)), color > 0.0031308f);
         color = select(float3(0), clamp(color + noise * slope, 0.0f, 1.0f), color > 0);
-        return connectionEdgeGlow(color, opacity, in.position.xy, glow);
+        return connectionEdgeGlow(color, opacity, in.position.xy, glow, glowOpacity);
     }
     """
 }

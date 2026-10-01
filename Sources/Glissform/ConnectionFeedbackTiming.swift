@@ -3,8 +3,11 @@ import Foundation
 /// Both the display link and audio host clock use seconds since boot.
 enum ConnectionFeedbackTiming {
     static let attack = 0.030
-    static let decay = 0.160
-    static let retreat = 0.400
+    // Keep the click's contact offset, but let the light approach that same
+    // peak over more frames instead of flashing up only after reaching flat.
+    static let glowAttack = 0.065
+    static let decay = 0.180
+    static let retreat = 0.320
     static let schedulingLead = 0.020
 
     struct Playback {
