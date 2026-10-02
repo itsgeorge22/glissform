@@ -221,3 +221,5 @@ The local release build and mounted installer passed version/build, signature an
 - The beta.6 packaging workflow succeeded for tag `v0.1.0-beta.6` at `9342884`, publishing the version-specific prerelease and installer/checksum assets.
 - The public DMG is 6,597,313 bytes, SHA-256 `bcdb5fd8ec5839941ffee193a52babb33caf9a2f9183eafdb6df2f9ad6303457`; the public checksum and signed feed's beta.6/build-17 entry agree. The mounted public package reports beta.6 and passes deep strict signature verification; retired battery and play icons are absent. A fresh copy of the local installer also passed signature and version checks.
 - Physical lid feel, final glow/click alignment, beta.5-to-beta.6 Sparkle upgrade and wider hardware compatibility remain unverified.
+
+- The public installer and feed signatures were verified against the app’s embedded Ed25519 public key. Website deployment `24457e0` is live, links beta.6 and no longer advertises Battery Ripple; unrelated work in the primary website checkout was preserved.
