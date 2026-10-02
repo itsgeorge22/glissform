@@ -9,8 +9,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let statusMenu = NSMenu()
     private let statusLine = NSMenuItem(title: "Starting…", action: nil, keyEquivalent: "")
     private let enableMenuItem = NSMenuItem(title: "Enable Seamless Close", action: nil, keyEquivalent: "")
-    private let chargingMenuItem = NSMenuItem(title: "Power connection ripple", action: nil, keyEquivalent: "")
-    private let lowBatteryMenuItem = NSMenuItem(title: "Battery at 20% ripple", action: nil, keyEquivalent: "")
     private let sensor = LidSensor()
     private let capture: DesktopScreenshotSource
     private let desktopAvailable: (CGDirectDisplayID) -> Bool
@@ -21,9 +19,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var appDisplayName: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Glissform"
     }
-    private let chargingFeedback = ChargingFeedbackController()
-    private var chargingPowerMonitor: ChargingPowerMonitor?
-    private var chargingSuppressedUntil = 0.0
     private var settingsWindowController: SettingsWindowController?
     private var window: OverlayWindow?
     private var renderer: EffectRenderer?
@@ -101,10 +96,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                   "seamlessCloseBlurEnabled": true,
                                                   "seamlessCloseBlurStrength": BlurStrength.defaultStrength.rawValue,
                                                   "automaticStartAngleEnabled": false,
-                                                  "chargingFeedbackEnabled": true,
-                                                  "lowBatteryRippleEnabled": true,
                                                   "runInBackground": true,
                                                   "showMenuBarIcon": true])
+        // Retire saved preferences from the removed battery feature.
+        UserDefaults.standard.removeObject(forKey: "chargingFeedbackEnabled")
+        UserDefaults.standard.removeObject(forKey: "lowBatteryRippleEnabled")
         let storedAngle = UserDefaults.standard.double(forKey: "animationStartAngle")
         let startAngle = storedAngle.isFinite ? min(130, max(20, storedAngle)).rounded() : 90
         let animationEnabled = UserDefaults.standard.bool(forKey: "animationEnabled")
@@ -121,14 +117,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         enableMenuItem.action = #selector(toggleAnimation)
         enableMenuItem.state = animationEnabled ? .on : .off
         statusMenu.addItem(enableMenuItem)
-        chargingMenuItem.target = self
-        chargingMenuItem.action = #selector(toggleChargingFeedback)
-        chargingMenuItem.state = UserDefaults.standard.bool(forKey: "chargingFeedbackEnabled") ? .on : .off
-        statusMenu.addItem(chargingMenuItem)
-        lowBatteryMenuItem.target = self
-        lowBatteryMenuItem.action = #selector(toggleLowBatteryRipple)
-        lowBatteryMenuItem.state = UserDefaults.standard.bool(forKey: "lowBatteryRippleEnabled") ? .on : .off
-        statusMenu.addItem(lowBatteryMenuItem)
         let settings = statusMenu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
         settings.target = self
         if !settingsModel.isDevelopmentBuild {
@@ -153,8 +141,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             connectionEffectEnabled: UserDefaults.standard.bool(forKey: "seamlessCloseConnectionEffectEnabled"),
             blurEnabled: UserDefaults.standard.bool(forKey: "seamlessCloseBlurEnabled"),
             blurStrength: BlurStrength(rawValue: UserDefaults.standard.string(forKey: "seamlessCloseBlurStrength") ?? "") ?? .defaultStrength,
-            chargingFeedbackEnabled: UserDefaults.standard.bool(forKey: "chargingFeedbackEnabled"),
-            lowBatteryRippleEnabled: UserDefaults.standard.bool(forKey: "lowBatteryRippleEnabled"),
             runInBackground: UserDefaults.standard.bool(forKey: "runInBackground"),
             showMenuBarIcon: UserDefaults.standard.bool(forKey: "showMenuBarIcon")
         )
@@ -194,19 +180,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.applyBlurStrength(strength)
         }
         settingsModel.onOpenPermissions = { [weak self] in self?.openPermissions() }
-        settingsModel.onChargingFeedbackEnabledChange = { [weak self] enabled in
-            UserDefaults.standard.set(enabled, forKey: "chargingFeedbackEnabled")
-            self?.chargingMenuItem.state = enabled ? .on : .off
-            if !enabled { self?.chargingFeedback.stop(if: .connected) }
-        }
-        settingsModel.onLowBatteryRippleEnabledChange = { [weak self] enabled in
-            UserDefaults.standard.set(enabled, forKey: "lowBatteryRippleEnabled")
-            self?.lowBatteryMenuItem.state = enabled ? .on : .off
-            if !enabled { self?.chargingFeedback.stop(if: .lowBattery) }
-        }
-        settingsModel.onPreviewBatteryRipple = { [weak self] style in
-            self?.playChargingFeedback(style: style, isPreview: true)
-        }
         settingsModel.onRunInBackgroundChange = { enabled in
             UserDefaults.standard.set(enabled, forKey: "runInBackground")
         }
@@ -278,11 +251,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             })
         }
-        chargingPowerMonitor = ChargingPowerMonitor(onConnect: { [weak self] in
-            MainActor.assumeIsolated { self?.playChargingFeedback(style: .connected) }
-        }, onLowBattery: { [weak self] in
-            MainActor.assumeIsolated { self?.playChargingFeedback(style: .lowBattery) }
-        })
         startSensor()
         connect()
         DispatchQueue.main.async { [weak self] in
@@ -547,17 +515,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func playChargingFeedback(style: BatteryRippleStyle, isPreview: Bool = false) {
-        guard !quitting, !sleeping, !screenLocked, !sessionInactive, !hasSnapshot,
-              !snapshotRequested, !earlyCaptureRequested, !motion.active, !wakeOpening.pending,
-              (isPreview || (style == .connected ? settingsModel.chargingFeedbackEnabled : settingsModel.lowBatteryRippleEnabled)),
-              (isPreview || ProcessInfo.processInfo.systemUptime >= chargingSuppressedUntil),
-              let screen = builtInScreen(),
-              let id = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value,
-              CGDisplayIsAsleep(id) == 0 else { return }
-        chargingFeedback.play(on: screen, style: style)
-    }
-
     private func matchesConnection(_ screen: NSScreen) -> Bool {
         let id = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
         return displayID == id && window?.frame == screen.frame
@@ -574,7 +531,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func handleDisplayChange() {
         guard !quitting else { return }
-        chargingFeedback.stop()
         invalidateCaptureMetadata()
         if let screen = builtInScreen(), matchesConnection(screen) {
             if !sleeping, wakeOpening.pending { connect() }
@@ -609,8 +565,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func prepareGestureSnapshot() {
-        // Keep the separate charging overlay out of Seamless Close's one capture.
-        chargingFeedback.stop()
         guard let displayID, canUseDesktop() else {
             cancelWake("desktop unavailable")
             motion.reset()
@@ -860,8 +814,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func suspend() {
         guard !sleeping else { return }
-        chargingFeedback.stop()
-        chargingPowerMonitor?.refreshSilently()
         invalidateCaptureMetadata()
         let retain = screenAccessAllowed() && (canRetainClosingSnapshot
             || (retainedClosingSnapshot && sleepPreparationTimer != nil && recentClosedLid))
@@ -882,9 +834,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func resume(startHardware: Bool = true) {
         guard sleeping else { return }
         sleeping = false
-        chargingFeedback.stop()
-        chargingPowerMonitor?.refreshSilently()
-        chargingSuppressedUntil = ProcessInfo.processInfo.systemUptime + 1
         sensorRestartedAt = Date()
         let hadClosedEvidence = wakeOpening.awaitingWake
         let eligible = settingsModel.animationEnabled && retainedClosingSnapshot
@@ -993,7 +942,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func handleScreenLock(_ locked: Bool) {
         screenLocked = locked
-        if locked { chargingFeedback.stop() }
         wakeLog.notice("screen lock changed: locked=\(locked), sleeping=\(self.sleeping), awaitingWake=\(self.wakeOpening.awaitingWake), pending=\(self.wakeOpening.pending)")
         if locked { blockDesktop() }
         else if sleepPreparationTimer != nil { cancelWake("unlocked without sleep") }
@@ -1001,7 +949,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func handleSessionActivity(inactive: Bool) {
         sessionInactive = inactive
-        if inactive { chargingFeedback.stop() }
         wakeLog.notice("session changed: inactive=\(inactive), sleeping=\(self.sleeping), awaitingWake=\(self.wakeOpening.awaitingWake), pending=\(self.wakeOpening.pending)")
         if inactive {
             invalidateCaptureMetadata()
@@ -1013,7 +960,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func handleActiveSpaceChange() {
         guard !quitting else { return }
-        chargingFeedback.stop()
         invalidateCaptureMetadata()
         cancelWake("active Space changed")
         endGesture()
@@ -1097,14 +1043,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func toggleAnimation() {
         settingsModel.setAnimationEnabled(!settingsModel.animationEnabled)
-    }
-
-    @objc private func toggleChargingFeedback() {
-        settingsModel.setChargingFeedbackEnabled(!settingsModel.chargingFeedbackEnabled)
-    }
-
-    @objc private func toggleLowBatteryRipple() {
-        settingsModel.setLowBatteryRippleEnabled(!settingsModel.lowBatteryRippleEnabled)
     }
 
     @objc private func showAbout() {
@@ -1199,8 +1137,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func shutdown() {
         quitting = true
-        chargingFeedback.stop()
-        chargingPowerMonitor = nil
         invalidateCaptureMetadata()
         cancelWake("quit")
         heartbeat?.invalidate()
@@ -1464,7 +1400,6 @@ extension AppDelegate {
             app.motion.resumeAfterPause = true
             try check(model.resumeAfterPause && model.startAngle == 90 && !model.seamlessCloseHasCustomSettings && model.connectionEffectEnabled && model.blurStrength == .regular,
                       "Fresh Seamless Close settings must start at defaults")
-            let chargingBefore = model.chargingFeedbackEnabled
             let backgroundBefore = model.runInBackground
             model.setAnimationEnabled(false)
             model.setStartAngle(120)
@@ -1515,9 +1450,8 @@ extension AppDelegate {
             try check(UserDefaults.standard.bool(forKey: "seamlessCloseBlurEnabled")
                       && UserDefaults.standard.string(forKey: "seamlessCloseBlurStrength") == BlurStrength.regular.rawValue,
                       "Reset must save Blur defaults")
-            try check(model.chargingFeedbackEnabled == chargingBefore
-                      && model.runInBackground == backgroundBefore,
-                      "Page reset must preserve settings on other pages")
+            try check(model.runInBackground == backgroundBefore,
+                      "Page reset must preserve General settings")
             print("PASS: Seamless Close reset restores saved defaults and leaves other pages untouched")
         }
         do {

@@ -8,8 +8,6 @@ Collaborators with repository access can use the [submission chooser](https://gi
 
 Include the affected feature, Mac model, macOS version, Glissform version, steps to reproduce, and expected versus actual behaviour. For Seamless Close, include the chosen start angle, external displays, full-screen apps, and whether the Mac slept. Remove private desktop content from any media you choose to share.
 
-For Battery Ripple, distinguish the manual preview from connecting power, and mention any repeated or missing effect. The red 20% trigger and broader live interruption behavior still need physical confirmation.
-
 ## Propose a change
 
 1. Keep the change focused and explain the user-visible problem.

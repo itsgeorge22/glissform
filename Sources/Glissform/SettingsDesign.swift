@@ -49,45 +49,43 @@ enum SettingsDesign {
         static let field = Color.primary.opacity(0.045)
         static let focus = Color.accentColor.opacity(0.65)
         static let switchOff = Color(nsColor: .tertiaryLabelColor)
-        static let feature = Color(red: 78 / 255, green: 103 / 255, blue: 216 / 255)
+        static let feature = Color(red: 0x25 / 255, green: 0x8D / 255, blue: 0xEB / 255)
         static let neutralSidebar = Color.gray
-        static let feedbackSidebar = Color(red: 182 / 255, green: 104 / 255, blue: 112 / 255)
+        static let aboutSidebar = Color(red: 0xED / 255, green: 0x62 / 255, blue: 0x58 / 255)
+        static let feedbackSidebar = Color(red: 0x4B / 255, green: 0xC7 / 255, blue: 0x6B / 255)
         static let success = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
-        static let batterySidebar = Color(red: 55 / 255, green: 196 / 255, blue: 91 / 255)
         static let attention = Color(red: 1, green: 159 / 255, blue: 10 / 255)
-        static let danger = Color(red: 1, green: 69 / 255, blue: 58 / 255)
         enum CardIconColor {
-            case feature, automaticAngle, blur, feedback, success, attention, danger, neutral
+            case feature, automaticAngle, connectionEffect, blur, feedback, success, attention, neutral
 
             var tile: Color {
                 switch self {
                 case .feature: return Palette.feature
+                case .connectionEffect: return Color(red: 1, green: 0x95 / 255, blue: 0)
                 case .automaticAngle: return Color(red: 0xAD / 255, green: 0x91 / 255, blue: 0xDC / 255)
                 case .blur: return Color(red: 0x70 / 255, green: 0xB9 / 255, blue: 0xEE / 255)
                 case .feedback: return Palette.feedbackSidebar
                 case .success: return Palette.success
                 case .attention: return Palette.attention
-                case .danger: return Palette.danger
                 case .neutral: return Color.gray
                 }
             }
 
             func symbol(in scheme: ColorScheme) -> Color {
                 switch (self, scheme) {
-                case (.feature, .light): return Color(red: 0x43 / 255, green: 0x5C / 255, blue: 0xCD / 255)
+                case (.connectionEffect, .light): return Color(red: 0xD9 / 255, green: 0x77 / 255, blue: 0x06 / 255)
                 case (.automaticAngle, .light): return Color(red: 0x86 / 255, green: 0x63 / 255, blue: 0xC7 / 255)
                 case (.blur, .light): return Color(red: 0x3B / 255, green: 0x94 / 255, blue: 0xD0 / 255)
-                case (.feedback, .light): return Color(red: 0xA8 / 255, green: 0x55 / 255, blue: 0x60 / 255)
+                case (.feedback, .light): return Color(red: 0x35 / 255, green: 0xAA / 255, blue: 0x55 / 255)
                 case (.success, .light): return Color(red: 0x2A / 255, green: 0xB8 / 255, blue: 0x4D / 255)
                 case (.attention, .light): return Color(red: 0xE0 / 255, green: 0x8C / 255, blue: 0x09 / 255)
-                case (.danger, .light): return Color(red: 0xDF / 255, green: 0x38 / 255, blue: 0x35 / 255)
-                case (.feature, _): return Color(red: 0x66 / 255, green: 0x7C / 255, blue: 0xE7 / 255)
+                case (.feature, _): return Palette.feature
+                case (.connectionEffect, _): return Color(red: 1, green: 0xB3 / 255, blue: 0x40 / 255)
                 case (.automaticAngle, _): return Color(red: 0xC2 / 255, green: 0xA6 / 255, blue: 0xED / 255)
-                case (.feedback, _): return Color(red: 0xDC / 255, green: 0x92 / 255, blue: 0x9A / 255)
+                case (.feedback, _): return Palette.feedbackSidebar
                 case (.blur, _): return Color(red: 0x8C / 255, green: 0xCE / 255, blue: 0xFF / 255)
                 case (.success, _): return Palette.success
                 case (.attention, _): return Palette.attention
-                case (.danger, _): return Palette.danger
                 case (.neutral, _): return .secondary
                 }
             }
@@ -103,9 +101,6 @@ enum SettingsDesign {
         static let pressedBorder = 0.30
         static let fieldHoverFill = 0.035
         static let fieldHoverBorder = 0.12
-        static let previewHoverFill = 0.08
-        static let previewPressedFill = 0.13
-        static let previewPressedBorder = 0.20
         static let hoverDuration = 0.12
         static let pressedDuration = 0.08
         static let switchDuration = 0.16

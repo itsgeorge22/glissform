@@ -3,9 +3,6 @@ import SwiftUI
 
 /// Bundled feature artwork, independent of the developer Iconly style selector.
 enum FeatureSymbol: String, CaseIterable {
-    case batteryRipple = "empty-battery"
-    case powerConnection = "charge-battery"
-    case batteryAt20Percent = "low-battery"
     case infiniteScreen = "monitor-display"
     case automaticAngle = "scan-object"
     case connectionEffect = "screen-size-2"

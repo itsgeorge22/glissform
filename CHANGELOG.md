@@ -24,8 +24,29 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 - Correct the upside-down Apple mark on the website MacBook lid. Published to glissform.app on 2026-10-01.
 - Close the white gaps around the website MacBook’s outer lid and between its keyboard deck and front edge with continuous rounded aluminium walls. Soften the bright edge outlines while preserving the scroll motion. Published to glissform.app on 2026-10-01.
+
+## 0.1.0-beta.6 — 2026-10-02
+
+Focus development on Seamless Close, simplify Settings, and refine its visual identity and quick-opening feedback.
+
+### Removed
+
+- Remove Battery Ripple to focus on Seamless Close: delete its power-source and low-battery monitoring, renderer, Settings page, menu switches, preview controls, dedicated feature and play icons, and feature-specific tests. Clear its retired saved preferences on launch and update current guides and collaborator issue forms.
+
+### Improved
+
+- Give Privacy & About a softened red sidebar tile (#ED6258) and Send feedback a softened green sidebar tile (#4BC76B) with matching green card artwork, with a slightly calmer saturation and brightness across the red, green, and Seamless Close blue.
+- Give the Connection effect card its own orange icon and tinted container, with appearance-specific symbol colors.
+- Use a slightly softened #258DEB blue for Seamless Close’s sidebar tile and main feature icon in both Light and Dark appearances.
+
+### Fixed
+
 - Keep the connection glow and click when a quick reopening skips sensor readings inside the final 5° and reaches or passes the starting angle. Preserve ordinary lid-driven smoothing and gather the glow during the final visible 5°. Pending captures stay silent and interruptions cancel feedback.
 - Remove the fast-opening feedback wait through the nearly invisible smoothing tail: forecast visible contact using copies of the existing motion state, queue the click during the return, and begin the glow pulse within 0.1° of flat without altering motion or screenshot fade timing. The owner confirmed feedback appears with speakers and AirPods in both angle modes, but reported delayed contact on the earlier correction; physical acceptance of this timing refinement remains pending.
+
+### Validation and limitations
+
+- The beta.6 release build and full local regression suite passed before publication. Physical lid feel, final glow/click alignment, and a beta.5-to-beta.6 Sparkle upgrade remain unverified; compatibility beyond the development Mac is unverified.
 
 ## 0.1.0-beta.5 — 2026-10-01
 

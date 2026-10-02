@@ -6,7 +6,7 @@ New experiences should feel native, have a clear purpose, stay lightweight, and 
 
 Glissform is a small passion project. The owner's intended price is $1.90, with occasional improvements and new features after launch. Keep release preparation proportional to that scope; broad hardware certification, formal performance studies, and a fixed tester cohort are not prerequisites.
 
-## Public beta — 0.1.0-beta.5
+## Release preparation — 0.1.0-beta.6
 
 The first feature, Seamless Close, implements screenshot-based closing animation with continuous hinge perspective and upper-edge narrowing through the full gesture, steadier adaptive smoothing, optional full-image blur and shadow, awake reversal, cached post-sleep opening, native settings with a configurable starting angle, optional desktop restoration after an adjustable still-lid pause, menu bar controls, and lifecycle cleanup. On 2026-09-21, the owner confirmed correct smoothness, speed, abrupt lid stops, reversals, and opening after sleep without locking on the development Mac. On 2026-09-28, the owner confirmed the revised geometry and Blur on/off during everyday gestures, plus the requested Space and sleep/wake checks. Locked-screen animation remains unavailable. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
 
@@ -17,11 +17,12 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 
 ## Product development
 
-- [x] Implement Battery Ripple with independent power-connection and 20%-battery switches, using public power-source notifications and a reduced-motion fallback. Included in the alpha.9 source prerelease.
-- [x] Replace the original concentric connection rings with a fluid emerald light wave, a curling silhouette, and translucent folds; reuse the geometry in red for the 20% battery event. The owner approved the revised emerald appearance on 2026-09-26; the red variant awaits physical approval.
-- [ ] Complete physical Battery Ripple checks for both triggers with settings closed, full-screen apps, sleep/wake, lock, and Reduce Motion. On 2026-09-26, the owner confirmed one green ripple on one unplug/reconnect trial with the earlier visual design. The 20% event has only synthetic checks so far.
-- [ ] Design and validate additional animation and quality-of-life experiences for everyday Mac interactions.
-- [x] Add sidebar navigation with separate Seamless Close, Battery Ripple, and Privacy & About pages, plus a Send feedback placeholder grouped under More.
+The current priority is improving Seamless Close as the sole available experience in development builds. Other experiences are deferred; the broader product direction remains open.
+
+- [x] Remove Battery Ripple from the app, including event monitoring, settings and menu controls, previews, dedicated icons, and tests. Included in beta.6; beta.5 and older published builds still include it.
+
+- [ ] Revisit additional animation and quality-of-life experiences after the Seamless Close improvements; deferred.
+- [x] Add sidebar navigation with separate Seamless Close and Privacy & About pages, plus a Send feedback placeholder grouped under More.
 - [x] Add General as the first page under Features with saved background-running and menu bar icon controls. Background running removes the Dock icon on Settings close even when the menu bar icon is hidden; opening the app again restores Settings.
 - [x] Add a Launch at login control to General, backed by the system login-item status with approval feedback.
 - [x] Replace the Automatic updates placeholder with a switch backed by Sparkle's download and install preference. Keep update checks active in both modes.
@@ -37,11 +38,10 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 - [x] Check the first public beta.1 DMG download against its published SHA-256 checksum.
 - [x] Publish beta.3 to replace the broken beta.2 DMG, whose flat SwiftPM resource directory causes a Settings startup crash. The public DMG checksum, signature, bundle structure, and installed startup were verified on the development Mac on 2026-09-30; Screen Recording access remained allowed after a direct reinstall. The owner confirmed first launch and Seamless Close from the earlier locally packaged beta DMG on the development Mac.
 - [x] Refine the compact settings composition with native toolbar controls over a narrower sidebar, concentric navigation rows and icons, subtle page icon tiles, a combined Seamless Close switch-and-angle card, and distinct automatic-selection and pause cards. Remove both feature preview illustrations and feature-page privacy footers.
-- [x] Add compact play buttons beside the two Battery Ripple event switches so either color can be previewed on demand.
 - [x] Build and run the full regression suite for the card and sidebar revision (2026-09-26). Inspect all three pages in the running app's Light appearance for the earlier separate-card layout, including compact rows, icon tiles, and removal of previews. Live Dark and earlier-macOS checks remain pending.
-- [ ] Complete live Dark appearance, Reduce Transparency, Increase Contrast, and earlier-macOS checks. Offscreen samples do not validate native selection, focus, or system accessibility integration. The owner's green Battery Ripple appearance approval covers the desktop effect, not this settings revision or the red variant.
+- [ ] Complete live Dark appearance, Reduce Transparency, Increase Contrast, and earlier-macOS checks. Offscreen samples do not validate native selection, focus, or system accessibility integration.
 - [ ] Define the purpose, controls, permissions, accessibility behaviour, and performance budget of each new experience before release.
-- [ ] Continue improving existing features alongside new work; expansion is not dependent on making Seamless Close the entire product.
+- [ ] Continue improving Seamless Close before resuming work on additional experiences.
 
 ## Alpha.9 foundations and Seamless Close follow-up
 
@@ -61,7 +61,7 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 - [x] Move connection audio startup after screenshot/first-frame preparation to remove repeated-close capture contention. On the development Mac, a diagnostic copy reduced median repeated capture time from 300 ms to 42 ms (beta.3: 45 ms), and the owner confirmed the improved start. Coordinator checks enforce preparation order and keep canceled captures silent.
 - [x] Default Begin at to 90° and Resume desktop after pause to on for fresh settings and page reset, preserving saved preferences.
 - [x] Add one saved Connection effect switch for glow and sound together across assisted opening, Pause and Esc, enabled by default and included in Seamless Close reset. Use the supplied four-corner icon and cover off-state silence, unchanged return motion and live cancellation synthetically.
-- [x] Correct missing connection feedback when quick reopening skips the final 5° sensor region. Keep the existing lid-driven return, forecast visible contact to queue audio early, and trigger the pulse before the invisible settling tail without changing the trajectory or screenshot fade. Cover manual/learned angles, unchanged smoothing, one cue, pending-capture silence, switch behavior and interruption cleanup. Unreleased; GitHub issue tracking is pending repository access.
+- [x] Correct missing connection feedback when quick reopening skips the final 5° sensor region. Keep the existing lid-driven return, forecast visible contact to queue audio early, and trigger the pulse before the invisible settling tail without changing the trajectory or screenshot fade. Cover manual/learned angles, unchanged smoothing, one cue, pending-capture silence, switch behavior and interruption cleanup. Included in beta.6; physical timing acceptance remains pending.
 - [ ] Physically check the quick-opening timing refinement at and beyond the starting angle, including reversal before contact, feedback off and another closing gesture. On 2026-10-01, the owner confirmed glow/click availability with speakers and AirPods in manual and automatic modes, then reported a late pulse after apparent contact. Acceptance of the refined timing remains pending; automated replay does not establish physical smoothness or audible timing.
 - [x] Refine the shared connection glow with a wider pearl bloom and continuous corner field. Soften its rhythm with opacity easing, a 65 ms brightness lead-in to the click peak, a stationary crest and a 320 ms fading release with gentle contraction. Physical feel remains pending; the regression suite was not rerun for this refinement.
 - [ ] Physically check the refined bloom on light and dark desktops during assisted opening, Pause and Esc; compare the quick, soft snap with the click, the fading tail and corner continuity at normal viewing distance.
@@ -97,7 +97,7 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 - [x] Use a monochrome menu bar template derived from the actual Clear app icon, sharing the Icon Composer source and using the system foreground colour.
 - [ ] Verify the compiler-generated legacy icon on an earlier supported macOS version.
 
-- [x] Bundle interface vectors locally, using supplied feature icons for Seamless Close and Battery Ripple and Iconly Bold / Regular for supporting controls. Retain Iconly Bulk, Outline, and the previous Custom mix as alternatives with live switching in developer builds.
+- [x] Bundle interface vectors locally, using supplied feature icons for Seamless Close and Iconly Bold / Regular for supporting controls. Retain Iconly Bulk, Outline, and the previous Custom mix as alternatives with live switching in developer builds.
 
 - [x] Establish shared spacing, typography, surfaces, permission-state colours, and control feedback across settings and About.
 - [x] Add a manual update-check button to the right of the app identity in Privacy & About, using the existing updater and its availability state.

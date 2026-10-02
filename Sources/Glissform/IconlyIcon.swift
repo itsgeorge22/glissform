@@ -19,7 +19,7 @@ final class IconlyAppearance: ObservableObject {
 /// Iconly Regular vectors, with Bold, Bulk, and Outline bundled locally.
 /// See docs/ICONLY.md for provenance and asset licensing.
 enum IconlySymbol: String, CaseIterable {
-    case shieldDone, shieldInfo, pause, chevronUp, play, lock, copy, memory, laptop
+    case shieldDone, shieldInfo, pause, chevronUp, lock, copy, memory, laptop
 
     private static let images: [IconlyStyle: [IconlySymbol: NSImage]] = Dictionary(uniqueKeysWithValues: [IconlyStyle.outline, .bulk, .bold].map { style in
         (style, Dictionary(uniqueKeysWithValues: allCases.map { symbol in
@@ -49,7 +49,7 @@ enum IconlySymbol: String, CaseIterable {
     // Keep future product icon adjustments here; the three source sets stay intact.
     private var customStyle: IconlyStyle {
         switch self {
-        case .chevronUp, .play: return .bold
+        case .chevronUp: return .bold
         default: return .bulk
         }
     }

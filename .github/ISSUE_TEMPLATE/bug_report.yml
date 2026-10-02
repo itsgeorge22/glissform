@@ -37,8 +37,7 @@ body:
     label: Affected area
     options:
     - Seamless Close (Infinite Screen before alpha.9)
-    - Battery Ripple
-    - Settings or preview
+    - Settings
     - Installation or permissions
     - Other / unsure
   validations:

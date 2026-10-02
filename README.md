@@ -2,7 +2,7 @@
 
 Subtle animations and quality-of-life improvements for everyday interactions on your Mac.
 
-**Seamless Close is the first available feature:** your desktop appears to stay in place as you close your MacBook lid, with perspective, frost, and shadow responding to the movement. Glissform is designed to grow into a collection of useful experiences.
+**Seamless Close is the currently available feature:** your desktop appears to stay in place as you close your MacBook lid, with perspective, frost, and shadow responding to the movement. Glissform is designed to grow into a collection of useful experiences.
 
 [Website](https://glissform.app/) · [Roadmap](ROADMAP.md)
 
@@ -18,7 +18,7 @@ The website also includes a dedicated Seamless Close section with a large centre
 
 Open the DMG and drag Glissform into Applications. The beta is not Apple notarized, so macOS may block first launch; after a blocked attempt, use **System Settings → Privacy & Security → Open Anyway** if you trust the download. See [Apple's instructions](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac). Seamless Close needs Screen Recording permission. Future beta updates are checked through the app; Automatic updates controls whether they download and install automatically. The public DMG and signed update feed are live, while an upgrade against that public feed has not yet been physically verified. Lock Screen animation is not available; Settings shows it as a planned feature.
 
-Beta.5 fixes the installed beta.4 crash when closing starts. Beta.4 adds shared connection feedback, refined opening motion, revised defaults and an About update-check button. Beta.3 repairs launch after the beta.2 packaging defect and improves update discovery. Beta.2 added an Esc return for Seamless Close and an email contact page. Beta.1 added signed updates and configurable Seamless Close blur strength. Earlier alpha releases introduced **Battery Ripple** and renamed **Infinite Screen** to **Seamless Close**. See the [changelog](CHANGELOG.md) for version-specific changes and ongoing limitations.
+Beta.5 fixes the installed beta.4 crash when closing starts. Beta.4 adds shared connection feedback, refined opening motion, revised defaults and an About update-check button. Beta.3 repairs launch after the beta.2 packaging defect and improves update discovery. Beta.2 added an Esc return for Seamless Close and an email contact page. Beta.1 added signed updates and configurable Seamless Close blur strength. Earlier alpha releases used the name **Infinite Screen** for **Seamless Close**. See the [changelog](CHANGELOG.md) for version-specific changes and ongoing limitations.
 
 ## Current features
 
@@ -28,9 +28,9 @@ Beta.5 fixes the installed beta.4 crash when closing starts. Beta.4 adds shared 
 - Keep Glissform running after its Settings window closes, with menu bar access by default.
 - Press Esc during Seamless Close to use the same fold-to-flat return as pause restoration, whether the pause feature is on or off. Reopen above the starting angle to start another gesture.
 
-Battery Ripple plays a green wave when power connects or a red wave when the built-in battery falls to 20%. The two events have independent saved switches and preview buttons; there is no overall Battery Ripple switch. A compact sidebar groups General, Seamless Close, and Battery Ripple in that order under Features, with Privacy & About and Send feedback under More. Privacy & About includes **Check for Updates…** beside the app name and current version. General controls whether Glissform keeps running after Settings closes, whether its menu bar icon appears, whether macOS launches it at login, and whether updates download and install automatically. With automatic installation off, the sidebar shows the existing Update card only when a newer installable version is found; its button opens the installer. When background running is on, closing Settings removes Glissform from the Dock even if its menu bar icon is hidden; opening the app again restores Settings. Seamless Close keeps its switch, live lid reading, and manual angle together in one card, with separate automatic-selection and pause cards and a page reset for its settings. Battery Ripple uses no screenshot or additional permission.
+A compact sidebar groups General and Seamless Close in that order under Features, with Privacy & About and Send feedback under More. Privacy & About includes **Check for Updates…** beside the app name and current version. General controls whether Glissform keeps running after Settings closes, whether its menu bar icon appears, whether macOS launches it at login, and whether updates download and install automatically. With automatic installation off, the sidebar shows the existing Update card only when a newer installable version is found; its button opens the installer. When background running is on, closing Settings removes Glissform from the Dock even if its menu bar icon is hidden; opening the app again restores Settings. Seamless Close keeps its switch, live lid reading, and manual angle together in one card, with separate automatic-selection and pause cards and a page reset for its settings.
 
-Unreleased development work adds the same connection feedback when a quick reopening reaches or passes the starting angle between sensor readings, preserving the existing lid-driven return and timing feedback to visible contact rather than its nearly invisible settling tail. The published beta.5 can still skip feedback on this path; physical validation of the timing refinement is pending.
+Beta.6 preparation removes Battery Ripple, its power/battery monitoring, controls, previews, and icons so development can focus on Seamless Close. The currently published beta.5 still includes Battery Ripple. Beta.6 also adds the same connection feedback when a quick reopening reaches or passes the starting angle between sensor readings, preserving the existing lid-driven return and timing feedback to visible contact rather than its nearly invisible settling tail. The published beta.5 can still skip feedback on this path; physical validation of the timing refinement is pending.
 
 ## Compatibility
 
@@ -39,15 +39,13 @@ Unreleased development work adds the same connection feedback when a quick reope
 | macOS | 15 or later is the deployment minimum; this is not a guarantee of compatibility on every version. |
 | Hardware | A Metal-capable MacBook with a compatible lid-angle sensor. |
 | Tested hardware | MacBook Air M5 15-inch (Mac17,4), the development machine. Other models are unverified. |
-| Permission | Seamless Close needs Screen Recording access for individual desktop screenshots. Battery Ripple does not. |
+| Permission | Seamless Close needs Screen Recording access for individual desktop screenshots. |
 
 The lid sensor uses an undocumented protocol. Glissform tries fractional angle readings and falls back to whole degrees when unavailable. Other Mac configurations remain unverified; future compatibility reports can help build coverage, but they are not hardware certification.
 
 ## Privacy
 
 One screenshot is taken per closing attempt and kept in memory. On a fast close it may be requested just before the selected start angle; if the lid reverses or stops before that angle, the hidden image is discarded. A completed closing image may remain through lid-close sleep for the following opening; it stays hidden while locked or asleep and is released after completion or cancellation. There is no continuous recording, audio capture, screenshot saving, or analytics. Update checks and downloads use glissform.app; screen images are never sent. Normal system sleep remains enabled.
-
-Battery Ripple reads the Mac's power-source and built-in battery charge state. It does not capture screen content and stops when the display sleeps or the session locks.
 
 ## Feedback and support
 

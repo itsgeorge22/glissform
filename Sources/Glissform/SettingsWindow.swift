@@ -5,12 +5,11 @@ import SwiftUI
 @MainActor
 final class SettingsModel: ObservableObject {
     enum Page: Hashable {
-        case infiniteScreen, batteryRipple, general, about, foundBug
+        case infiniteScreen, general, about, foundBug
 
         var title: String {
             switch self {
             case .infiniteScreen: return "Seamless Close"
-            case .batteryRipple: return "Battery Ripple"
             case .general: return "General"
             case .about: return "Privacy & About"
             case .foundBug: return "Send feedback"
@@ -47,10 +46,6 @@ final class SettingsModel: ObservableObject {
     var onBlurEnabledChange: ((Bool) -> Void)?
     @Published private(set) var blurStrength: BlurStrength = .defaultStrength
     var onBlurStrengthChange: ((BlurStrength) -> Void)?
-    @Published private(set) var chargingFeedbackEnabled = true
-    var onChargingFeedbackEnabledChange: ((Bool) -> Void)?
-    @Published private(set) var lowBatteryRippleEnabled = true
-    var onLowBatteryRippleEnabledChange: ((Bool) -> Void)?
     @Published private(set) var runInBackground = true
     var onRunInBackgroundChange: ((Bool) -> Void)?
     @Published private(set) var showMenuBarIcon = true
@@ -70,7 +65,6 @@ final class SettingsModel: ObservableObject {
     }
     var manualUpdateAvailable: Bool { !automaticUpdatesEnabled && availableUpdate != nil }
     var onAutomaticUpdatesEnabledChange: ((Bool) -> Void)?
-    var onPreviewBatteryRipple: ((BatteryRippleStyle) -> Void)?
 
     var onOpenPermissions: (() -> Void)?
 
@@ -79,7 +73,6 @@ final class SettingsModel: ObservableObject {
                    pauseDuration: Double = 1, automaticAngleDuration: Double = 1,
                    automaticDetectionThreshold: Double = 20,
                    connectionEffectEnabled: Bool = true, blurEnabled: Bool = true, blurStrength: BlurStrength = .defaultStrength,
-                   chargingFeedbackEnabled: Bool = true, lowBatteryRippleEnabled: Bool = true,
                    runInBackground: Bool = true, showMenuBarIcon: Bool = true) {
         self.animationEnabled = animationEnabled
         self.startAngle = startAngle
@@ -92,8 +85,6 @@ final class SettingsModel: ObservableObject {
         self.connectionEffectEnabled = connectionEffectEnabled
         self.blurEnabled = blurEnabled
         self.blurStrength = blurStrength
-        self.chargingFeedbackEnabled = chargingFeedbackEnabled
-        self.lowBatteryRippleEnabled = lowBatteryRippleEnabled
         self.runInBackground = runInBackground
         self.showMenuBarIcon = showMenuBarIcon
     }
@@ -230,18 +221,6 @@ final class SettingsModel: ObservableObject {
         setBlurEnabled(true)
         setBlurStrength(.defaultStrength)
         setAnimationEnabled(true)
-    }
-
-    func setChargingFeedbackEnabled(_ enabled: Bool) {
-        guard chargingFeedbackEnabled != enabled else { return }
-        chargingFeedbackEnabled = enabled
-        onChargingFeedbackEnabledChange?(enabled)
-    }
-
-    func setLowBatteryRippleEnabled(_ enabled: Bool) {
-        guard lowBatteryRippleEnabled != enabled else { return }
-        lowBatteryRippleEnabled = enabled
-        onLowBatteryRippleEnabledChange?(enabled)
     }
 
     func setAnimationEnabled(_ enabled: Bool) {
@@ -484,7 +463,6 @@ private struct SettingsRootView: View {
                 sidebarSectionTitle("Features")
                 navigationRow(.general)
                 navigationRow(.infiniteScreen)
-                navigationRow(.batteryRipple)
                 sidebarSectionTitle("More")
                     .padding(.top, 12)
                 navigationRow(.about)
@@ -500,7 +478,7 @@ private struct SettingsRootView: View {
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Settings pages")
             .onMoveCommand { direction in
-                let pages: [SettingsModel.Page] = [.general, .infiniteScreen, .batteryRipple, .about, .foundBug]
+                let pages: [SettingsModel.Page] = [.general, .infiniteScreen, .about, .foundBug]
                 let index = pages.firstIndex(of: focusedPage ?? model.selectedPage) ?? 0
                 let next: Int
                 if direction == .down { next = min(index + 1, pages.count - 1) }
@@ -514,7 +492,6 @@ private struct SettingsRootView: View {
                 Group {
                     switch model.selectedPage {
                     case .infiniteScreen: AnimationSettingsView(model: model)
-                    case .batteryRipple: BatterySettingsView(model: model)
                     case .general: GeneralSettingsView(model: model)
                     case .about: AboutSettingsView(model: model)
                     case .foundBug: SendFeedbackView()
@@ -599,7 +576,6 @@ private struct SettingsRootView: View {
                 Group {
                     switch page {
                     case .infiniteScreen: FeatureIcon(.infiniteScreen, size: 17)
-                    case .batteryRipple: FeatureIcon(.batteryRipple, size: 17)
                     case .general: FeatureIcon(.general, size: 17)
                     case .about: IconlyIcon(.shieldDone, size: 17)
                     case .foundBug: FeatureIcon(.sendFeedback, size: 17)
@@ -609,8 +585,8 @@ private struct SettingsRootView: View {
                 .frame(width: 28, height: 28)
                 .background {
                     let tint = page == .infiniteScreen ? SettingsDesign.Palette.feature
-                        : page == .batteryRipple ? SettingsDesign.Palette.batterySidebar
-                        : page == .general || page == .about ? SettingsDesign.Palette.neutralSidebar
+                        : page == .general ? SettingsDesign.Palette.neutralSidebar
+                        : page == .about ? SettingsDesign.Palette.aboutSidebar
                         : SettingsDesign.Palette.feedbackSidebar
                     RoundedRectangle(cornerRadius: SettingsDesign.Metrics.sidebarIconRadius, style: .continuous)
                         .fill(tint.gradient)
@@ -689,7 +665,6 @@ private struct FeatureToggleRow<Icon: View>: View {
     let detail: String
     let color: SettingsDesign.Palette.CardIconColor
     @Binding var isEnabled: Bool
-    let preview: (() -> Void)?
     @ViewBuilder let icon: () -> Icon
 
     var body: some View {
@@ -701,35 +676,10 @@ private struct FeatureToggleRow<Icon: View>: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
-            if let preview {
-                Button(action: preview) {
-                    IconlyIcon(.play, size: 16)
-                }
-                .buttonStyle(BatteryPreviewButtonStyle())
-                .modifier(SettingsActionCursor())
-                .accessibilityLabel("Preview \(title) ripple")
-                .help("Preview \(title) ripple")
-            }
             Toggle(title, isOn: $isEnabled)
                 .labelsHidden().toggleStyle(AppleSwitchStyle())
                 .accessibilityLabel("Enable \(title)")
         }
-    }
-}
-
-private struct FeatureToggleCard<Icon: View>: View {
-    let title: String
-    let detail: String
-    let color: SettingsDesign.Palette.CardIconColor
-    @Binding var isEnabled: Bool
-    let preview: () -> Void
-    @ViewBuilder let icon: () -> Icon
-
-    var body: some View {
-        FeatureToggleRow(title: title, detail: detail, color: color, isEnabled: $isEnabled,
-                         preview: preview, icon: icon)
-            .padding(SettingsDesign.Spacing.mainCardInsets)
-            .modifier(SettingsCardSurface())
     }
 }
 
@@ -812,8 +762,7 @@ private struct AnimationSettingsView: View {
         VStack(spacing: 0) {
             FeatureToggleRow(title: "Seamless Close", detail: "Animates the desktop as the lid closes.",
                              color: .feature,
-                             isEnabled: Binding(get: { model.animationEnabled }, set: { model.setAnimationEnabled($0) }),
-                             preview: nil) {
+                             isEnabled: Binding(get: { model.animationEnabled }, set: { model.setAnimationEnabled($0) })) {
                 FeatureIcon(.infiniteScreen)
             }
             .padding(SettingsDesign.Spacing.mainCardInsets)
@@ -932,10 +881,9 @@ private struct AnimationSettingsView: View {
     private var connectionEffectControls: some View {
         FeatureToggleRow(title: "Connection effect",
                          detail: "Adds a soft edge glow and click when the desktop returns.",
-                         color: .feature,
+                         color: .connectionEffect,
                          isEnabled: Binding(get: { model.connectionEffectEnabled },
-                                            set: { model.setConnectionEffectEnabled($0) }),
-                         preview: nil) {
+                                            set: { model.setConnectionEffectEnabled($0) })) {
             FeatureIcon(.connectionEffect)
         }
     }
@@ -1113,35 +1061,6 @@ private struct AnimationSettingsView: View {
 
 }
 
-private struct BatterySettingsView: View {
-    @ObservedObject var model: SettingsModel
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: SettingsDesign.Spacing.cards) {
-            SettingsFeatureHeader(title: "Battery Ripple",
-                subtitle: "A soft ripple for charging and low battery.")
-                .padding(.bottom, SettingsDesign.Spacing.detail)
-
-            FeatureToggleCard(title: "Power connection", detail: "Shows a green ripple when power connects.",
-                              color: .success,
-                              isEnabled: Binding(get: { model.chargingFeedbackEnabled },
-                                                 set: { model.setChargingFeedbackEnabled($0) }),
-                              preview: { model.onPreviewBatteryRipple?(.connected) }) {
-                FeatureIcon(.powerConnection)
-            }
-
-            FeatureToggleCard(title: "Battery at 20%", detail: "Shows a red ripple when battery reaches 20%.",
-                              color: .danger,
-                              isEnabled: Binding(get: { model.lowBatteryRippleEnabled },
-                                                 set: { model.setLowBatteryRippleEnabled($0) }),
-                              preview: { model.onPreviewBatteryRipple?(.lowBattery) }) {
-                FeatureIcon(.batteryAt20Percent)
-            }
-        }
-        .padding(SettingsDesign.Spacing.page)
-    }
-}
-
 private struct GeneralSettingsView: View {
     @ObservedObject var model: SettingsModel
 
@@ -1154,8 +1073,7 @@ private struct GeneralSettingsView: View {
                              detail: "Keep effects active after closing Settings.",
                              color: .neutral,
                              isEnabled: Binding(get: { model.runInBackground },
-                                                set: { model.setRunInBackground($0) }),
-                             preview: nil) {
+                                                set: { model.setRunInBackground($0) })) {
                 FeatureIcon(.backgroundRunning)
             }
             .padding(SettingsDesign.Spacing.mainCardInsets)
@@ -1165,8 +1083,7 @@ private struct GeneralSettingsView: View {
                              detail: "Open Settings and controls from the menu bar.",
                              color: .neutral,
                              isEnabled: Binding(get: { model.showMenuBarIcon },
-                                                set: { model.setShowMenuBarIcon($0) }),
-                             preview: nil) {
+                                                set: { model.setShowMenuBarIcon($0) })) {
                 FeatureIcon(.menuBarIcon)
             }
             .padding(SettingsDesign.Spacing.mainCardInsets)
@@ -1177,8 +1094,7 @@ private struct GeneralSettingsView: View {
                                  detail: "Open Glissform when you sign in.",
                                  color: .neutral,
                                  isEnabled: Binding(get: { model.launchAtLoginEnabled },
-                                                    set: { model.setLaunchAtLogin($0) }),
-                                 preview: nil) {
+                                                    set: { model.setLaunchAtLogin($0) })) {
                     FeatureIcon(.launchAtLogin)
                 }
                 if let message = model.launchAtLoginMessage {
@@ -1211,8 +1127,7 @@ private struct GeneralSettingsView: View {
                                  detail: "Download updates and install when Glissform quits.",
                                  color: .neutral,
                                  isEnabled: Binding(get: { model.automaticUpdatesEnabled },
-                                                    set: { model.setAutomaticUpdatesEnabled($0) }),
-                                 preview: nil) {
+                                                    set: { model.setAutomaticUpdatesEnabled($0) })) {
                     FeatureIcon(.automaticUpdates)
                 }
                 .padding(SettingsDesign.Spacing.mainCardInsets)
@@ -1634,7 +1549,7 @@ private struct AboutSettingsView: View {
     private var privacyCard: some View {
         VStack(alignment: .leading, spacing: SettingsDesign.Spacing.cardInset) {
             Text("Private by design.").font(SettingsDesign.Typography.sectionTitle)
-            privacyDetail("Only what’s needed.", text: "Uses lid angle, power status, and temporary screen images.", symbol: .copy)
+            privacyDetail("Only what’s needed.", text: "Uses lid angle and temporary screen images.", symbol: .copy)
             privacyDetail("Kept in memory.", text: "Screen images are released after use, never saved or sent.", symbol: .memory)
             privacyDetail("No tracking.", text: "No audio capture or analytics. Network access is used for app updates.", symbol: .lock)
         }
@@ -1705,44 +1620,6 @@ private struct FeedbackButtonBody: View {
             .onHover { hover.isHovered = $0 }
             .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.hoverDuration), value: isHovered)
             .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.pressedDuration), value: isPressed)
-    }
-}
-
-private struct BatteryPreviewButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        BatteryPreviewButtonBody(configuration: configuration)
-    }
-}
-
-private struct BatteryPreviewButtonBody: View {
-    let configuration: ButtonStyleConfiguration
-    @Environment(\.isEnabled) private var isEnabled
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @StateObject private var hover = HoverState()
-
-    var body: some View {
-        let pressed = isEnabled && configuration.isPressed
-        let hovered = isEnabled && hover.isHovered
-        configuration.label
-            .foregroundStyle(Color.primary)
-            .frame(width: 30, height: 30)
-            .background {
-                Circle()
-                    .fill(pressed ? Color.primary.opacity(SettingsDesign.Feedback.previewPressedFill)
-                          : hovered ? Color.primary.opacity(SettingsDesign.Feedback.previewHoverFill)
-                          : Color.primary.opacity(SettingsDesign.Feedback.idleFill))
-            }
-            .overlay {
-                Circle()
-                    .strokeBorder(Color.primary.opacity(pressed ? SettingsDesign.Feedback.previewPressedBorder
-                                                        : hovered ? SettingsDesign.Feedback.fieldHoverBorder : 0), lineWidth: 1)
-                    .allowsHitTesting(false)
-            }
-            .opacity(isEnabled ? 1 : SettingsDesign.Feedback.disabledOpacity)
-            .contentShape(Circle())
-            .onHover { hover.isHovered = $0 }
-            .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.hoverDuration), value: hovered)
-            .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.pressedDuration), value: pressed)
     }
 }
 
