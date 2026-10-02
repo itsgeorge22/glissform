@@ -10,7 +10,7 @@ Website source and deployment are maintained separately in the private [glissfor
 
 ## Project status
 
-**Public beta:** [Download Glissform 0.1.0-beta.5](https://glissform.app/downloads/Glissform-0.1.0-beta.5.dmg) from [glissform.app](https://glissform.app/). The source repository is private.
+**Public beta:** [Download Glissform 0.1.0-beta.6](https://glissform.app/downloads/Glissform-0.1.0-beta.6.dmg) from [glissform.app](https://glissform.app/). The source repository is private.
 
 The website presents the desktop landing page with fixed Customisable, Private, and F.A.Q navigation at widths of 1156px or more. As soon as scrolling begins, the same navbar smoothly gains a translucent, blurred material and removes it again at the top. The selected link follows the linked section occupying the largest visible area; the brand returns to the top and clears the selection. Its feature cards show still previews, cycle every ten seconds, and transition smoothly through automatic and manual selection, with hover, pressed, and keyboard-focus feedback. The Customisable grid provides interactive blur choices, starting-angle slider, and switches; timing values are illustrations. Narrower windows show a MacBook viewing message.
 
@@ -30,7 +30,7 @@ Beta.5 fixes the installed beta.4 crash when closing starts. Beta.4 adds shared 
 
 A compact sidebar groups General and Seamless Close in that order under Features, with Privacy & About and Send feedback under More. Privacy & About includes **Check for Updates…** beside the app name and current version. General controls whether Glissform keeps running after Settings closes, whether its menu bar icon appears, whether macOS launches it at login, and whether updates download and install automatically. With automatic installation off, the sidebar shows the existing Update card only when a newer installable version is found; its button opens the installer. When background running is on, closing Settings removes Glissform from the Dock even if its menu bar icon is hidden; opening the app again restores Settings. Seamless Close keeps its switch, live lid reading, and manual angle together in one card, with separate automatic-selection and pause cards and a page reset for its settings.
 
-Beta.6 preparation removes Battery Ripple, its power/battery monitoring, controls, previews, and icons so development can focus on Seamless Close. The currently published beta.5 still includes Battery Ripple. Beta.6 also adds the same connection feedback when a quick reopening reaches or passes the starting angle between sensor readings, preserving the existing lid-driven return and timing feedback to visible contact rather than its nearly invisible settling tail. The published beta.5 can still skip feedback on this path; physical validation of the timing refinement is pending.
+Beta.6 removes Battery Ripple, its power/battery monitoring, controls, previews, and icons so development can focus on Seamless Close. It also adds connection feedback when a quick reopening reaches or passes the starting angle between sensor readings, preserving the existing lid-driven return and timing feedback to visible contact rather than its nearly invisible settling tail. Physical validation of the timing refinement remains pending.
 
 ## Compatibility
 

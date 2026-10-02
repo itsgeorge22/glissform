@@ -191,7 +191,7 @@ The single Connection effect switch defaults to on. Coordinator checks verify sa
 
 Renderer checks now describe inward glow width, the bounded 65 ms brightness anticipation, click-aligned peak, 50 ms screenshot fade and the 320 ms glow release for shallow and deep Pause/Esc returns, requiring zero glow outside the final 5° of visible fold and a gradual approach when the return starts within 5°. Coordinator checks require exactly one contact click for a visible return, silence for pending captures and pre-contact interruptions, mouse access while the rim retreats, and screenshot cleanup/rearming. Pause reversal and sleep, lock, Space/display changes and quit are covered; Esc preserves its existing lid-independent return and interruption cleanup.
 
-The refined glow timing has not had the regression suite rerun; physical feel remains for owner comparison. On the development Mac, compare Pause and Esc against assisted reopening at shallow and deep folds. Confirm the glow stays hidden until the final 5° of visible fold, then shows the same brightness pulse and click, unchanged return motion, and mouse access before the glow disappears. Interrupt before contact and during the retreat; check for lingering pixels, replayed clicks, premature cutoff and normal rearming. This physical comparison remains pending.
+The beta.6 full release regression suite passed; physical feel remains for owner comparison. On the development Mac, compare Pause and Esc against assisted reopening at shallow and deep folds. Confirm the glow stays hidden until the final 5° of visible fold, then shows the same brightness pulse and click, unchanged return motion, and mouse access before the glow disappears. Interrupt before contact and during the retreat; check for lingering pixels, replayed clicks, premature cutoff and normal rearming. This physical comparison remains pending.
 
 ### Connection audio and glow synchronization
 
@@ -214,3 +214,10 @@ The local release build and mounted installer passed version/build, signature an
 - The public DMG is 6,621,593 bytes, SHA-256 `70ad0492dcc04717d5a930364632e03e07abdb76b76ddcb54df935bd0aae6022`; the checksum and signed appcast entry agree. The mounted package reports beta.5 and passes strict signature verification.
 - An isolated diagnostic using the production audio preparation code and the published package's resources successfully loaded the click and started/stopped audio output. No local regression suite was run, following the owner's instruction.
 - The website serves the beta.5 download link. Physical lid acceptance and the beta.4-to-beta.5 Sparkle upgrade remain pending.
+
+### Beta.6 release verification — 2026-10-02
+
+- Release build 17 and the full local regression suite passed (175 PASS results). Issue-form YAML, local Markdown links and diff formatting were checked.
+- The beta.6 packaging workflow succeeded for tag `v0.1.0-beta.6` at `9342884`, publishing the version-specific prerelease and installer/checksum assets.
+- The public DMG is 6,597,313 bytes, SHA-256 `bcdb5fd8ec5839941ffee193a52babb33caf9a2f9183eafdb6df2f9ad6303457`; the public checksum and signed feed's beta.6/build-17 entry agree. The mounted public package reports beta.6 and passes deep strict signature verification; retired battery and play icons are absent. A fresh copy of the local installer also passed signature and version checks.
+- Physical lid feel, final glow/click alignment, beta.5-to-beta.6 Sparkle upgrade and wider hardware compatibility remain unverified.
