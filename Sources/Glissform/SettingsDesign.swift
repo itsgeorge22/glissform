@@ -52,7 +52,8 @@ enum SettingsDesign {
         static let feature = Color(red: 0x25 / 255, green: 0x8D / 255, blue: 0xEB / 255)
         static let neutralSidebar = Color.gray
         static let aboutSidebar = Color(red: 0xED / 255, green: 0x62 / 255, blue: 0x58 / 255)
-        static let feedbackSidebar = Color(red: 0x4B / 255, green: 0xC7 / 255, blue: 0x6B / 255)
+        static let licenseSidebar = Color(red: 0x4B / 255, green: 0xC7 / 255, blue: 0x6B / 255)
+        static let feedbackSidebar = Color(red: 1, green: 0x95 / 255, blue: 0)
         static let success = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
         static let attention = Color(red: 1, green: 159 / 255, blue: 10 / 255)
         enum CardIconColor {
@@ -76,7 +77,6 @@ enum SettingsDesign {
                 case (.connectionEffect, .light): return Color(red: 0xD9 / 255, green: 0x77 / 255, blue: 0x06 / 255)
                 case (.automaticAngle, .light): return Color(red: 0x86 / 255, green: 0x63 / 255, blue: 0xC7 / 255)
                 case (.blur, .light): return Color(red: 0x3B / 255, green: 0x94 / 255, blue: 0xD0 / 255)
-                case (.feedback, .light): return Color(red: 0x35 / 255, green: 0xAA / 255, blue: 0x55 / 255)
                 case (.success, .light): return Color(red: 0x2A / 255, green: 0xB8 / 255, blue: 0x4D / 255)
                 case (.attention, .light): return Color(red: 0xE0 / 255, green: 0x8C / 255, blue: 0x09 / 255)
                 case (.feature, _): return Palette.feature

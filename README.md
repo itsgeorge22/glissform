@@ -28,7 +28,7 @@ Beta.5 fixes the installed beta.4 crash when closing starts. Beta.4 adds shared 
 - Keep Glissform running after its Settings window closes, with menu bar access by default.
 - Press Esc during Seamless Close to use the same fold-to-flat return as pause restoration, whether the pause feature is on or off. Reopen above the starting angle to start another gesture.
 
-A compact sidebar groups General and Seamless Close in that order under Features, with Privacy & About and Send feedback under More. Privacy & About includes **Check for Updates…** beside the app name and current version. General controls whether Glissform keeps running after Settings closes, whether its menu bar icon appears, whether macOS launches it at login, and whether updates download and install automatically. With automatic installation off, the sidebar shows the existing Update card only when a newer installable version is found; its button opens the installer. When background running is on, closing Settings removes Glissform from the Dock even if its menu bar icon is hidden; opening the app again restores Settings. Seamless Close keeps its switch, live lid reading, and manual angle together in one card, with separate automatic-selection and pause cards and a page reset for its settings.
+A compact sidebar groups General and Seamless Close in that order under Features, with Privacy & about and Send feedback under More. Privacy & about includes **Check for updates…** beside the app name and current version. General controls whether Glissform keeps running after Settings closes, whether its menu bar icon appears, whether macOS launches it at login, and whether updates download and install automatically. With automatic installation off, the sidebar shows the existing Update card only when a newer installable version is found; its button opens the installer. When background running is on, closing Settings removes Glissform from the Dock even if its menu bar icon is hidden; opening the app again restores Settings. Seamless Close keeps its switch, live lid reading, and manual angle together in one card, with separate automatic-selection and pause cards and a page reset for its settings.
 
 Beta.6 removes Battery Ripple, its power/battery monitoring, controls, previews, and icons so development can focus on Seamless Close. It also adds connection feedback when a quick reopening reaches or passes the starting angle between sensor readings, preserving the existing lid-driven return and timing feedback to visible contact rather than its nearly invisible settling tail. Physical validation of the timing refinement remains pending.
 
@@ -58,6 +58,8 @@ The source repository and its [issue tracker](https://github.com/itsgeorge22/gli
 Developer build and verification steps are documented in [Contributing](CONTRIBUTING.md). CI does not verify physical lid behaviour.
 
 Local builds are **Glissform Dev**, with a red icon, separate app identity and settings, and no public update checks. The installed beta from the DMG remains **Glissform**, with the blue icon and signed updates. Use an explicit release build only when preparing a versioned DMG; avoid running both apps' effects at once.
+
+Glissform is fully free to use. Trial limits, purchase prompts and license management are disabled in both normal and development launches. The [licensing prototype](docs/LICENSING_PREVIEW.md) is preserved in source for possible future reuse; its old preview flag is inactive.
 
 ## Credits and licensing
 

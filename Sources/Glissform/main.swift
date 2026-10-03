@@ -147,6 +147,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsModel.onAnimationEnabledChange = { [weak self] enabled in
             self?.applyAnimationEnabled(enabled)
         }
+        settingsModel.licensing.onAccessChange = { [weak self] allowed in
+            self?.applyLicenseAccess(allowed)
+        }
+        applyLicenseAccess(settingsModel.licensing.allowsUse)
         settingsModel.onStartAngleChange = { [weak self] angle in
             self?.applyStartAngle(angle)
         }
@@ -235,6 +239,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         heartbeat = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
             guard let self, !self.quitting else { return }
+            self.settingsModel.licensing.refresh()
+            guard self.settingsModel.licenseAllowsUse else { return }
             guard self.checkScreenAccess(), !self.sleeping else { return }
             self.settingsModel.refreshPermission()
             self.checkSensorHealth()
@@ -279,12 +285,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             item.menu = statusMenu
             statusItem = item
         }
-        statusItem?.isVisible = visible
+        statusItem?.isVisible = visible || !settingsModel.licenseAllowsUse
     }
 
     private func setStatus(_ text: String) {
-        statusLine.title = text
-        settingsModel.updateRuntimeStatus(text)
+        let status = settingsModel.licenseAllowsUse ? text : "Trial or license required"
+        statusLine.title = status
+        settingsModel.updateRuntimeStatus(status)
+    }
+
+    private func applyLicenseAccess(_ allowed: Bool) {
+        settingsModel.licenseAllowsUse = allowed
+        if !allowed {
+            cancelWake("license access ended")
+            invalidateCaptureMetadata()
+            endGesture()
+            motion.reset()
+            settingsModel.selectedPage = .license
+            setStatus("Trial or license required")
+        } else {
+            retryAfter = .distantPast
+            setStatus(settingsModel.animationEnabled ? "Ready" : "Paused")
+        }
+        updateMenuBarIcon(visible: settingsModel.showMenuBarIcon)
     }
 
     private func startSensor() {
@@ -314,6 +337,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func handleLidReading(_ angle: Double, time: Double = ProcessInfo.processInfo.systemUptime) {
         guard !sleeping, !quitting else { return }
+        settingsModel.licensing.refresh()
+        guard settingsModel.licenseAllowsUse else { return }
         guard angle.isFinite, (0...180).contains(angle) else {
             cancelWake("invalid sensor reading")
             endGesture()
@@ -453,6 +478,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func connect() {
         guard !starting, !sleeping, !quitting else { return }
+        guard settingsModel.licenseAllowsUse else { return }
         guard checkScreenAccess() else {
             setStatus("Screen Recording permission required")
             if !permissionRequested {
@@ -808,7 +834,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private var canRetainClosingSnapshot: Bool {
-        settingsModel.animationEnabled && !sessionInactive && !openingGesture && !finishingGesture
+        settingsModel.licenseAllowsUse && settingsModel.animationEnabled && !sessionInactive && !openingGesture && !finishingGesture
             && hasSnapshot && motion.active && recentClosedLid && renderer?.hasPreparedSnapshot == true
     }
 
@@ -833,10 +859,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func resume(startHardware: Bool = true) {
         guard sleeping else { return }
+        settingsModel.licensing.refresh()
         sleeping = false
         sensorRestartedAt = Date()
         let hadClosedEvidence = wakeOpening.awaitingWake
-        let eligible = settingsModel.animationEnabled && retainedClosingSnapshot
+        let eligible = settingsModel.licenseAllowsUse && settingsModel.animationEnabled && retainedClosingSnapshot
             && renderer?.hasPreparedSnapshot == true && checkScreenAccess()
             && wakeOpening.resume(time: ProcessInfo.processInfo.systemUptime)
         if !eligible { cancelWake("no eligible closing frame"); endGesture() }
@@ -867,7 +894,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func canUseDesktop() -> Bool {
-        guard !screenLocked, !sessionInactive, screenAccessAllowed(), let displayID else { return false }
+        guard settingsModel.licenseAllowsUse, !screenLocked, !sessionInactive, screenAccessAllowed(), let displayID else { return false }
         return desktopAvailable(displayID)
     }
 
@@ -1793,7 +1820,7 @@ extension AppDelegate {
         // Resolve a capture *after* each interruption to prove stale work cannot reappear.
         // Also interrupt a revealed snapshot to verify overlay and GPU cleanup.
         for visible in [false, true] {
-            for interruption in ["reversal", "sleep", "display change", "quit"] {
+            for interruption in ["reversal", "sleep", "display change", "quit", "license expiry"] {
                 let (app, source) = try makeGesture()
                 defer { app.shutdown(); app.window?.close() }
                 let task = app.snapshotTask
@@ -1815,6 +1842,7 @@ extension AppDelegate {
                 case "reversal": app.handleLidReading(100)
                 case "sleep": app.suspend()
                 case "display change": app.restart(startHardware: false)
+                case "license expiry": app.applyLicenseAccess(false)
                 default: app.shutdown()
                 }
                 source.pending?.resume(returning: buffer)
@@ -1822,6 +1850,13 @@ extension AppDelegate {
                 await task?.value
                 if visible && interruption == "reversal" { try await waitForCleanup(app) }
                 try checkCleared(app)
+                if interruption == "license expiry" {
+                    let captures = source.count
+                    app.handleLidReading(110)
+                    app.handleLidReading(80)
+                    try check(source.count == captures && !app.motion.active && !app.snapshotRequested,
+                              "Locked app must not start another gesture")
+                }
                 if !visible {
                     try check(sound.preparationCount == 0,
                               "A canceled capture must not start audio when its stale result arrives")
@@ -2400,7 +2435,7 @@ extension AppDelegate {
                 print("PASS: lock \(lockOrder), \(completesWhileLocked ? "completed opening skipped" : "same frame after unlock")")
             }
         }
-        for interruption in ["deadline", "session change", "permission", "disable", "threshold", "quit", "display"] {
+        for interruption in ["deadline", "session change", "permission", "disable", "threshold", "quit", "display", "license expiry"] {
             var access = true
             let (app, source) = try await makeSleepingWake(screenAccessAllowed: { access })
             defer { app.shutdown(); app.window?.close() }
@@ -2414,6 +2449,7 @@ extension AppDelegate {
             case "permission": access = false; app.checkScreenAccess()
             case "disable": app.settingsModel.setAnimationEnabled(false); app.applyAnimationEnabled(false)
             case "threshold": app.applyStartAngle(95)
+            case "license expiry": app.applyLicenseAccess(false)
             case "quit": app.shutdown()
             default: app.restart(startHardware: false)
             }

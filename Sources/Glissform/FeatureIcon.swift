@@ -8,6 +8,8 @@ enum FeatureSymbol: String, CaseIterable {
     case connectionEffect = "screen-size-2"
     case blur = "rain-drop"
     case sendFeedback = "messages"
+    case license = "key"
+    case trial = "time-circle"
     case general = "setting"
     case backgroundRunning = "web-page-check"
     case menuBarIcon = "grid-interface"

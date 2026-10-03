@@ -12,7 +12,7 @@ body:
   id: app-version
   attributes:
     label: Glissform version
-    description: Find it in Privacy & About. For a source build, include the commit
+    description: Find it in Privacy & about. For a source build, include the commit
       if known.
   validations:
     required: true

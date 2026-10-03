@@ -5,18 +5,21 @@ import SwiftUI
 @MainActor
 final class SettingsModel: ObservableObject {
     enum Page: Hashable {
-        case infiniteScreen, general, about, foundBug
+        case infiniteScreen, general, about, foundBug, license
 
         var title: String {
             switch self {
             case .infiniteScreen: return "Seamless Close"
             case .general: return "General"
-            case .about: return "Privacy & About"
+            case .about: return "Privacy & about"
             case .foundBug: return "Send feedback"
+            case .license: return "License"
             }
         }
     }
     @Published var selectedPage: Page = .infiniteScreen
+    let licensing = LicenseController()
+    @Published var licenseAllowsUse = true
     @Published private(set) var animationEnabled = true
     @Published private(set) var startAngle = 90.0
     @Published private(set) var automaticStartAngle = false
@@ -467,9 +470,12 @@ private struct SettingsRootView: View {
                     .padding(.top, 12)
                 navigationRow(.about)
                 navigationRow(.foundBug)
+                if model.licensing.isPreview { navigationRow(.license) }
                 Spacer(minLength: 0)
-                if model.manualUpdateAvailable, let update = model.availableUpdate {
+                if let update = model.availableUpdate, model.manualUpdateAvailable || model.licensing.isPreview {
                     sidebarUpdateCard(for: update)
+                } else {
+                    SidebarTrialCard(licensing: model.licensing) { model.selectedPage = .license }
                 }
             }
             .padding(.horizontal, 12)
@@ -479,6 +485,7 @@ private struct SettingsRootView: View {
             .accessibilityLabel("Settings pages")
             .onMoveCommand { direction in
                 let pages: [SettingsModel.Page] = [.general, .infiniteScreen, .about, .foundBug]
+                    + (model.licensing.isPreview ? [.license] : [])
                 let index = pages.firstIndex(of: focusedPage ?? model.selectedPage) ?? 0
                 let next: Int
                 if direction == .down { next = min(index + 1, pages.count - 1) }
@@ -491,10 +498,13 @@ private struct SettingsRootView: View {
             ScrollView {
                 Group {
                     switch model.selectedPage {
-                    case .infiniteScreen: AnimationSettingsView(model: model)
+                    case .infiniteScreen:
+                        if model.licenseAllowsUse { AnimationSettingsView(model: model) }
+                        else { licensePage }
                     case .general: GeneralSettingsView(model: model)
                     case .about: AboutSettingsView(model: model)
                     case .foundBug: SendFeedbackView()
+                    case .license: licensePage
                     }
                 }
                 .frame(width: SettingsDesign.Metrics.contentWidth)
@@ -522,6 +532,14 @@ private struct SettingsRootView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
             layout.height = resizeWindow(SettingsDesign.Metrics.preferredHeight)
+        }
+    }
+
+    @ViewBuilder private var licensePage: some View {
+        if model.licensing.isPreview {
+            LicenseSettingsView(licensing: model.licensing)
+        } else {
+            GeneralSettingsView(model: model)
         }
     }
 
@@ -558,13 +576,7 @@ private struct SettingsRootView: View {
                 .modifier(SettingsActionCursor())
                 .accessibilityLabel("Update to \(update.version)")
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.75),
-                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .strokeBorder(Color.primary.opacity(0.065)))
-        .padding(.horizontal, SettingsDesign.Metrics.sidebarRowInset)
+        .modifier(SidebarStatusCardSurface())
     }
 
     private func navigationRow(_ page: SettingsModel.Page) -> some View {
@@ -579,6 +591,7 @@ private struct SettingsRootView: View {
                     case .general: FeatureIcon(.general, size: 17)
                     case .about: IconlyIcon(.shieldDone, size: 17)
                     case .foundBug: FeatureIcon(.sendFeedback, size: 17)
+                    case .license: FeatureIcon(.license, size: 17)
                     }
                 }
                 .foregroundStyle(.white)
@@ -587,6 +600,7 @@ private struct SettingsRootView: View {
                     let tint = page == .infiniteScreen ? SettingsDesign.Palette.feature
                         : page == .general ? SettingsDesign.Palette.neutralSidebar
                         : page == .about ? SettingsDesign.Palette.aboutSidebar
+                        : page == .license ? SettingsDesign.Palette.licenseSidebar
                         : SettingsDesign.Palette.feedbackSidebar
                     RoundedRectangle(cornerRadius: SettingsDesign.Metrics.sidebarIconRadius, style: .continuous)
                         .fill(tint.gradient)
@@ -612,6 +626,52 @@ private struct SettingsRootView: View {
         .accessibilityLabel(page.title)
     }
 
+}
+
+private struct SidebarStatusCardSurface: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(nsColor: .controlBackgroundColor).opacity(0.75),
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.065)))
+            .padding(.horizontal, SettingsDesign.Metrics.sidebarRowInset)
+    }
+}
+
+private struct SidebarTrialCard: View {
+    @ObservedObject var licensing: LicenseController
+    let openLicense: () -> Void
+
+    var body: some View {
+        if licensing.isPreview && licensing.access.licenseKey == nil {
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                let remaining = Int(ceil(licensing.access.remainingTrial(at: context.date)))
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .top, spacing: 8) {
+                        FeatureIcon(.trial, size: 16)
+                            .foregroundStyle(SettingsDesign.Palette.licenseSidebar)
+                            .frame(width: 28, height: 28)
+                            .background(SettingsDesign.Palette.licenseSidebar.opacity(0.12),
+                                        in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(remaining > 0 ? "Free trial" : "Trial ended")
+                                .font(.system(size: 11, weight: .semibold))
+                            Text(licensing.access.trialTimeLeft(at: context.date))
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Button("View license", action: openLicense)
+                        .buttonStyle(SidebarUpdateButtonStyle())
+                        .modifier(SettingsActionCursor())
+                }
+                .modifier(SidebarStatusCardSurface())
+            }
+        }
+    }
 }
 
 private struct SidebarUpdateButtonStyle: ButtonStyle {
@@ -643,6 +703,78 @@ private struct SidebarUpdateButtonBody: View {
             .onHover { hovered = $0 }
             .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.hoverDuration), value: hovered)
             .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.pressedDuration), value: configuration.isPressed)
+    }
+}
+
+private struct LicenseSettingsView: View {
+    @ObservedObject var licensing: LicenseController
+    @State private var key = ""
+    @State private var confirmingDeactivation = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SettingsDesign.Spacing.cards) {
+            SettingsFeatureHeader(title: "Make Glissform yours",
+                subtitle: "Subtle animations for everyday Mac interactions.")
+                .padding(.bottom, SettingsDesign.Spacing.detail)
+            HStack(spacing: SettingsDesign.Spacing.controls) {
+                CardIconTile(color: .success) { FeatureIcon(.license) }
+                VStack(alignment: .leading, spacing: SettingsDesign.Spacing.detail) {
+                    Text(licensing.status).font(SettingsDesign.Typography.controlTitle)
+                    Text(licensing.access.licenseKey == nil
+                        ? "Pay $2.99 once for lifetime access on this Mac."
+                        : "Lifetime access for this Mac.")
+                        .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: SettingsDesign.Spacing.controls)
+                if licensing.access.licenseKey == nil {
+                    Button("Buy for $2.99") { Task { await licensing.buy() } }
+                        .buttonStyle(FeedbackButtonStyle(kind: .filled))
+                        .fixedSize()
+                        .modifier(SettingsActionCursor(isActionEnabled: !licensing.busy))
+                }
+            }
+            .padding(SettingsDesign.Spacing.mainCardInsets)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .modifier(SettingsCardSurface())
+
+            VStack(alignment: .leading, spacing: 12) {
+                if let savedKey = licensing.access.licenseKey {
+                    Text("License key").font(SettingsDesign.Typography.controlTitle)
+                    Text(savedKey).font(.system(size: 11, design: .monospaced))
+                        .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                    Button("Deactivate this Mac") { confirmingDeactivation = true }
+                        .buttonStyle(FeedbackButtonStyle(kind: .quiet))
+                    Text("Free a device slot before moving Glissform to another Mac.")
+                        .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
+                } else {
+                    Text("Already have a license?").font(SettingsDesign.Typography.controlTitle)
+                    TextField("Paste your license key", text: $key)
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityLabel("License key")
+                        .onSubmit { Task { await licensing.activate(key) } }
+                    Button("Activate this Mac") { Task { await licensing.activate(key) } }
+                        .buttonStyle(FeedbackButtonStyle(kind: .quiet))
+                        .disabled(key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .padding(SettingsDesign.Spacing.mainCardInsets)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .modifier(SettingsCardSurface())
+            if licensing.busy { ProgressView().controlSize(.small).accessibilityLabel("Contacting license service") }
+            if let message = licensing.message {
+                Text(message).font(SettingsDesign.Typography.body)
+                    .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
+            }
+
+        }
+        .disabled(licensing.busy)
+        .padding(SettingsDesign.Spacing.page)
+        .confirmationDialog("Deactivate Glissform on this Mac?", isPresented: $confirmingDeactivation) {
+            Button("Deactivate this Mac", role: .destructive) { Task { await licensing.deactivate() } }
+        } message: {
+            Text("The license slot becomes available for another Mac. An active trial can still be used.")
+        }
     }
 }
 
@@ -1370,7 +1502,7 @@ private struct ScreenAccessCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
-            Button(model.screenCaptureAllowed ? "Manage Access…" : "Open Settings…") {
+            Button(model.screenCaptureAllowed ? "Manage access…" : "Open Settings…") {
                 model.onOpenPermissions?()
             }
             .buttonStyle(FeedbackButtonStyle(kind: .filled)).controlSize(.small)
@@ -1432,7 +1564,7 @@ private struct SendFeedbackView: View {
     private var contactCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: SettingsDesign.Spacing.controls) {
-                CardIconTile(color: .success) { FeatureIcon(.sendFeedback) }
+                CardIconTile(color: .feedback) { FeatureIcon(.sendFeedback) }
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: SettingsDesign.Spacing.detail) {
                     Text("Tell us what's on your mind")
@@ -1513,7 +1645,7 @@ private struct AboutSettingsView: View {
     @ObservedObject var model: SettingsModel
     var body: some View {
             VStack(alignment: .leading, spacing: SettingsDesign.Spacing.groups) {
-                Text("Privacy & About")
+                Text("Privacy & about")
                     .font(SettingsDesign.Typography.pageTitle)
                     .tracking(SettingsDesign.Typography.headlineTracking)
 
@@ -1528,7 +1660,7 @@ private struct AboutSettingsView: View {
                             .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: SettingsDesign.Spacing.controls)
-                    Button("Check for Updates…") { model.checkForUpdates() }
+                    Button("Check for updates…") { model.checkForUpdates() }
                         .buttonStyle(FeedbackButtonStyle(kind: .filled))
                         .fixedSize()
                         .disabled(!model.canCheckForUpdates)
@@ -1551,7 +1683,9 @@ private struct AboutSettingsView: View {
             Text("Private by design.").font(SettingsDesign.Typography.sectionTitle)
             privacyDetail("Only what’s needed.", text: "Uses lid angle and temporary screen images.", symbol: .copy)
             privacyDetail("Kept in memory.", text: "Screen images are released after use, never saved or sent.", symbol: .memory)
-            privacyDetail("No tracking.", text: "No audio capture or analytics. Network access is used for app updates.", symbol: .lock)
+            privacyDetail("No tracking.", text: model.licensing.isPreview
+                ? "No audio capture or analytics. This preview contacts a local license service."
+                : "No audio capture or analytics. Network access is used for app updates.", symbol: .lock)
         }
         .padding(SettingsDesign.Spacing.supportCardInsets)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1559,7 +1693,7 @@ private struct AboutSettingsView: View {
     }
 
     private func privacyDetail(_ title: String, text: String, symbol: IconlySymbol) -> some View {
-        HStack(alignment: .top, spacing: SettingsDesign.Spacing.controls) {
+        HStack(alignment: .center, spacing: SettingsDesign.Spacing.controls) {
             CardIconTile(color: .neutral) {
                 IconlyIcon(symbol, size: 24, isCardIcon: true)
             }

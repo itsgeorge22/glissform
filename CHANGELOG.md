@@ -4,19 +4,31 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+- Make Glissform fully free to use. Disable the licensing preview even with its former launch flag, hide all trial/purchase/license screens and preserve the implementation and saved fixtures for possible future reuse. Align the separate website’s download copy and metadata with free availability. Source publication authorized on 2026-10-03; no new app release is included.
+
 - Remove website brand-logo CSS corner rounding and use transparency-aware shadows in the navbar and footer to eliminate the rectangular corner artifact.
 
 - Move the approved website source into the separate private `glissform-website` repository and verify GitHub Actions production deployment, preserving app downloads and the update feed.
 
 ### Added
 
+- Preserve a currently disabled Dev licensing prototype with an automatic first-launch 72-hour trial, live sidebar countdown with update priority, local simulated $2.99 checkout, saved key activation and a single-device ledger with deactivation. Block and safely cancel effects when preview access ends while keeping Settings and menu access. No payment processor or public paywall is enabled.
+
 - Reveal “A little magic. Every time you close.” behind the website MacBook as its lid lowers. Keep the existing lid motion, camera movement, scroll distance and timing intact. Published to glissform.app on 2026-10-01.
 - Add the Figma Seamless Close website section with one large centred MacBook and no card or stage indicator. Pin the scene while scrolling down physically folds the lid shut, with an eased landing, subtle camera tilt, aluminium back, keyboard deck, contact shadow and coordinated desktop perspective and blur. Keep it closed at the end and reopen only on upward scrolling. Use bundled artwork only, keep the following section below the scene, fit shorter desktop viewports, and show an unpinned still preview for Reduce Motion or unavailable graphics. Published to glissform.app on 2026-10-01.
 
 ### Improved
 
-- Use a consistent 4-point title-to-subtitle gap in the screen-access card and all three Privacy & About notice rows, matching the Send feedback card.
-- Match the Send feedback card's icon and container green to the granted screen-access card in Privacy & About.
+- Standardize Settings copy on sentence case: “Privacy & about”, “Manage access…” and “Check for updates…”. Preserve proper names and native menu command capitalization.
+
+- Use the supplied Time Circle artwork with a green icon and matching 12%-tinted container in the sidebar trial card.
+
+- Show trial time as days left, then whole hours below 24 hours. Limit each preview license to one active Mac and describe the $2.99 purchase as lifetime access for this Mac.
+
+- Match the License page to feature-card insets, title the purchase card “Get Glissform”, put “Buy for $2.99” beside the text, and use the supplied key artwork with green icon surfaces. Remove the manual trial-start action, payment-details footnote and development footer.
+
+- Use a consistent 4-point title-to-subtitle gap in the screen-access card and all three Privacy & about notice rows, matching the Send feedback card.
+- Make Send feedback orange in its sidebar tile and page icon/container, using the same bright orange for the page symbol as the sidebar. Keep License green.
 - Replace the website MacBook’s separate CSS 3D surfaces and wallpaper worker with one WebGL2 scene. Keep the existing shell geometry, 78 unlabeled keycaps, Touch ID, camera notch, materials, lid/camera motion, text reveal and scroll timing. Render the wallpaper into the same GPU context and use depth testing to keep it behind the bezel and opaque lid. Preserve native sticky positioning and an unpinned still fallback. Earlier optimizations did not resolve owner-reported Safari lag. Published to glissform.app on 2026-10-01 after owner approval; the live single-canvas renderer and matching production bundles were verified. Dedicated Safari performance testing of the rewrite remains unverified.
 - Polish website headlines by capitalizing every word, using consistent periods and clearer control descriptions; remove the Seamless Close eyebrow. Give all four everyday-control titles deliberate two-line breaks without isolated final words. Keep feature names as labels and FAQ headings as questions. Published to glissform.app on 2026-10-01.
 - Round the website MacBook’s lower enclosure inward toward its underside, continuing the curve around the front corners and keeping the feet attached to the inset bottom. Published to glissform.app on 2026-10-01.
@@ -24,6 +36,7 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ### Fixed
 
+- Vertically center all three Privacy & about notice text groups beside their icons.
 - Vertically center the Send feedback card's heading and description beside its icon.
 - Correct the upside-down Apple mark on the website MacBook lid. Published to glissform.app on 2026-10-01.
 - Close the white gaps around the website MacBook’s outer lid and between its keyboard deck and front edge with continuous rounded aluminium walls. Soften the bright edge outlines while preserving the scroll motion. Published to glissform.app on 2026-10-01.

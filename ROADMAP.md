@@ -4,7 +4,16 @@ Glissform adds subtle animations and quality-of-life improvements to everyday Ma
 
 New experiences should feel native, have a clear purpose, stay lightweight, and respect privacy and normal system behaviour. This roadmap separates available work, near-term fixes, and feature ideas without committed release dates.
 
-Glissform is a small passion project. The owner's intended price is $1.90, with occasional improvements and new features after launch. Keep release preparation proportional to that scope; broad hardware certification, formal performance studies, and a fixed tester cohort are not prerequisites.
+Glissform is a small, fully free passion project. Payment and licensing work is paused; preserve the existing UI and flows for possible future reuse without exposing or enforcing them. Keep release preparation proportional to that scope; broad hardware certification, formal performance studies, and a fixed tester cohort are not prerequisites.
+
+## Licensing flow — paused, preserved for possible reuse
+
+- [x] Disable all licensing entry points, trial limits and purchase prompts in normal and development launches. Preserve the existing screens, service, assets and test fixtures. Resuming paid development requires a new product decision; the remaining items are deferred, not release requirements.
+
+- [x] Implement an opt-in Dev preview of automatic first-launch trial start/expiry, a sidebar countdown replaced by available updates, key entry, local simulated checkout and one device slot with deactivation. See [licensing preview](docs/LICENSING_PREVIEW.md). No public paywall or real payment integration.
+- [ ] Select an eligible payment provider and verify the $2.99 checkout and seller payout end to end.
+- [ ] Replace development fixtures with production trial records, signed entitlements, hosted activation, verified payment notifications, automatic key delivery, recovery and refund/revocation handling.
+- [ ] Verify the customer flow on physical Macs and publish accurate licensing/privacy terms before enabling a paid release.
 
 ## Public beta — 0.1.0-beta.6
 
@@ -22,7 +31,7 @@ The current priority is improving Seamless Close as the sole available experienc
 - [x] Remove Battery Ripple from the app, including event monitoring, settings and menu controls, previews, dedicated icons, and tests. Included in beta.6; beta.5 and older published builds still include it.
 
 - [ ] Revisit additional animation and quality-of-life experiences after the Seamless Close improvements; deferred.
-- [x] Add sidebar navigation with separate Seamless Close and Privacy & About pages, plus a Send feedback placeholder grouped under More.
+- [x] Add sidebar navigation with separate Seamless Close and Privacy & about pages, plus a Send feedback placeholder grouped under More.
 - [x] Add General as the first page under Features with saved background-running and menu bar icon controls. Background running removes the Dock icon on Settings close even when the menu bar icon is hidden; opening the app again restores Settings.
 - [x] Add a Launch at login control to General, backed by the system login-item status with approval feedback.
 - [x] Replace the Automatic updates placeholder with a switch backed by Sparkle's download and install preference. Keep update checks active in both modes.
@@ -92,7 +101,7 @@ The current priority is improving Seamless Close as the sole available experienc
 
 - [x] By default, hide the Dock icon when Settings closes, keep Seamless Close and menu bar access running, and restore the window and Dock icon when reopened without adding a permission requirement. General allows quitting on close or hiding the menu bar icon; with background running on, the Dock icon hides on close in either case.
 
-- [x] Integrate the centred, inset blue glass-wave icon with distinct light and dark bases plus native clear and tinted appearances. Preserve the same material shading in every style; verify native compilation, all six rendition exports, Finder style changes, and the running app's Privacy & About icon on macOS 27.
+- [x] Integrate the centred, inset blue glass-wave icon with distinct light and dark bases plus native clear and tinted appearances. Preserve the same material shading in every style; verify native compilation, all six rendition exports, Finder style changes, and the running app's Privacy & about icon on macOS 27.
 - [x] Correct the Dock placeholder after resetting the native launch icon and refreshing development bundle registration; the owner confirmed the icon displays correctly.
 - [x] Use a monochrome menu bar template derived from the actual Clear app icon, sharing the Icon Composer source and using the system foreground colour.
 - [ ] Verify the compiler-generated legacy icon on an earlier supported macOS version.
@@ -100,9 +109,9 @@ The current priority is improving Seamless Close as the sole available experienc
 - [x] Bundle interface vectors locally, using supplied feature icons for Seamless Close and Iconly Bold / Regular for supporting controls. Retain Iconly Bulk, Outline, and the previous Custom mix as alternatives with live switching in developer builds.
 
 - [x] Establish shared spacing, typography, surfaces, permission-state colours, and control feedback across settings and About.
-- [x] Add a manual update-check button to the right of the app identity in Privacy & About, using the existing updater and its availability state.
+- [x] Add a manual update-check button to the right of the app identity in Privacy & about, using the existing updater and its availability state.
 
-- [x] Show missing screen access on the main page, briefly confirm detected grants, and keep persistent access status and management in Privacy & About.
+- [x] Show missing screen access on the main page, briefly confirm detected grants, and keep persistent access status and management in Privacy & about.
 
 - [x] Add optional desktop restoration after a still-lid pause, with a persisted toggle and gesture/cancellation regression checks. Its saved wait is independently adjustable from 0.5 to 10 seconds, defaulting to one second.
 - [ ] Physically validate pause-to-resume timing and jitter tolerance during slow movement, lower-angle work, and sleep transitions.
