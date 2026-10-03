@@ -1360,7 +1360,7 @@ private struct ScreenAccessCard: View {
         HStack(alignment: .center, spacing: SettingsDesign.Spacing.cards) {
             ScreenAccessIcon(allowed: model.screenCaptureAllowed)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
+            VStack(alignment: .leading, spacing: SettingsDesign.Spacing.detail) {
                 Text(model.screenCaptureAllowed ? "Screen access allowed" : "Screen access required")
                     .font(SettingsDesign.Typography.controlTitle)
                 Text(model.screenCaptureAllowed
@@ -1431,8 +1431,8 @@ private struct SendFeedbackView: View {
 
     private var contactCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: SettingsDesign.Spacing.controls) {
-                CardIconTile(color: .feedback) { FeatureIcon(.sendFeedback) }
+            HStack(alignment: .center, spacing: SettingsDesign.Spacing.controls) {
+                CardIconTile(color: .success) { FeatureIcon(.sendFeedback) }
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: SettingsDesign.Spacing.detail) {
                     Text("Tell us what's on your mind")
@@ -1564,7 +1564,7 @@ private struct AboutSettingsView: View {
                 IconlyIcon(symbol, size: 24, isCardIcon: true)
             }
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
+            VStack(alignment: .leading, spacing: SettingsDesign.Spacing.detail) {
                 Text(title).font(SettingsDesign.Typography.controlTitle)
                 Text(text).font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

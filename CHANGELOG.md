@@ -15,6 +15,8 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ### Improved
 
+- Use a consistent 4-point title-to-subtitle gap in the screen-access card and all three Privacy & About notice rows, matching the Send feedback card.
+- Match the Send feedback card's icon and container green to the granted screen-access card in Privacy & About.
 - Replace the website MacBook’s separate CSS 3D surfaces and wallpaper worker with one WebGL2 scene. Keep the existing shell geometry, 78 unlabeled keycaps, Touch ID, camera notch, materials, lid/camera motion, text reveal and scroll timing. Render the wallpaper into the same GPU context and use depth testing to keep it behind the bezel and opaque lid. Preserve native sticky positioning and an unpinned still fallback. Earlier optimizations did not resolve owner-reported Safari lag. Published to glissform.app on 2026-10-01 after owner approval; the live single-canvas renderer and matching production bundles were verified. Dedicated Safari performance testing of the rewrite remains unverified.
 - Polish website headlines by capitalizing every word, using consistent periods and clearer control descriptions; remove the Seamless Close eyebrow. Give all four everyday-control titles deliberate two-line breaks without isolated final words. Keep feature names as labels and FAQ headings as questions. Published to glissform.app on 2026-10-01.
 - Round the website MacBook’s lower enclosure inward toward its underside, continuing the curve around the front corners and keeping the feet attached to the inset bottom. Published to glissform.app on 2026-10-01.
@@ -22,6 +24,7 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ### Fixed
 
+- Vertically center the Send feedback card's heading and description beside its icon.
 - Correct the upside-down Apple mark on the website MacBook lid. Published to glissform.app on 2026-10-01.
 - Close the white gaps around the website MacBook’s outer lid and between its keyboard deck and front edge with continuous rounded aluminium walls. Soften the bright edge outlines while preserving the scroll motion. Published to glissform.app on 2026-10-01.
 
