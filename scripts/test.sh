@@ -8,6 +8,10 @@ fi
 APP="build/Glissform Dev.app"
 if [[ "${1:-}" == "--release" ]]; then APP="build/Glissform.app"; fi
 mkdir -p build/tests
+swiftc -swift-version 5 -parse-as-library Sources/Glissform/UsageAnalyticsState.swift Tests/AnalyticsChecks.swift -o build/tests/analytics-checks
+build/tests/analytics-checks
+swiftc -swift-version 5 -parse-as-library Sources/Glissform/UsageAnalyticsState.swift Sources/Glissform/UsageAnalytics.swift Tests/AnalyticsTransportChecks.swift -o build/tests/analytics-transport-checks
+GLISSFORM_ANALYTICS_TEST=1 build/tests/analytics-transport-checks
 swiftc -swift-version 5 -parse-as-library Sources/Glissform/LicenseAccess.swift Sources/Glissform/LicenseController.swift Tests/LicenseChecks.swift -o build/tests/license-checks
 build/tests/license-checks
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s Tests -p 'test_license_preview.py'

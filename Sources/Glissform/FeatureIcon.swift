@@ -15,6 +15,7 @@ enum FeatureSymbol: String, CaseIterable {
     case menuBarIcon = "grid-interface"
     case launchAtLogin = "user"
     case automaticUpdates = "download"
+    case analytics = "chart-circle"
 
     private static let images: [FeatureSymbol: NSImage] = Dictionary(uniqueKeysWithValues: allCases.map { symbol in
         guard let url = AppResource.url(symbol.rawValue, extension: "svg", subdirectory: "FeatureIcons"),

@@ -24,6 +24,12 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 - [x] Resolve [#1: Infinite Screen breaks when switching Spaces with a full-screen app open](https://github.com/itsgeorge22/glissform/issues/1) in code: keep visible pixels in their source Space instead of duplicating them across the transition, then cancel the animation, release input and discard its screenshot when the active Space changes; require reopening above the active starting angle before the next gesture.
 - [x] Owner confirmed normal and full-screen Space changes on the development Mac, with settings open and closed, on 2026-09-26. Issue #1 was already closed after the code fix; this owner check supplied the remaining physical acceptance.
 
+## Optional usage analytics — beta.7 release preparation
+
+- [x] Implement explicit opt-in, withdrawal, daily counts, bounded offline retry and development isolation for PostHog EU. See [event definitions and rollout](docs/ANALYTICS.md).
+- [x] Owner confirmed closing/reopening, reversal, sleep/wake and the analytics choice on 2026-10-15. Website privacy and consent controls are published.
+- [ ] Publish beta.7 and verify production events from an opted-in release installation.
+
 ## Product development
 
 The current priority is improving Seamless Close as the sole available experience in development builds. Other experiences are deferred; the broader product direction remains open.
@@ -190,7 +196,7 @@ A release candidate is a complete proposed stable build. Publish 1.0.0 when thos
 
 ## Further possibilities — not committed
 
-- Lock Screen support for Seamless Close, if a privacy-safe design can be implemented and physically validated. It has no target version or date; the current Settings card says Soon, but no animation plays while the Mac is locked.
+- Lock Screen support for Seamless Close, if a privacy-safe design can be implemented and physically validated. It has no target version or date and is not advertised in Settings; no animation plays while the Mac is locked.
 - Touch ID feedback: a similar ripple spreading from the bottom-right corner with a red haze. Idea only; the exact Touch ID event and feasibility still need to be determined. Not implemented.
 - Broader wake-opening support after the prototype passes timing, privacy, and physical acceptance gates; no first-frame or locked-wake guarantee.
 - Carefully bounded blur, shadow, and motion preferences or presets.

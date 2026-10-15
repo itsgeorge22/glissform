@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let connectionSound: ConnectionSoundPlayback
     private let settingsModel = SettingsModel()
     private var appUpdates: AppUpdates?
+    private var usageAnalytics: UsageAnalytics?
     private var appDisplayName: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Glissform"
     }
@@ -87,6 +88,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        usageAnalytics = UsageAnalytics()
+        settingsModel.syncAnalyticsConsent(usageAnalytics!.state.consent)
+        settingsModel.onAnalyticsChoice = { [weak self] allowed in
+            guard let self else { return }
+            self.usageAnalytics?.choose(allowed)
+            self.settingsModel.syncAnalyticsConsent(self.usageAnalytics!.state.consent)
+        }
+        usageAnalytics?.start()
         UserDefaults.standard.register(defaults: ["animationStartAngle": 90.0, "animationEnabled": true,
                                                   "resumeAfterPause": true,
                                                   "seamlessClosePauseDuration": 1.0,
@@ -656,6 +665,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func presentPreparedSnapshot() {
         guard hasSnapshot, motion.active, !snapshotPresented, captureMayPresent() else { return }
         snapshotPresented = true
+        if !openingGesture { usageAnalytics?.recordClose() }
         // The prepared screenshot retains the Dock and menu bar underneath.
         window?.pinToCurrentSpace()
         window?.level = NSWindow.Level(rawValue: NSWindow.Level.popUpMenu.rawValue + 1)
@@ -840,6 +850,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func suspend() {
         guard !sleeping else { return }
+        usageAnalytics?.checkpoint()
         invalidateCaptureMetadata()
         let retain = screenAccessAllowed() && (canRetainClosingSnapshot
             || (retainedClosingSnapshot && sleepPreparationTimer != nil && recentClosedLid))
@@ -861,6 +872,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard sleeping else { return }
         settingsModel.licensing.refresh()
         sleeping = false
+        usageAnalytics?.tick()
         sensorRestartedAt = Date()
         let hadClosedEvidence = wakeOpening.awaitingWake
         let eligible = settingsModel.licenseAllowsUse && settingsModel.animationEnabled && retainedClosingSnapshot
@@ -1164,6 +1176,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func shutdown() {
         quitting = true
+        usageAnalytics?.stop()
         invalidateCaptureMetadata()
         cancelWake("quit")
         heartbeat?.invalidate()

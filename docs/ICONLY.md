@@ -27,3 +27,7 @@ Swift Package Manager includes the directory as a resource; `scripts/build.sh` c
 Icon artwork remains copyright Iconly / Piqo. The project owner confirmed that their paid license permits this project's public, commercial, and private use. Inclusion here does not grant an independent license to extract, resell, or redistribute Iconly assets. Consult your applicable purchase agreement and [Iconly's licensing guide](https://iconly.pro/pages/licensing-guide) for reuse. This notice does not assign an open-source license to Glissform or its third-party assets.
 
 The original Glissform brand mark and the animated laptop illustration are project artwork, not Iconly assets.
+
+## Owner-supplied card artwork
+
+`Resources/FeatureIcons/chart-circle.svg` contains the Chart circle vector supplied by the owner on 2026-10-15 for the optional usage-statistics card. Its three paths and fill rules are preserved. `FeatureIcon` renders it as a template with the shared card tint, independently of the developer Iconly style selector.

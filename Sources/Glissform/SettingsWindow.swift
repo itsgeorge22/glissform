@@ -69,6 +69,11 @@ final class SettingsModel: ObservableObject {
     var manualUpdateAvailable: Bool { !automaticUpdatesEnabled && availableUpdate != nil }
     var onAutomaticUpdatesEnabledChange: ((Bool) -> Void)?
 
+    @Published private(set) var analyticsConsent: UsageAnalyticsState.Consent = .undecided
+    var onAnalyticsChoice: ((Bool) -> Void)?
+    func syncAnalyticsConsent(_ consent: UsageAnalyticsState.Consent) { analyticsConsent = consent }
+    func chooseAnalytics(_ allowed: Bool) { onAnalyticsChoice?(allowed) }
+
     var onOpenPermissions: (() -> Void)?
 
     func configure(animationEnabled: Bool, startAngle: Double, screenCaptureAllowed: Bool,
@@ -472,6 +477,10 @@ private struct SettingsRootView: View {
                 navigationRow(.foundBug)
                 if model.licensing.isPreview { navigationRow(.license) }
                 Spacer(minLength: 0)
+                if model.analyticsConsent == .undecided {
+                    AnalyticsSidebarCard(model: model)
+                        .padding(.bottom, SettingsDesign.Spacing.detail)
+                }
                 if let update = model.availableUpdate, model.manualUpdateAvailable || model.licensing.isPreview {
                     sidebarUpdateCard(for: update)
                 } else {
@@ -867,9 +876,6 @@ private struct AnimationSettingsView: View {
                 .modifier(SettingsCardSurface())
             blurControls
                 .modifier(SettingsCardSurface())
-            lockScreenSupport
-                .padding(SettingsDesign.Spacing.mainCardInsets)
-                .modifier(SettingsCardSurface())
             Button("Reset to defaults") { model.resetSeamlessCloseToDefaults() }
                 .buttonStyle(FeedbackButtonStyle(kind: .quiet))
                 .disabled(!model.seamlessCloseHasCustomSettings)
@@ -1089,23 +1095,6 @@ private struct AnimationSettingsView: View {
         }
     }
 
-    private var lockScreenSupport: some View {
-        HStack(spacing: SettingsDesign.Spacing.cards) {
-            CardIconTile(color: .neutral) {
-                IconlyIcon(.lock, size: 24)
-            }
-            .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Lock Screen support").font(SettingsDesign.Typography.controlTitle)
-                Text("Play the animation while your Mac is locked.")
-                    .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-            SoonTag()
-        }
-    }
-
     private var automaticAngleControls: some View {
         VStack(spacing: 0) {
             HStack(spacing: SettingsDesign.Spacing.cards) {
@@ -1267,18 +1256,6 @@ private struct GeneralSettingsView: View {
             }
         }
         .padding(SettingsDesign.Spacing.page)
-    }
-}
-
-private struct SoonTag: View {
-    var body: some View {
-        Text("Soon")
-            .font(SettingsDesign.Typography.action)
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.45)))
-            .accessibilityLabel("Coming soon")
     }
 }
 
@@ -1671,6 +1648,7 @@ private struct AboutSettingsView: View {
                 }
                 VStack(spacing: SettingsDesign.Spacing.cards) {
                     privacyCard
+                    AnalyticsSettingsCard(model: model)
                     ScreenAccessCard(model: model)
                 }
 
@@ -1680,12 +1658,10 @@ private struct AboutSettingsView: View {
 
     private var privacyCard: some View {
         VStack(alignment: .leading, spacing: SettingsDesign.Spacing.cardInset) {
-            Text("Private by design.").font(SettingsDesign.Typography.sectionTitle)
-            privacyDetail("Only what’s needed.", text: "Uses lid angle and temporary screen images.", symbol: .copy)
-            privacyDetail("Kept in memory.", text: "Screen images are released after use, never saved or sent.", symbol: .memory)
-            privacyDetail("No tracking.", text: model.licensing.isPreview
-                ? "No audio capture or analytics. This preview contacts a local license service."
-                : "No audio capture or analytics. Network access is used for app updates.", symbol: .lock)
+            Text("Private by design").font(SettingsDesign.Typography.sectionTitle)
+            privacyDetail("Only what’s needed", text: "Uses lid angle and temporary screen images.", symbol: .copy)
+            privacyDetail("Kept in memory", text: "Screen images are released after use, never saved or sent.", symbol: .memory)
+            privacyDetail("Your choice", text: "Usage sharing is optional. Updates connect separately.", symbol: .lock)
         }
         .padding(SettingsDesign.Spacing.supportCardInsets)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1938,5 +1914,75 @@ private final class ThumbFeedbackSliderCell: NSSliderCell {
                             width: diameter, height: diameter)
         NSColor.white.setFill()
         NSBezierPath(ovalIn: circle).fill()
+    }
+}
+
+private enum AnalyticsConsentContent {
+    static let title = "Help improve Glissform"
+    static let detail: LocalizedStringKey = "Optional usage statistics. [Privacy details](https://glissform.app/privacy/)"
+    static let sidebarDetail: LocalizedStringKey = "Usage statistics. [Details](https://glissform.app/privacy/)"
+}
+
+private struct AnalyticsSidebarCard: View {
+    @ObservedObject var model: SettingsModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
+            VStack(alignment: .leading, spacing: SettingsDesign.Spacing.detail) {
+                Text(AnalyticsConsentContent.title)
+                    .font(.system(size: 11, weight: .semibold))
+                Text(AnalyticsConsentContent.sidebarDetail)
+                    .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: SettingsDesign.Spacing.detail) {
+                Button("No thanks") { model.chooseAnalytics(false) }
+                    .buttonStyle(FeedbackButtonStyle(kind: .quiet))
+                    .fixedSize()
+                Button("Allow") { model.chooseAnalytics(true) }
+                    .buttonStyle(SidebarUpdateButtonStyle())
+            }
+            .modifier(SettingsActionCursor())
+        }
+        .modifier(SidebarStatusCardSurface())
+    }
+}
+
+private struct AnalyticsSettingsCard: View {
+    @ObservedObject var model: SettingsModel
+
+    var body: some View {
+        HStack(spacing: SettingsDesign.Spacing.controls) {
+            CardIconTile(color: .feature) {
+                FeatureIcon(.analytics, size: 24)
+            }
+            .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: SettingsDesign.Spacing.detail) {
+                Text(AnalyticsConsentContent.title).font(SettingsDesign.Typography.controlTitle)
+                Text(AnalyticsConsentContent.detail)
+                    .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if model.analyticsConsent == .undecided {
+                HStack(spacing: SettingsDesign.Spacing.detail) {
+                    Button("No thanks") { model.chooseAnalytics(false) }
+                        .buttonStyle(FeedbackButtonStyle(kind: .quiet))
+                    Button("Allow") { model.chooseAnalytics(true) }
+                        .buttonStyle(SidebarUpdateButtonStyle())
+                        .frame(width: 64)
+                }
+                .fixedSize()
+                .modifier(SettingsActionCursor())
+            } else {
+                Toggle("Share usage statistics", isOn: Binding(
+                    get: { model.analyticsConsent == .allowed },
+                    set: { model.chooseAnalytics($0) }))
+                    .labelsHidden().toggleStyle(AppleSwitchStyle())
+            }
+        }
+        .padding(SettingsDesign.Spacing.mainCardInsets)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .modifier(SettingsCardSurface())
     }
 }
