@@ -4,6 +4,8 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+- Clarify analytics documentation: local retry data is cleaned up when the app runs, and PostHog’s one-year reporting window does not guarantee deletion of older data. App behavior is unchanged.
+
 - Remove website brand-logo CSS corner rounding and use transparency-aware shadows in the navbar and footer to eliminate the rectangular corner artifact.
 
 - Move the approved website source into the separate private `glissform-website` repository and verify GitHub Actions production deployment, preserving app downloads and the update feed.
