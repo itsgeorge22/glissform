@@ -10,13 +10,13 @@ Website source and deployment are maintained separately in the private [glissfor
 
 ## Project status
 
-**Public beta (beta.7 release preparation):** [Download Glissform 0.1.0-beta.6](https://glissform.app/downloads/Glissform-0.1.0-beta.6.dmg) from [glissform.app](https://glissform.app/). The source repository is private.
+**Public beta:** [Download Glissform 0.1.0-beta.7](https://glissform.app/downloads/Glissform-0.1.0-beta.7.dmg) from [glissform.app](https://glissform.app/). The source repository is private.
 
 The website presents the same product information on desktop, tablet and phone, with responsive layouts and lightweight fallbacks for the MacBook animation.
 
 Open the DMG and drag Glissform into Applications. The beta is not Apple notarized, so macOS may block first launch; after a blocked attempt, use **System Settings → Privacy & Security → Open Anyway** if you trust the download. See [Apple's instructions](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac). Seamless Close needs Screen Recording permission. Future beta updates are checked through the app; Automatic updates controls whether they download and install automatically. The public DMG and signed update feed are live, while an upgrade against that public feed has not yet been physically verified. Lock Screen animation is not available.
 
-Beta.5 fixes the installed beta.4 crash when closing starts. Beta.4 adds shared connection feedback, refined opening motion, revised defaults and an About update-check button. Beta.3 repairs launch after the beta.2 packaging defect and improves update discovery. Beta.2 added an Esc return for Seamless Close and an email contact page. Beta.1 added signed updates and configurable Seamless Close blur strength. Earlier alpha releases used the name **Infinite Screen** for **Seamless Close**. See the [changelog](CHANGELOG.md) for version-specific changes and ongoing limitations.
+Beta.7 adds optional usage sharing, refines Settings, removes the planned Lock Screen card and keeps Glissform fully free. Beta.5 fixes the installed beta.4 crash when closing starts. Beta.4 adds shared connection feedback, refined opening motion, revised defaults and an About update-check button. Beta.3 repairs launch after the beta.2 packaging defect and improves update discovery. Beta.2 added an Esc return for Seamless Close and an email contact page. Beta.1 added signed updates and configurable Seamless Close blur strength. Earlier alpha releases used the name **Infinite Screen** for **Seamless Close**. See the [changelog](CHANGELOG.md) for version-specific changes and ongoing limitations.
 
 ## Current features
 

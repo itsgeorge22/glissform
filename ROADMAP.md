@@ -15,7 +15,7 @@ Glissform is a small, fully free passion project. Payment and licensing work is 
 - [ ] Replace development fixtures with production trial records, signed entitlements, hosted activation, verified payment notifications, automatic key delivery, recovery and refund/revocation handling.
 - [ ] Verify the customer flow on physical Macs and publish accurate licensing/privacy terms before enabling a paid release.
 
-## Public beta — 0.1.0-beta.6
+## Public beta — 0.1.0-beta.7
 
 The first feature, Seamless Close, implements screenshot-based closing animation with continuous hinge perspective and upper-edge narrowing through the full gesture, steadier adaptive smoothing, optional full-image blur and shadow, awake reversal, cached post-sleep opening, native settings with a configurable starting angle, optional desktop restoration after an adjustable still-lid pause, menu bar controls, and lifecycle cleanup. On 2026-09-21, the owner confirmed correct smoothness, speed, abrupt lid stops, reversals, and opening after sleep without locking on the development Mac. On 2026-09-28, the owner confirmed the revised geometry and Blur on/off during everyday gestures, plus the requested Space and sleep/wake checks. Locked-screen animation remains unavailable. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
 
@@ -24,11 +24,12 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 - [x] Resolve [#1: Infinite Screen breaks when switching Spaces with a full-screen app open](https://github.com/itsgeorge22/glissform/issues/1) in code: keep visible pixels in their source Space instead of duplicating them across the transition, then cancel the animation, release input and discard its screenshot when the active Space changes; require reopening above the active starting angle before the next gesture.
 - [x] Owner confirmed normal and full-screen Space changes on the development Mac, with settings open and closed, on 2026-09-26. Issue #1 was already closed after the code fix; this owner check supplied the remaining physical acceptance.
 
-## Optional usage analytics — beta.7 release preparation
+## Optional usage analytics — beta.7
 
 - [x] Implement explicit opt-in, withdrawal, daily counts, bounded offline retry and development isolation for PostHog EU. See [event definitions and rollout](docs/ANALYTICS.md).
 - [x] Owner confirmed closing/reopening, reversal, sleep/wake and the analytics choice on 2026-10-15. Website privacy and consent controls are published.
-- [ ] Publish beta.7 and verify production events from an opted-in release installation.
+- [x] Publish beta.7 with opt-in app analytics.
+- [ ] Verify production events from an opted-in release installation. An actual beta.6-to-beta.7 Sparkle upgrade still needs verification.
 
 ## Product development
 
