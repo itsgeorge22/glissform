@@ -15,7 +15,7 @@ Glissform is a small, fully free passion project. Payment and licensing work is 
 - [ ] Replace development fixtures with production trial records, signed entitlements, hosted activation, verified payment notifications, automatic key delivery, recovery and refund/revocation handling.
 - [ ] Verify the customer flow on physical Macs and publish accurate licensing/privacy terms before enabling a paid release.
 
-## Public release candidate — 0.1.0-rc.1
+## Public release candidate — 0.1.0-rc.2
 
 The first feature, Seamless Close, implements screenshot-based closing animation with continuous hinge perspective and upper-edge narrowing through the full gesture, steadier adaptive smoothing, optional full-image blur and shadow, awake reversal, cached post-sleep opening, native settings with a configurable starting angle, optional desktop restoration after an adjustable still-lid pause, menu bar controls, and lifecycle cleanup. On 2026-09-21, the owner confirmed correct smoothness, speed, abrupt lid stops, reversals, and opening after sleep without locking on the development Mac. On 2026-09-28, the owner confirmed the revised geometry and Blur on/off during everyday gestures, plus the requested Space and sleep/wake checks. Locked-screen animation remains unavailable. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
 
@@ -37,18 +37,18 @@ The current priority is improving Seamless Close as the app's sole experience.
 
 Seamless Close remains an explicitly chosen motion experience. No reduced-motion replacement or automatic disabling of the effect is planned; existing accessibility behaviour in Settings remains in place.
 
-### Late closing stretch — rc.2 preparation
+### Late closing stretch — rc.2
 
 - [x] Add a gradual increase in vertical stretch below 60° of lid opening, using the existing smoothed fold and preserving flat starts at low angles.
 - [x] Owner reported consistent everyday behaviour after the below-60° adjustment on 2026-10-16.
 
-### Quiet launch at login — rc.2 preparation
+### Quiet launch at login — rc.2
 
 - [x] Recognize macOS login-item launch events and start without opening Settings or retaining a Dock icon. Preserve the saved menu bar preference. Manual launch and explicit reopen select the Seamless Close page, even if another page was previously selected. Defer missing Screen Recording permission prompts until Settings is explicitly opened; keep runtime status available through the existing menu bar.
 - [x] Complete the local build and full regression suite, including synthetic login/manual-launch events, deferred permission prompts and explicit reopen after a quiet launch (2026-10-16).
 - [ ] Verify an actual sign-out/sign-in with Launch at login enabled, including missing screen access and a hidden menu bar icon. Synthetic event checks do not establish real login-session behaviour.
 
-### Automatic closing dead zone — rc.2 preparation
+### Automatic closing dead zone — rc.2
 
 Approved on 2026-10-16. Applies only after automatic detection has learned a resting angle; manual mode and the unlearned **Begin at** fallback remain unchanged.
 
@@ -61,7 +61,7 @@ Approved on 2026-10-16. Applies only after automatic detection has learned a res
 - [x] Pass live overlay verification with both regular and background activation in the revised-input regression run (2026-10-16). The earlier run failed active-Space visibility; no overlay implementation change was made.
 - [x] Owner confirmed consistent everyday behaviour on 2026-10-16. Targeted extremes across the full 1–10° range remain covered by automated checks; broader physical coverage is unverified.
 
-Rc.2 (build 20) publication was authorized on 2026-10-16. Release build, installer and public artifact verification are in progress.
+Rc.2 (build 20) was published on 2026-10-16. Release build, regressions, installer, public artifact and both update-mode checks passed.
 
 ### Connected displays — rc.1
 
@@ -223,14 +223,15 @@ The broader investigations below and above are follow-up work, not a requirement
 - [x] Replace the **Send feedback** placeholder with an email action addressed to support@glissform.app that includes the current app and macOS versions, an icon to copy the address, and concise guidance. The source repository and GitHub forms remain private. The owner confirmed a test email arrived on 2026-09-30.
 - [x] Add Escape to exit an active Seamless Close animation whether **Resume desktop after pause** is on or off, with an always-visible shortcut hint in the first Seamless Close card. A visible image uses the pause feature's fold-to-flat return before releasing its capture; a pending capture is canceled immediately. Reopening above the start angle is required before another gesture. Synthetic checks cover pending and visible captures plus return interruption. On 2026-09-30, the owner confirmed the return with Pause enabled, a fresh close after reopening, and stable card layout when toggling Pause. Broader sleep, Space-change, and quit interruptions remain synthetic-only for this shortcut.
 
-## Release candidate and stable — 0.1.0-rc.1 → 0.1.0
+## Release candidate and stable — 0.1.0-rc.2 → 0.1.0
 
 - [x] Publish rc.1 (build 19) with the approved installer after the full local build/regression suite and owner checks of closing/reopening, sleep/wake and external-display use.
+- [x] Publish rc.2 (build 20), tag `v0.1.0-rc.2` at `caf95b173b260b286184449f6566a84295c71c6b`. Verify the GitHub prerelease and backup assets, public DMG/checksum, signed feed, mounted resources, strict app signature and website download. Full local release build/regressions and owner everyday-use acceptance passed; actual sign-out/sign-in remains pending.
 
 - [x] Owner confirmed consistent everyday use on the development Mac on 2026-10-16; no new blocking failure was reported.
 - [ ] Reassess Developer ID signing and notarization; if the app remains ad-hoc signed, keep the installation warning and permission limitations explicit.
 - [x] Verify rc.1 on GitHub and the public download server: exact tag and commit, prerelease status, DMG/checksum assets, mounted app build 19, installer layout and artwork, strict app signature, and signed public update feed.
-- [ ] Verify an actual beta.7-to-rc.1 Sparkle upgrade and permission state afterward.
+- [x] Verify manual and automatic-on-quit rc.1-to-rc.2 Sparkle upgrades using separate writable copies on the development Mac. Both installed build 20 from the public feed and retained Screen Recording access (2026-10-16). The earlier beta.7-to-rc.1 upgrade remains untested.
 - [ ] Verify installation, upgrade, and removal on supported macOS versions.
 - [ ] Confirm normal desktop access is restored after errors and interruptions.
 - [ ] Finalize privacy documentation, support instructions, and release notes.

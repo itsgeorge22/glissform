@@ -44,7 +44,8 @@ Refine Seamless Close while preserving its familiar appearance and motion smooth
 
 - The owner confirmed consistent everyday behaviour on the development Mac on 2026-10-16. Earlier closing/reopening, sleep/wake and external-display acceptance remains recorded with rc.1. This is not a broader hardware compatibility claim.
 - The release build and full motion, Metal renderer, lifecycle, settings and updater regression suite passed. The local DMG passed integrity, bundle, resource and signature checks; its copied app opened on Seamless Close with Screen Recording access retained on the development Mac.
-- This release candidate remains unnotarized. An actual sign-out/sign-in test of quiet startup and an rc.1-to-rc.2 Sparkle upgrade remain unverified.
+- After publication, both manual and automatic-on-quit Sparkle upgrades from rc.1 to rc.2 passed using separate writable test copies on the development Mac. Both retained Screen Recording access. The published DMG and feed signatures, checksum, mounted bundle and website download were verified.
+- This release candidate remains unnotarized. An actual sign-out/sign-in test of quiet startup remains unverified.
 
 ## 0.1.0-rc.1 — 2026-10-16
 
