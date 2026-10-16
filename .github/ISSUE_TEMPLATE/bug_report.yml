@@ -64,7 +64,8 @@ body:
   attributes:
     label: Gesture and display context
     description: 'If relevant: starting angle, pause setting, sleep/lock, full-screen
-      apps, Space switching, and external displays.'
+      apps, Space switching, and external displays. For display issues, include extended
+      desktop or mirroring, closed-lid use, and the External display support setting if available.'
 - type: textarea
   id: attachments
   attributes:

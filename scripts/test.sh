@@ -8,6 +8,8 @@ fi
 APP="build/Glissform Dev.app"
 if [[ "${1:-}" == "--release" ]]; then APP="build/Glissform.app"; fi
 mkdir -p build/tests
+swiftc -swift-version 5 -parse-as-library Sources/Glissform/DisplayConfiguration.swift Tests/DisplayConfigurationChecks.swift -o build/tests/display-configuration-checks
+build/tests/display-configuration-checks
 swiftc -swift-version 5 -parse-as-library Sources/Glissform/UsageAnalyticsState.swift Tests/AnalyticsChecks.swift -o build/tests/analytics-checks
 build/tests/analytics-checks
 swiftc -swift-version 5 -parse-as-library Sources/Glissform/UsageAnalyticsState.swift Sources/Glissform/UsageAnalytics.swift Tests/AnalyticsTransportChecks.swift -o build/tests/analytics-transport-checks

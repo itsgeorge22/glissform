@@ -102,9 +102,7 @@ struct SettingsDetailSurface: View {
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        LinearGradient(colors: scheme == .dark
-            ? [Color(white: 0.12), Color(white: 0.105)]
-            : [Color(red: 0.985, green: 0.987, blue: 0.995), Color(red: 0.956, green: 0.961, blue: 0.978)],
+        LinearGradient(colors: SettingsDesign.Palette.detailGradient(in: scheme),
             startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 }

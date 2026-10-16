@@ -13,6 +13,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let capture: DesktopScreenshotSource
     private let desktopAvailable: (CGDirectDisplayID) -> Bool
     private let screenAccessAllowed: () -> Bool
+    private let displayConfigurationSource: () -> DisplayConfiguration
+    private var displayConfiguration: DisplayConfiguration
+    private var connectedDisplayConfiguration: DisplayConfiguration?
+    private var displayReconfiguring = false
+    private var displaySettleTimer: Timer?
+    private var displayRearmAngle: Double?
+    private var displayCallbackRegistered = false
     private let connectionSound: ConnectionSoundPlayback
     private let settingsModel = SettingsModel()
     private var appUpdates: AppUpdates?
@@ -79,10 +86,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     init(capture: DesktopScreenshotSource? = nil,
          desktopAvailable: @escaping (CGDirectDisplayID) -> Bool = DesktopAvailability.allowsCapture,
          screenAccessAllowed: @escaping () -> Bool = CGPreflightScreenCaptureAccess,
+         displayConfigurationSource: @escaping () -> DisplayConfiguration = DisplayConfiguration.current,
          connectionSound: ConnectionSoundPlayback? = nil) {
         self.capture = capture ?? DesktopCapture()
         self.desktopAvailable = desktopAvailable
         self.screenAccessAllowed = screenAccessAllowed
+        self.displayConfigurationSource = displayConfigurationSource
+        self.displayConfiguration = displayConfigurationSource()
         self.connectionSound = connectionSound ?? OpeningConnectionSound.shared
         super.init()
     }
@@ -102,6 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                   "seamlessCloseAutomaticAngleDuration": 1.0,
                                                   "seamlessCloseDetectionThreshold": 20.0,
                                                   "seamlessCloseConnectionEffectEnabled": true,
+                                                  "seamlessCloseExternalDisplaySupportEnabled": true,
                                                   "seamlessCloseBlurEnabled": true,
                                                   "seamlessCloseBlurStrength": BlurStrength.defaultStrength.rawValue,
                                                   "automaticStartAngleEnabled": false,
@@ -150,6 +161,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             connectionEffectEnabled: UserDefaults.standard.bool(forKey: "seamlessCloseConnectionEffectEnabled"),
             blurEnabled: UserDefaults.standard.bool(forKey: "seamlessCloseBlurEnabled"),
             blurStrength: BlurStrength(rawValue: UserDefaults.standard.string(forKey: "seamlessCloseBlurStrength") ?? "") ?? .defaultStrength,
+            externalDisplaySupportEnabled: UserDefaults.standard.bool(forKey: "seamlessCloseExternalDisplaySupportEnabled"),
             runInBackground: UserDefaults.standard.bool(forKey: "runInBackground"),
             showMenuBarIcon: UserDefaults.standard.bool(forKey: "showMenuBarIcon")
         )
@@ -185,6 +197,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         settingsModel.onConnectionEffectEnabledChange = { [weak self] enabled in
             self?.applyConnectionEffectEnabled(enabled)
+        }
+        settingsModel.onExternalDisplaySupportChange = { [weak self] enabled in
+            self?.applyExternalDisplaySupport(enabled)
         }
         settingsModel.onBlurEnabledChange = { [weak self] enabled in
             self?.applyBlurEnabled(enabled)
@@ -245,11 +260,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.handleDisplayChange()
             }
         })
+        displayCallbackRegistered = CGDisplayRegisterReconfigurationCallback(
+            Self.displayCallback, Unmanaged.passUnretained(self).toOpaque()) == .success
+        updateDisplayStatus()
         heartbeat = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
             guard let self, !self.quitting else { return }
             self.settingsModel.licensing.refresh()
             guard self.settingsModel.licenseAllowsUse else { return }
+            self.refreshDisplayConfiguration()
             guard self.checkScreenAccess(), !self.sleeping else { return }
             self.settingsModel.refreshPermission()
             self.checkSensorHealth()
@@ -298,7 +317,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setStatus(_ text: String) {
-        let status = settingsModel.licenseAllowsUse ? text : "Trial or license required"
+        let status: String
+        if !settingsModel.licenseAllowsUse { status = "Trial or license required" }
+        else if !settingsModel.animationEnabled { status = "Seamless Close is off" }
+        else { status = displayPauseStatus ?? text }
         statusLine.title = status
         settingsModel.updateRuntimeStatus(status)
     }
@@ -360,6 +382,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         lastLidAngle = angle
         lastLidTime = time
         settingsModel.updateAngle(angle, time: time)
+        guard displayPauseStatus == nil else { setStatus("Ready"); return }
+        // A closed-lid external session never replays the pre-close desktop.
+        // This also covers drivers that keep the internal display online briefly.
+        if displayConfiguration.hasExternalDisplay && angle <= 1 {
+            if displayRearmAngle == nil {
+                cancelDisplayGesture()
+                setStatus("Ready · Reopen the MacBook to use Seamless Close")
+            }
+            return
+        }
+        if let reference = displayRearmAngle {
+            guard angle > reference else {
+                setStatus("Ready · Open above \(Int(reference))° to rearm")
+                return
+            }
+            displayRearmAngle = nil
+            motion.reset()
+        }
         if escapeReturning { return }
         guard settingsModel.animationEnabled else {
             if assistedOpeningPeakAngle != nil {
@@ -486,8 +526,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func connect() {
-        guard !starting, !sleeping, !quitting else { return }
+        guard !starting, !sleeping, !quitting, !displayReconfiguring else { return }
         guard settingsModel.licenseAllowsUse else { return }
+        refreshDisplayConfiguration()
+        guard displayPauseStatus == nil else { setStatus("Ready"); return }
         guard checkScreenAccess() else {
             setStatus("Screen Recording permission required")
             if !permissionRequested {
@@ -536,6 +578,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.displayID = displayID
         displayScale = screen.backingScaleFactor
         displayLayout = currentDisplayLayout()
+        connectedDisplayConfiguration = displayConfiguration
         ready = true
         starting = false
         motion.reset()
@@ -555,6 +598,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return displayID == id && window?.frame == screen.frame
             && displayScale == screen.backingScaleFactor && renderer != nil
             && displayLayout == currentDisplayLayout()
+            && connectedDisplayConfiguration?.hasSameTopology(as: displayConfiguration) == true
     }
 
     private func currentDisplayLayout() -> [DisplayGeometry] {
@@ -566,16 +610,111 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func handleDisplayChange() {
         guard !quitting else { return }
+        let configuration = displayConfigurationSource()
+        let sameTopology = displayConfiguration.hasSameTopology(as: configuration)
+        displayConfiguration = configuration
         invalidateCaptureMetadata()
-        if let screen = builtInScreen(), matchesConnection(screen) {
+        updateDisplayStatus()
+        if !displayReconfiguring, sameTopology,
+           let screen = builtInScreen(), matchesConnection(screen),
+           sleeping || displayPauseStatus == nil {
             if !sleeping, wakeOpening.pending { connect() }
             return
         }
-        if sleeping {
-            cancelWake("display changed during sleep")
-            endGesture()
+        beginDisplayReconfiguration()
+    }
+
+    private var displayPauseStatus: String? {
+        if displayReconfiguring { return "Waiting for the display setup to settle" }
+        return displayConfiguration.pauseReason(supportEnabled: settingsModel.externalDisplaySupportEnabled)?.rawValue
+    }
+
+    private func updateDisplayStatus() {
+        settingsModel.updateExternalDisplayStatus(displayPauseStatus
+            ?? (displayConfiguration.hasExternalDisplay ? "Animation stays on the MacBook display." : nil))
+    }
+
+    private func refreshDisplayConfiguration() {
+        let configuration = displayConfigurationSource()
+        let enabled = settingsModel.externalDisplaySupportEnabled
+        if !configuration.hasSameTopology(as: displayConfiguration)
+            || (!sleeping && configuration.pauseReason(supportEnabled: enabled)
+                != displayConfiguration.pauseReason(supportEnabled: enabled)) {
+            handleDisplayChange()
+        } else {
+            displayConfiguration = configuration
+            updateDisplayStatus()
+        }
+    }
+
+    private func cancelDisplayGesture() {
+        let reference = motion.active ? motion.activationAngle
+            : (motion.effectiveStartAngle ?? settingsModel.startAngle)
+        invalidateCaptureMetadata()
+        cancelWake("display setup changed")
+        endGesture()
+        motion.cancelUntilOpened(above: reference)
+        displayRearmAngle = reference
+    }
+
+    private func beginDisplayReconfiguration() {
+        guard !quitting else { return }
+        if !displayReconfiguring {
+            displayReconfiguring = true
+            cancelDisplayGesture()
+            ready = false
             displayID = nil
-        } else { restart() }
+        }
+        updateDisplayStatus()
+        setStatus("Ready")
+        displaySettleTimer?.invalidate()
+        // Coalesce the per-display callbacks and AppKit's later geometry update.
+        // The next gesture requires a new above-threshold lid sample.
+        let timer = Timer(timeInterval: 0.3, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.finishDisplayReconfiguration() }
+        }
+        displaySettleTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func finishDisplayReconfiguration(connectDisplay: Bool = true) {
+        displaySettleTimer?.invalidate()
+        displaySettleTimer = nil
+        guard !quitting else { return }
+        displayConfiguration = displayConfigurationSource()
+        displayReconfiguring = false
+        updateDisplayStatus()
+        retryAfter = .distantPast
+        if connectDisplay && !sleeping { connect() }
+        setStatus("Ready · Reopen above the starting angle to animate")
+    }
+
+    nonisolated private static let displayCallback: CGDisplayReconfigurationCallBack = { _, flags, context in
+        guard let context else { return }
+        let app = Unmanaged<AppDelegate>.fromOpaque(context).takeUnretainedValue()
+        // CoreGraphics normally calls on the event thread. Preserve immediate
+        // hiding before mirroring begins; marshal other callers to AppKit's thread.
+        if Thread.isMainThread {
+            MainActor.assumeIsolated { app.receiveDisplayCallback(flags) }
+        } else {
+            DispatchQueue.main.async { [weak app] in app?.receiveDisplayCallback(flags) }
+        }
+    }
+
+    private func receiveDisplayCallback(_ flags: CGDisplayChangeSummaryFlags) {
+        guard !quitting else { return }
+        if flags.contains(.beginConfigurationFlag) { beginDisplayReconfiguration() }
+        else { handleDisplayChange() }
+    }
+
+    private func applyExternalDisplaySupport(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: "seamlessCloseExternalDisplaySupportEnabled")
+        displayConfiguration = displayConfigurationSource()
+        if displayConfiguration.hasExternalDisplay || displayPauseStatus != nil {
+            cancelDisplayGesture()
+        }
+        updateDisplayStatus()
+        setStatus("Ready · Close the lid to animate")
     }
 
     @discardableResult private func checkScreenAccess() -> Bool {
@@ -623,7 +762,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     try await capture.prepare(displayID: displayID,
                                               excludingWindowID: CGWindowID(window.windowNumber),
                                               expectedPixelSize: view.drawableSize)
-                    guard !Task.isCancelled, token == snapshotToken, captureMayPresent() else { return }
+                    guard !Task.isCancelled, token == snapshotToken else { return }
+                    guard captureMayPresent() else { discardCapture(); return }
                     let captureStarted = ProcessInfo.processInfo.systemUptime
                     let buffer = try await capture.screenshot(displayID: displayID)
                     if timingEnabled {
@@ -845,14 +985,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var canRetainClosingSnapshot: Bool {
         settingsModel.licenseAllowsUse && settingsModel.animationEnabled && !sessionInactive && !openingGesture && !finishingGesture
+            && mayKeepLaptopOnlySnapshot
             && hasSnapshot && motion.active && recentClosedLid && renderer?.hasPreparedSnapshot == true
+    }
+
+    private var mayKeepLaptopOnlySnapshot: Bool {
+        let current = displayConfigurationSource()
+        return !displayReconfiguring && current.isValid && !current.hasExternalDisplay
+            && current.builtInDisplay != nil && current.builtInDisplay?.isInMirrorSet == false
+            && current.hasSameTopology(as: displayConfiguration)
     }
 
     private func suspend() {
         guard !sleeping else { return }
         usageAnalytics?.checkpoint()
         invalidateCaptureMetadata()
-        let retain = screenAccessAllowed() && (canRetainClosingSnapshot
+        let retain = screenAccessAllowed() && mayKeepLaptopOnlySnapshot && (canRetainClosingSnapshot
             || (retainedClosingSnapshot && sleepPreparationTimer != nil && recentClosedLid))
         clearWakeTracking()
         let sampleAge = ProcessInfo.processInfo.systemUptime - lastLidTime
@@ -876,6 +1024,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         sensorRestartedAt = Date()
         let hadClosedEvidence = wakeOpening.awaitingWake
         let eligible = settingsModel.licenseAllowsUse && settingsModel.animationEnabled && retainedClosingSnapshot
+            && mayKeepLaptopOnlySnapshot
             && renderer?.hasPreparedSnapshot == true && checkScreenAccess()
             && wakeOpening.resume(time: ProcessInfo.processInfo.systemUptime)
         if !eligible { cancelWake("no eligible closing frame"); endGesture() }
@@ -906,7 +1055,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func canUseDesktop() -> Bool {
-        guard settingsModel.licenseAllowsUse, !screenLocked, !sessionInactive, screenAccessAllowed(), let displayID else { return false }
+        guard settingsModel.licenseAllowsUse, !screenLocked, !sessionInactive, screenAccessAllowed(),
+              !displayReconfiguring, displayRearmAngle == nil, let displayID else { return false }
+        let current = displayConfigurationSource()
+        guard current.pauseReason(supportEnabled: settingsModel.externalDisplaySupportEnabled) == nil,
+              current.builtInDisplay?.id == displayID,
+              current.hasSameTopology(as: displayConfiguration) else { return false }
         return desktopAvailable(displayID)
     }
 
@@ -1176,6 +1330,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func shutdown() {
         quitting = true
+        displaySettleTimer?.invalidate()
+        displaySettleTimer = nil
+        if displayCallbackRegistered {
+            CGDisplayRemoveReconfigurationCallback(Self.displayCallback, Unmanaged.passUnretained(self).toOpaque())
+            displayCallbackRegistered = false
+        }
         usageAnalytics?.stop()
         invalidateCaptureMetadata()
         cancelWake("quit")
@@ -1222,6 +1382,7 @@ extension AppDelegate {
                              "resumeAfterPause", "seamlessClosePauseDuration",
                              "seamlessCloseAutomaticAngleDuration", "seamlessCloseDetectionThreshold",
                              "seamlessCloseConnectionEffectEnabled", "seamlessCloseBlurEnabled", "seamlessCloseBlurStrength",
+                             "seamlessCloseExternalDisplaySupportEnabled",
                              "runInBackground", "showMenuBarIcon"].map {
             ($0, UserDefaults.standard.object(forKey: $0))
         }
@@ -1233,7 +1394,12 @@ extension AppDelegate {
         }
         final class SyntheticCapture: DesktopScreenshotSource {
             var pending: CheckedContinuation<CVPixelBuffer, Error>?
+            var holdPreparation = false
+            var pendingPreparation: CheckedContinuation<Void, Never>?
             var count = 0
+            func prepare(displayID: CGDirectDisplayID, excludingWindowID: CGWindowID, expectedPixelSize: CGSize) async throws {
+                if holdPreparation { await withCheckedContinuation { pendingPreparation = $0 } }
+            }
             func screenshot(displayID: CGDirectDisplayID) async throws -> CVPixelBuffer {
                 count += 1
                 return try await withCheckedThrowingContinuation { pending = $0 }
@@ -1302,10 +1468,15 @@ extension AppDelegate {
         func makeGesture(screenAccessAllowed: @escaping () -> Bool = { true },
                          startGesture: Bool = true,
                          resumeAfterPause: Bool = false,
+                         displayConfigurationSource: (() -> DisplayConfiguration)? = nil,
                          playConnectionSound: @escaping @MainActor () -> Void = {}) throws -> (AppDelegate, SyntheticCapture) {
             let source = SyntheticCapture()
             let app = AppDelegate(capture: source, desktopAvailable: { _ in true },
                                   screenAccessAllowed: screenAccessAllowed,
+                                  displayConfigurationSource: displayConfigurationSource ?? { DisplayConfiguration(
+                                      displays: [DisplayConfiguration.Display(id: CGMainDisplayID(), isBuiltIn: true,
+                                          isInMirrorSet: false, mirrorsDisplay: 0, bounds: CGRect(x: 0, y: 0, width: 64, height: 64),
+                                          pixelWidth: 64, pixelHeight: 64, rotation: 0)], builtInIsActive: true) },
                                   connectionSound: SyntheticSound(onPeak: playConnectionSound))
             let window = OverlayWindow(contentRect: NSRect(x: 16, y: 16, width: 64, height: 64))
             let view = MTKView(frame: NSRect(x: 0, y: 0, width: 64, height: 64))
@@ -1318,11 +1489,15 @@ extension AppDelegate {
             app.window = window
             app.renderer = renderer
             app.displayID = CGMainDisplayID()
+            app.connectedDisplayConfiguration = app.displayConfiguration
             app.ready = true
             app.settingsModel.configure(animationEnabled: true, startAngle: 100,
                                         screenCaptureAllowed: true, resumeAfterPause: resumeAfterPause)
             app.settingsModel.onConnectionEffectEnabledChange = { [weak app] enabled in
                 app?.applyConnectionEffectEnabled(enabled)
+            }
+            app.settingsModel.onExternalDisplaySupportChange = { [weak app] enabled in
+                app?.applyExternalDisplaySupport(enabled)
             }
             app.motion.startAngle = 100
             app.motion.resumeAfterPause = resumeAfterPause
@@ -1359,6 +1534,151 @@ extension AppDelegate {
                 try await Task.sleep(nanoseconds: 10_000_000)
             }
             try check(false, "Connection feedback must release mouse access while the glow retreats")
+        }
+
+        // Exercise display policy through the actual capture and renderer lifecycle.
+        func testDisplays(external: Bool = true, mirrored: Bool = false,
+                          builtInActive: Bool = true, monitorX: CGFloat = 64) -> DisplayConfiguration {
+            let builtIn = DisplayConfiguration.Display(id: CGMainDisplayID(), isBuiltIn: true,
+                isInMirrorSet: mirrored, mirrorsDisplay: 0, bounds: CGRect(x: 0, y: 0, width: 64, height: 64),
+                pixelWidth: 64, pixelHeight: 64, rotation: 0)
+            let monitor = DisplayConfiguration.Display(id: UInt32.max, isBuiltIn: false,
+                isInMirrorSet: mirrored, mirrorsDisplay: mirrored ? builtIn.id : 0,
+                bounds: CGRect(x: monitorX, y: 0, width: 64, height: 64), pixelWidth: 64, pixelHeight: 64, rotation: 0)
+            return DisplayConfiguration(displays: external ? [builtIn, monitor] : [builtIn], builtInIsActive: builtInActive)
+        }
+        for visible in [false, true] {
+            for change in ["mirroring", "unplug", "rearrange", "closed display", "support off", "reconfiguration begins", "quit"] {
+                var configuration = testDisplays()
+                let (app, source) = try makeGesture(displayConfigurationSource: { configuration })
+                defer { app.shutdown(); app.window?.close() }
+                try await waitForCapture(source)
+                let pending = app.snapshotTask
+                if visible {
+                    source.pending?.resume(returning: buffer)
+                    source.pending = nil
+                    await pending?.value
+                    try check(app.hasSnapshot && app.displayID == configuration.builtInDisplay?.id,
+                              "Extended mode must prepare its only overlay on the MacBook display")
+                }
+                switch change {
+                case "mirroring": configuration = testDisplays(mirrored: true); app.handleDisplayChange()
+                case "unplug": configuration = testDisplays(external: false); app.handleDisplayChange()
+                case "rearrange": configuration = testDisplays(monitorX: -64); app.handleDisplayChange()
+                case "closed display": configuration = testDisplays(builtInActive: false); app.handleDisplayChange()
+                case "support off": app.settingsModel.setExternalDisplaySupportEnabled(false)
+                case "reconfiguration begins": app.receiveDisplayCallback(.beginConfigurationFlag)
+                default: app.shutdown()
+                }
+                try checkCleared(app)
+                if !visible {
+                    source.pending?.resume(returning: buffer)
+                    source.pending = nil
+                    await pending?.value
+                    try checkCleared(app)
+                }
+                try check(app.escapeHotKey == nil && (app.connectionSound as? SyntheticSound)?.stopped == true,
+                          "Display interruptions must release Esc and stop connection audio")
+                print("PASS: \(change) cancels \(visible ? "visible" : "pending") external-display gesture and late work")
+            }
+        }
+        do {
+            var configuration = testDisplays()
+            let (app, source) = try makeGesture(displayConfigurationSource: { configuration })
+            defer { app.shutdown(); app.window?.close() }
+            try await waitForCapture(source)
+            let pending = app.snapshotTask
+            configuration = testDisplays(mirrored: true) // Before either system notification arrives.
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await pending?.value
+            try checkCleared(app)
+            print("PASS: mirror change between screenshot request and completion cannot reveal captured pixels")
+        }
+        do {
+            var configuration = testDisplays()
+            let (app, source) = try makeGesture(displayConfigurationSource: { configuration })
+            defer { app.shutdown(); app.window?.close() }
+            source.holdPreparation = true
+            let pending = app.snapshotTask
+            for _ in 0..<100 {
+                if source.pendingPreparation != nil { break }
+                try await Task.sleep(nanoseconds: 5_000_000)
+            }
+            try check(source.pendingPreparation != nil, "Metadata preparation must reach the test gate")
+            configuration = testDisplays(mirrored: true)
+            source.pendingPreparation?.resume()
+            source.pendingPreparation = nil
+            await pending?.value
+            try checkCleared(app)
+            try check(source.count == 0, "A display change during metadata lookup must cancel before capturing pixels")
+            print("PASS: mirror change during metadata preparation clears the request without capturing")
+        }
+        do {
+            let configuration = testDisplays()
+            let (app, source) = try makeGesture(displayConfigurationSource: { configuration })
+            defer { app.shutdown(); app.window?.close() }
+            try await waitForCapture(source)
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await app.snapshotTask?.value
+            app.handleLidReading(0)
+            try checkCleared(app)
+            app.handleLidReading(80)
+            try check(source.count == 1 && !app.motion.active, "Closed-lid external use must return directly to live desktop")
+            app.handleLidReading(110)
+            app.handleLidReading(80)
+            try await waitForCapture(source)
+            try check(source.count == 2, "Reopening above the threshold must allow one fresh closing gesture")
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await app.snapshotTask?.value
+            app.handleLidReading(8)
+            app.suspend()
+            try checkCleared(app)
+            try check(!app.wakeOpening.awaitingWake, "External-display sleep must never retain a stale closing image")
+            app.resume(startHardware: false)
+            try check(!app.wakeOpening.pending, "External-display wake must not replay the previous desktop")
+            print("PASS: closed-lid external use and sleep discard the image; a fresh closure works after reopening")
+        }
+        do {
+            var configuration = testDisplays(mirrored: true)
+            let (app, source) = try makeGesture(startGesture: false, displayConfigurationSource: { configuration })
+            defer { app.shutdown(); app.window?.close() }
+            app.updateDisplayStatus()
+            app.handleLidReading(110)
+            app.handleLidReading(80)
+            try check(!app.snapshotRequested && source.count == 0 && app.settingsModel.animationEnabled
+                      && app.settingsModel.externalDisplayStatus == DisplayConfiguration.PauseReason.mirroring.rawValue,
+                      "Mirroring must pause with an explanation without changing the user's enable switch")
+            configuration = testDisplays()
+            app.handleDisplayChange()
+            app.finishDisplayReconfiguration(connectDisplay: false)
+            app.ready = true
+            app.displayID = configuration.builtInDisplay?.id
+            app.handleLidReading(75)
+            try check(!app.snapshotRequested, "Ending mirroring must not start halfway through a gesture")
+            app.handleLidReading(110)
+            app.handleLidReading(80)
+            try await waitForCapture(source)
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await app.snapshotTask?.value
+            app.settingsModel.setExternalDisplaySupportEnabled(false)
+            try checkCleared(app)
+            try check(app.settingsModel.externalDisplayStatus == DisplayConfiguration.PauseReason.externalDisplay.rawValue
+                      && !UserDefaults.standard.bool(forKey: "seamlessCloseExternalDisplaySupportEnabled"),
+                      "Turning support off must persist and explain the external-display pause")
+            let restored = SettingsModel()
+            restored.configure(animationEnabled: true, startAngle: 90, screenCaptureAllowed: true,
+                externalDisplaySupportEnabled: UserDefaults.standard.bool(forKey: "seamlessCloseExternalDisplaySupportEnabled"))
+            try check(!restored.externalDisplaySupportEnabled && restored.seamlessCloseHasCustomSettings,
+                      "The saved external-display preference must restore on launch")
+            app.settingsModel.resetSeamlessCloseToDefaults()
+            try check(app.settingsModel.externalDisplaySupportEnabled
+                      && UserDefaults.standard.bool(forKey: "seamlessCloseExternalDisplaySupportEnabled"),
+                      "Reset must restore external display support and its saved value")
+            print("PASS: mirroring pause, safe rearm, persisted external-display switch and reset")
         }
 
         func waitForCleanup(_ app: AppDelegate) async throws {

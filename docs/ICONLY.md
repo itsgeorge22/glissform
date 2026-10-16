@@ -30,4 +30,6 @@ The original Glissform brand mark and the animated laptop illustration are proje
 
 ## Owner-supplied card artwork
 
+`Resources/FeatureIcons/monitor-display-stand.svg` contains the monitor display stand vector supplied by the owner on 2026-10-16 for Seamless Close's External display support card. Its path and fill rules are preserved. The shared template renderer applies a teal tile (#30B8AC at 12% opacity), a darker teal symbol in Light appearance (#178F85), and a lighter teal symbol in Dark appearance (#68DACD).
+
 `Resources/FeatureIcons/chart-circle.svg` contains the Chart circle vector supplied by the owner on 2026-10-15 for the optional usage-statistics card. Its three paths and fill rules are preserved. `FeatureIcon` renders it as a template with the shared card tint, independently of the developer Iconly style selector.

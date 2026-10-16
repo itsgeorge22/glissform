@@ -1,6 +1,14 @@
 # Implementation notes
 
-Glissform is a macOS app for subtle animations and quality-of-life improvements across everyday interactions. The current source includes Seamless Close, an email feedback page, signed updates, and shared settings, appearance, permission presentation, and menu infrastructure. The lid sensor, capture pipeline, and projection described below belong to Seamless Close; they are not requirements for every future experience.
+Glissform is a macOS app focused on Seamless Close. The current source includes its animation, an email feedback page, signed updates, and shared settings, appearance, permission presentation, and menu infrastructure.
+
+## Connected displays — unreleased
+
+`DisplayConfiguration.swift` reads the online CoreGraphics display list, including mirror followers that AppKit may omit from `NSScreen.screens`. It distinguishes a mirrored built-in display from mirrors involving only external displays. Display IDs, mirror relationships, bounds, backing pixel sizes and rotation form the topology; active/asleep availability is separate so ordinary laptop-only sleep need not invalidate an eligible cached image.
+
+The coordinator saves `seamlessCloseExternalDisplaySupportEnabled` (default true). With support on, an active, unmirrored built-in screen is the only capture/render target; with support off, any online external display pauses the effect. Both the card and menu status explain pauses without mutating `animationEnabled`. CoreGraphics begin-reconfiguration callbacks clear screenshots, pending asynchronous work, overlays, Esc interception and connection feedback. AppKit notifications update geometry; a 300 ms quiet interval coalesces notifications before reconnecting. A separate lid-rearm gate survives sleep and sensor resets, preventing a new mid-gesture capture. Every capture presentation rechecks topology and mirror policy, including before a delayed screenshot can reveal.
+
+A fully closed lid (at most 1°) with an external display clears the image even if the driver has not yet removed the built-in screen. External-display sleep never retains a closing image. Reopening after that session therefore shows the live desktop; awake partial reversals still use the same gesture image. No display configuration, application window placement, system sleep or locked-screen behavior is changed. Synthetic policy and coordinator checks are separate from pending physical display acceptance.
 
 The dormant [licensing prototype](LICENSING_PREVIEW.md) uses `LicenseAccess.swift` for trial state and the `LicenseService` interface, `LicenseController.swift` for local persistence and asynchronous checkout/activation, and a loopback Python/SQLite service for simulated purchases and device slots. `LicenseController.previewsEnabled = false` disables the entry point even for flagged Dev launches: no trial starts, saved trial/key data is ignored and untouched, commerce methods do nothing, and use is unrestricted. Hidden screens and access-cancellation paths remain available for future reuse and isolated regression tests. Production payment verification and entitlement protection remain unimplemented.
 

@@ -2,8 +2,8 @@
 
 ## Scope and product
 
-- The product name is Glissform: a macOS app for subtle animations and quality-of-life improvements across everyday gestures and system changes.
-- Seamless Close is the first available feature. Never describe Glissform itself as only a lid-closing or screen-animation app; distinguish the broader product direction from implemented features.
+- The product name is Glissform: a macOS app focused exclusively on Seamless Close.
+- Improve Seamless Close's animation, controls, setup and reliability. Do not propose or add separate experiences without a new explicit product decision from the owner.
 - Do not announce specific future experiences before the owner approves their disclosure. Keep unimplemented ideas clearly separate from current capabilities.
 - VERSION is the source for the current release; the first public version was 0.1.0-alpha.1.
 - Preserve menu bar access, Seamless Close’s one-screenshot-per-gesture model, normal system sleep, and privacy behaviour unless the user explicitly changes the scope.
@@ -31,7 +31,7 @@ As part of each relevant feature, fix, compatibility finding, product decision, 
 
 - Keep README.md a concise visitor-facing overview. Keep its product description, current features, development/download status, requirements, tested hardware, privacy claims, and feedback links accurate. Keep detailed behaviour in docs/APP_GUIDE.md and update both when shared facts change.
 - Cross-check version claims against VERSION, the corresponding tag, CHANGELOG.md, and actual published GitHub Releases and assets. Clearly distinguish unreleased main-branch work, source-only prereleases, and downloadable app releases. Do not imply a `.dmg` exists until it is published.
-- Review the GitHub About description, website URL, and topics when positioning, availability, or the relevant technology changes. Describe Glissform's broader purpose; do not reduce it to Seamless Close. Use only relevant topics and real, working destination links.
+- Review the GitHub About description, website URL, and topics when positioning, availability, or the relevant technology changes. Describe Glissform's focus on Seamless Close. Use only relevant topics and real, working destination links.
 - Keep CONTRIBUTING.md, the issue chooser, bug/feature/compatibility forms, and pull-request template aligned with current features and support needs. Private GitHub forms are for collaborators only; do not present them as public feedback links. Ask only for useful information and never request serial numbers or credentials.
 - Track actionable bugs and unresolved work in GitHub Issues, not in README bug or limitations lists. Label the README issue-tracker link as private until a public feedback channel exists; record inherent behaviour and compatibility boundaries in the relevant guide or requirements section. Search existing issues before creating a report, link roadmap work to its issue, and do not create speculative or duplicate issues merely to suggest activity.
 - Write issues in a clean, concise, professional style: state the problem directly and add expected behaviour when useful. Do not use third-person attribution such as "the owner reported" for issues submitted on the owner's behalf. Include reproduction steps or environment details only when known and necessary; avoid speculative steps, filler sections, and lengthy investigation checklists.

@@ -1,8 +1,8 @@
 # Roadmap
 
-Glissform adds subtle animations and quality-of-life improvements to everyday Mac interactions. The product is intended to grow into a cohesive collection of useful visual experiences for familiar gestures and system changes. Seamless Close is the first available feature, not the boundary of the app.
+Glissform is focused exclusively on Seamless Close and improvements to its motion, controls, setup and reliability. Separate experiences are outside the current product scope.
 
-New experiences should feel native, have a clear purpose, stay lightweight, and respect privacy and normal system behaviour. This roadmap separates available work, near-term fixes, and feature ideas without committed release dates.
+Seamless Close improvements should feel native, stay lightweight, and respect privacy and normal system behaviour. This roadmap separates available work, near-term fixes, and ideas without committed release dates.
 
 Glissform is a small, fully free passion project. Payment and licensing work is paused; preserve the existing UI and flows for possible future reuse without exposing or enforcing them. Keep release preparation proportional to that scope; broad hardware certification, formal performance studies, and a fixed tester cohort are not prerequisites.
 
@@ -33,11 +33,20 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 
 ## Product development
 
-The current priority is improving Seamless Close as the sole available experience in development builds. Other experiences are deferred; the broader product direction remains open.
+The current priority is improving Seamless Close as the app's sole experience.
+
+### Connected displays — unreleased
+
+- [x] Add the saved External display support switch, default on, with a teal monitor-stand icon, automatic pause explanations and reset support.
+- [x] Keep extended-desktop effects on the MacBook, pause when its display is mirrored, and pause for any external display when support is off. Detect mirror followers through the online display list rather than relying only on AppKit screens.
+- [x] Cancel and release captures, overlays and feedback during display changes; resume only after settling and reopening above the starting angle. Skip cached opening after closed-lid external-display use, preserving the laptop-only wake path.
+- [x] Pass the local build and full regression suite, including display-policy and synthetic capture/lifecycle scenarios. Visually verify the new card in the running Dev app. These checks do not replace physical monitor testing.
+- [ ] Physically verify extended desktop with the external monitor as main display, both mirroring directions, closed-lid work and reopening, connection/disconnection during closing, resolution/arrangement changes, and pause/resume with the switch off/on. Automated checks do not establish hardware compatibility.
+
+### Existing work
 
 - [x] Remove Battery Ripple from the app, including event monitoring, settings and menu controls, previews, dedicated icons, and tests. Included in beta.6; beta.5 and older published builds still include it.
 
-- [ ] Revisit additional animation and quality-of-life experiences after the Seamless Close improvements; deferred.
 - [x] Add sidebar navigation with separate Seamless Close and Privacy & about pages, plus a Send feedback placeholder grouped under More.
 - [x] Add General as the first page under Features with saved background-running and menu bar icon controls. Background running removes the Dock icon on Settings close even when the menu bar icon is hidden; opening the app again restores Settings.
 - [x] Add a Launch at login control to General, backed by the system login-item status with approval feedback.
@@ -198,12 +207,10 @@ A release candidate is a complete proposed stable build. Publish 1.0.0 when thos
 ## Further possibilities — not committed
 
 - Lock Screen support for Seamless Close, if a privacy-safe design can be implemented and physically validated. It has no target version or date and is not advertised in Settings; no animation plays while the Mac is locked.
-- Touch ID feedback: a similar ripple spreading from the bottom-right corner with a red haze. Idea only; the exact Touch ID event and feasibility still need to be determined. Not implemented.
 - Broader wake-opening support after the prototype passes timing, privacy, and physical acceptance gates; no first-frame or locked-wake guarantee.
 - Carefully bounded blur, shadow, and motion preferences or presets.
 - Accessibility options and behavior that respects reduced-motion preferences.
 - Broader hardware support and calibration for different viewing angles.
-- Other visual feedback and transitions for everyday Mac interactions, where they add clarity or enjoyment and can be delivered reliably.
 - Additional distribution channels after platform requirements are assessed.
 
 ## Version policy

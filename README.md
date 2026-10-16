@@ -1,8 +1,8 @@
 # Glissform
 
-Subtle animations and quality-of-life improvements for everyday interactions on your Mac.
+Seamless Close for your MacBook.
 
-**Seamless Close is the currently available feature:** your desktop appears to stay in place as you close your MacBook lid, with perspective, frost, and shadow responding to the movement. Glissform is designed to grow into a collection of useful experiences.
+Your desktop appears to stay in place as you close your MacBook lid, with perspective, frost, and shadow responding to the movement. Glissform focuses on improving Seamless Close, its controls, and its reliability.
 
 [Website](https://glissform.app/) · [Roadmap](ROADMAP.md)
 
@@ -19,6 +19,8 @@ Open the DMG and drag Glissform into Applications. The beta is not Apple notariz
 Beta.7 adds optional usage sharing, refines Settings, removes the planned Lock Screen card and keeps Glissform fully free. Beta.5 fixes the installed beta.4 crash when closing starts. Beta.4 adds shared connection feedback, refined opening motion, revised defaults and an About update-check button. Beta.3 repairs launch after the beta.2 packaging defect and improves update discovery. Beta.2 added an Esc return for Seamless Close and an email contact page. Beta.1 added signed updates and configurable Seamless Close blur strength. Earlier alpha releases used the name **Infinite Screen** for **Seamless Close**. See the [changelog](CHANGELOG.md) for version-specific changes and ongoing limitations.
 
 ## Current features
+
+**Unreleased development work:** one **External display support** switch adapts Seamless Close to connected displays. It defaults to on: extended desktops animate only on the MacBook, mirroring the MacBook pauses the effect, and display changes clear the screenshot. Turning it off pauses Seamless Close whenever another display is connected. Reopening after closed-lid external-display use shows the live desktop without replaying an old image. These changes are not in the published beta.7; physical external-display acceptance is pending. See the [display guide](docs/APP_GUIDE.md#connected-displays--unreleased).
 
 - Experience a lid-driven desktop animation with a continuous perspective fold, an upper edge that narrows throughout closure, optional High, Regular, or Subtle blur (Regular by default), and shadow.
 - Reverse the effect by reopening the lid, including experimental opening after lid-close sleep using the same screenshot. The visible image can finish the final 5° automatically, carrying its visible motion and recent lid pace into a soft landing, with a soft inner edge glow that spreads inward, blooms with the contact click, and softly fades over the live desktop. A short click marks that connection. One **Connection effect** switch controls the glow and click together, defaults to on, and preserves the desktop return when off. Pause and Esc show the same glow only during the final 5° of their visible return, with the click scheduled to peak with the glow’s brightness pulse. Audio is prepared during the gesture and adjusted for the selected output’s reported delay; physical alignment on Bluetooth remains subject to device timing.

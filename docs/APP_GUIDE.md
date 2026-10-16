@@ -1,8 +1,8 @@
 # Glissform app guide
 
-Glissform brings subtle animations and quality-of-life improvements to everyday interactions on your Mac. It is designed to make familiar gestures and system changes feel more expressive, clear, and enjoyable.
+Glissform focuses on Seamless Close, making MacBook lid movement feel more continuous through a responsive desktop animation.
 
-**Seamless Close is its currently available feature:** your desktop appears to stay in place as you close your MacBook lid, with perspective, blur, and shadow responding to the movement. Glissform’s scope extends beyond this effect; additional experiences will be introduced as they are designed and validated.
+Your desktop appears to stay in place as you close your MacBook lid, with perspective, blur, and shadow responding to the movement. Development is focused on this effect and its usability and reliability.
 
 **Public beta: 0.1.0-beta.7.** This beta adds optional usage sharing, refines Settings, removes the planned Lock Screen card and keeps Glissform fully free. It retains beta.6’s focused Seamless Close settings and quick-opening connection feedback. It retains the beta.5 installed-build crash fix, updated defaults and a manual update check in About. The [versioned DMG and installation instructions](https://glissform.app/) are on the project website. The app uses a signed update feed there; an upgrade through the public feed still needs physical verification. Development testing uses a MacBook Air M5 15-inch; wider compatibility is still being evaluated.
 
@@ -17,6 +17,23 @@ Beta.6 removes Battery Ripple and its associated controls, monitoring, previews,
 [Changelog](../CHANGELOG.md) · [Roadmap](../ROADMAP.md) · [Contributing](../CONTRIBUTING.md)
 
 ## Current implementation — Seamless Close
+
+### Connected displays — unreleased
+
+These controls are in the development build, not the published beta.7. **External display support** is enabled by default and saved between launches. Reset to defaults turns it back on.
+
+| Setup | Behavior |
+| --- | --- |
+| MacBook alone | Normal Seamless Close behavior, with the switch on or off. |
+| Extended desktop, support on | Only the built-in MacBook screen animates, including when the external display is the main display. |
+| MacBook display mirrored | Automatically paused, whichever display is the mirror source. Mirroring only external displays leaves an independent MacBook display eligible. |
+| External display connected, support off | Paused until support is enabled or the external display is disconnected. |
+| Closed-lid external-display use | The closing effect ends when the built-in screen becomes unavailable or the lid fully closes. Its screenshot is discarded; reopening shows the current desktop. |
+| Displays connected, removed, rearranged or reconfigured | Cancel the effect and pending screenshot, release mouse access and connection feedback, and wait for the setup to settle. Reopen above the starting angle before the next closing gesture. |
+
+The card and menu bar explain automatic pauses without switching off Seamless Close itself. Sleep with an external display also discards the closing image, so there is no cached opening animation in that setup. Laptop-only cached opening remains experimental. Glissform does not change display modes, rearrange application windows, force closed-lid operation, or prevent sleep. Physical monitor, dock and mirroring acceptance is still pending.
+
+### Motion and controls
 
 - Takes one screenshot per closing attempt. A fast downward movement may request it just before your chosen lid angle; the image remains hidden until that angle is crossed. No continuous screen recording or idle capture.
 - Animates that same image through closing, pauses, and eligible reopening, including after lid-close sleep.
@@ -87,9 +104,9 @@ Select a page in the sidebar to open its settings. General comes first in Featur
 
 The refreshed interface uses rounded page titles, small selected sidebar tabs with equal padding, saturated sidebar icon tiles, subtle page icon tiles, and separate neutral cards. Native window controls sit over the continuous sidebar material in a unified toolbar window. All four corners are rounded, with a fine outline and faint, diffuse shadow, without a titlebar separator. The detail surface stays opaque. Live Dark appearance, earlier-macOS appearance, and accessibility fallbacks still need final visual verification. See [the design system](DESIGN_SYSTEM.md) and [reference study](DESIGN_REFERENCES.md).
 
-Remaining supporting interface icons use Iconly Bold / Regular, bundled locally as vectors. The General sidebar uses the supplied Setting icon; its background-running, menu-bar, login, and Automatic updates cards use the supplied checked-window, grid-interface, user, and download icons. The Seamless Close sidebar and enable card use the supplied monitor icon; automatic starting-angle detection uses the supplied scan-object icon with a muted violet symbol and tile, distinct from Seamless Close’s softened #258DEB blue. Connection effect uses its four-corner icon with an orange tile and a darker orange symbol in Light appearance or a lighter orange symbol in Dark appearance. Blur uses the supplied raindrop icon with a light-blue symbol and tile. Privacy & about’s sidebar tile uses softened red (#ED6258). Send feedback uses the supplied messages icon with an orange (#FF9500) sidebar tile and matching tinted card container; its symbol uses the same bright orange as the sidebar. The hidden licensing prototype retains its green sidebar and success-green page icon/container for future reuse. No icon downloads or account connection are needed at runtime. The previous Outline, Bulk, and Custom Iconly sets remain available for developer comparisons. The screen-access icon is green with a check when allowed and amber with an attention mark when permission is required.
+Remaining supporting interface icons use Iconly Bold / Regular, bundled locally as vectors. The General sidebar uses the supplied Setting icon; its background-running, menu-bar, login, and Automatic updates cards use the supplied checked-window, grid-interface, user, and download icons. The Seamless Close sidebar and enable card use the supplied monitor icon; automatic detection uses the scan-object icon, Connection effect its four-corner icon, and Blur the raindrop icon. In the unreleased colour update, shared palette values match the website: blue (#0073FF) for Seamless Close; purple (#A079DD) for automatic detection; teal (#35B4AF) for Blur and External display support; orange (#F39A43) for Connection effect, feedback and permission attention; and green (#30D158) for pause and granted access. Light appearance retains stronger detection and permission symbols. General uses grey icons and containers, including its sidebar tile. Privacy & about keeps its red (#ED6258) sidebar tile; its three privacy-information items use grey symbols and containers. Sidebar glyphs remain white. The Esc key stays neutral. The hidden licensing prototype reuses success green. No icon downloads or account connection are needed at runtime. The previous Outline, Bulk, and Custom Iconly sets remain available for developer comparisons. Permission status always includes text and a distinct icon.
 
-Interactive controls retain hover, pressed, focus, and disabled states. The existing capsule switches use the system accent and expose their state through native toggle accessibility. Angle and wait-time fields show a light neutral hover; editable angle fields show an accent outline while editing. The angle number and raised degree symbol share one rounded field with up/down arrows on the left. Each arrow has its own hit area, stays inside the rounded field, and supports holding to repeat. Blur strength hover darkens only its image; the accent outline still indicates selection. Disabled controls do not react to hover.
+Interactive controls retain hover, pressed, focus, and disabled states. The capsule switches use the shared primary blue and expose their state through native toggle accessibility. Angle and wait-time fields show a light neutral hover; editable angle fields show an accent outline while editing. The angle number and raised degree symbol share one rounded field with up/down arrows on the left. Each arrow has its own hit area, stays inside the rounded field, and supports holding to repeat. Blur strength hover darkens only its image; the accent outline still indicates selection. Disabled controls do not react to hover.
 
 ## Privacy and system behavior
 

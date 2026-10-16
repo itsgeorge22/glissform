@@ -1,6 +1,20 @@
 # Testing
 
-Glissform’s feature-specific checks cover Seamless Close’s motion, capture, rendering, and lifecycle. Shared UI checks cover settings, permissions, and appearance. Add appropriate behavioural, interruption, accessibility, and performance checks as new experiences are implemented; passing the lid-animation suite is not validation of a different feature.
+Glissform’s checks cover Seamless Close’s motion, capture, rendering, display handling, and lifecycle. Shared UI checks cover settings, permissions, and appearance.
+
+## Connected displays — unreleased
+
+`DisplayConfigurationChecks.swift` covers standalone and extended desktops, either built-in mirroring role, external-only mirrors, a missing/inactive built-in display, query failure, and topology changes without treating sleep alone as a layout change. Lifecycle checks use synthetic display configurations with the real coordinator and renderer: pending and visible cancellation on mirror/unplug/rearrange/closed-display/toggle changes and quit, late screenshot rejection before notification delivery, closed-lid and sleep image release, rearming, saved preference restoration and reset. These run in the standard suite; policy checks also run in CI's motion-only mode.
+
+Physical acceptance remains pending. On the development Mac, check:
+
+- Extended desktop with the external monitor as main display: animate only the MacBook and keep the external desktop usable; partially reopen to reverse the same image.
+- Mirror the MacBook in both directions: explain the automatic pause and show no folding image on the external display. Stop mirroring and reopen above the starting angle before a fresh close.
+- Close fully, continue work on the external display, and reopen: show the current live desktop without the earlier screenshot. Repeat with sleep, lock and wake.
+- Connect/disconnect a monitor or dock and change arrangement, resolution or mirroring during a pending/visible gesture and assisted return: release the overlay, input interception and feedback, then allow a fresh gesture after reopening.
+- Disable support while a monitor is connected; verify pause, relaunch persistence and reset. Disconnect while support is off and confirm normal laptop-only use resumes after rearming.
+
+Record the actual Mac, macOS, display/dock and setup tested; do not infer support for untested equipment. Existing laptop-only reversal, sleep, display change and quit checks still apply.
 
 ## Automated
 

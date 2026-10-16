@@ -45,6 +45,9 @@ final class SettingsModel: ObservableObject {
     var onPauseDurationChange: ((Double) -> Void)?
     @Published private(set) var connectionEffectEnabled = true
     var onConnectionEffectEnabledChange: ((Bool) -> Void)?
+    @Published private(set) var externalDisplaySupportEnabled = true
+    @Published private(set) var externalDisplayStatus: String?
+    var onExternalDisplaySupportChange: ((Bool) -> Void)?
     @Published private(set) var blurEnabled = true
     var onBlurEnabledChange: ((Bool) -> Void)?
     @Published private(set) var blurStrength: BlurStrength = .defaultStrength
@@ -81,6 +84,7 @@ final class SettingsModel: ObservableObject {
                    pauseDuration: Double = 1, automaticAngleDuration: Double = 1,
                    automaticDetectionThreshold: Double = 20,
                    connectionEffectEnabled: Bool = true, blurEnabled: Bool = true, blurStrength: BlurStrength = .defaultStrength,
+                   externalDisplaySupportEnabled: Bool = true,
                    runInBackground: Bool = true, showMenuBarIcon: Bool = true) {
         self.animationEnabled = animationEnabled
         self.startAngle = startAngle
@@ -91,6 +95,7 @@ final class SettingsModel: ObservableObject {
         self.pauseDuration = ClosingMotion.validStillDuration(pauseDuration)
         self.automaticAngleDuration = ClosingMotion.validStillDuration(automaticAngleDuration)
         self.connectionEffectEnabled = connectionEffectEnabled
+        self.externalDisplaySupportEnabled = externalDisplaySupportEnabled
         self.blurEnabled = blurEnabled
         self.blurStrength = blurStrength
         self.runInBackground = runInBackground
@@ -199,6 +204,16 @@ final class SettingsModel: ObservableObject {
         onConnectionEffectEnabledChange?(enabled)
     }
 
+    func setExternalDisplaySupportEnabled(_ enabled: Bool) {
+        guard externalDisplaySupportEnabled != enabled else { return }
+        externalDisplaySupportEnabled = enabled
+        onExternalDisplaySupportChange?(enabled)
+    }
+
+    func updateExternalDisplayStatus(_ status: String?) {
+        if externalDisplayStatus != status { externalDisplayStatus = status }
+    }
+
     func setBlurEnabled(_ enabled: Bool) {
         guard blurEnabled != enabled else { return }
         blurEnabled = enabled
@@ -215,7 +230,7 @@ final class SettingsModel: ObservableObject {
         !animationEnabled || startAngle != 90 || automaticStartAngle
             || automaticDetectionThreshold != 20 || automaticAngleDuration != 1
             || !resumeAfterPause || pauseDuration != 1 || !connectionEffectEnabled || !blurEnabled
-            || blurStrength != .defaultStrength
+            || blurStrength != .defaultStrength || !externalDisplaySupportEnabled
     }
 
     func resetSeamlessCloseToDefaults() {
@@ -226,6 +241,7 @@ final class SettingsModel: ObservableObject {
         setResumeAfterPause(true)
         setPauseDuration(1)
         setConnectionEffectEnabled(true)
+        setExternalDisplaySupportEnabled(true)
         setBlurEnabled(true)
         setBlurStrength(.defaultStrength)
         setAnimationEnabled(true)
@@ -525,6 +541,8 @@ private struct SettingsRootView: View {
             .background(SettingsDetailSurface())
         }
         .frame(width: SettingsDesign.Metrics.windowWidth, height: layout.height, alignment: .topLeading)
+        .tint(SettingsDesign.Palette.primaryBlue)
+        .accentColor(SettingsDesign.Palette.primaryBlue)
         .background(SettingsWindowMaterial().ignoresSafeArea())
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -566,9 +584,9 @@ private struct SettingsRootView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 8) {
                 FeatureIcon(.automaticUpdates, size: 16)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(SettingsDesign.Palette.primaryBlue)
                     .frame(width: 28, height: 28)
-                    .background(Color.accentColor.opacity(0.12),
+                    .background(SettingsDesign.Palette.primaryBlue.opacity(SettingsDesign.Palette.iconTileOpacity),
                                 in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
@@ -603,11 +621,11 @@ private struct SettingsRootView: View {
                     case .license: FeatureIcon(.license, size: 17)
                     }
                 }
-                .foregroundStyle(.white)
+                .foregroundStyle(SettingsDesign.Palette.onAccent)
                 .frame(width: 28, height: 28)
                 .background {
                     let tint = page == .infiniteScreen ? SettingsDesign.Palette.feature
-                        : page == .general ? SettingsDesign.Palette.neutralSidebar
+                        : page == .general ? SettingsDesign.Palette.generalSidebar
                         : page == .about ? SettingsDesign.Palette.aboutSidebar
                         : page == .license ? SettingsDesign.Palette.licenseSidebar
                         : SettingsDesign.Palette.feedbackSidebar
@@ -663,7 +681,7 @@ private struct SidebarTrialCard: View {
                         FeatureIcon(.trial, size: 16)
                             .foregroundStyle(SettingsDesign.Palette.licenseSidebar)
                             .frame(width: 28, height: 28)
-                            .background(SettingsDesign.Palette.licenseSidebar.opacity(0.12),
+                            .background(SettingsDesign.Palette.licenseSidebar.opacity(SettingsDesign.Palette.iconTileOpacity),
                                         in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                         VStack(alignment: .leading, spacing: 2) {
                             Text(remaining > 0 ? "Free trial" : "Trial ended")
@@ -697,17 +715,12 @@ private struct SidebarUpdateButtonBody: View {
     var body: some View {
         configuration.label
             .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(SettingsDesign.Palette.onAccent)
             .frame(maxWidth: .infinity)
             .frame(height: 27)
-            .background(Color.accentColor,
+            .background(configuration.isPressed ? SettingsDesign.Palette.primaryPressed
+                        : hovered ? SettingsDesign.Palette.primaryHover : SettingsDesign.Palette.primaryBlue,
                         in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(configuration.isPressed ? Color.black.opacity(0.14)
-                          : Color.white.opacity(hovered ? 0.10 : 0))
-                    .allowsHitTesting(false)
-            }
             .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
             .onHover { hovered = $0 }
             .animation(reduceMotion ? nil : .easeOut(duration: SettingsDesign.Feedback.hoverDuration), value: hovered)
@@ -876,6 +889,8 @@ private struct AnimationSettingsView: View {
                 .modifier(SettingsCardSurface())
             blurControls
                 .modifier(SettingsCardSurface())
+            externalDisplayControls
+                .modifier(SettingsCardSurface())
             Button("Reset to defaults") { model.resetSeamlessCloseToDefaults() }
                 .buttonStyle(FeedbackButtonStyle(kind: .quiet))
                 .disabled(!model.seamlessCloseHasCustomSettings)
@@ -1026,6 +1041,29 @@ private struct AnimationSettingsView: View {
         }
     }
 
+    private var externalDisplayControls: some View {
+        VStack(spacing: 0) {
+            FeatureToggleRow(title: "External display support",
+                             detail: "Adapt Seamless Close when other displays are connected.",
+                             color: .externalDisplay,
+                             isEnabled: Binding(get: { model.externalDisplaySupportEnabled },
+                                                set: { model.setExternalDisplaySupportEnabled($0) })) {
+                FeatureIcon(.externalDisplay)
+            }
+            .padding(SettingsDesign.Spacing.mainCardInsets)
+            .help("When on, animate only the MacBook display and pause while it is mirrored. When off, pause whenever an external display is connected.")
+            if let status = model.externalDisplayStatus {
+                Rectangle().fill(SettingsDesign.Palette.cardBorder).frame(height: 1)
+                Text(status)
+                    .font(SettingsDesign.Typography.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(SettingsDesign.Spacing.supportCardInsets)
+            }
+        }
+    }
+
     private var blurControls: some View {
         VStack(spacing: 0) {
             HStack(spacing: SettingsDesign.Spacing.cards) {
@@ -1070,7 +1108,7 @@ private struct AnimationSettingsView: View {
                                 .overlay {
                                     if model.blurStrength == strength {
                                         RoundedRectangle(cornerRadius: SettingsDesign.Radius.icon)
-                                            .strokeBorder(Color.accentColor, lineWidth: 2)
+                                            .strokeBorder(SettingsDesign.Palette.primaryBlue, lineWidth: 2)
                                     }
                                 }
                                 .accessibilityHidden(true)
@@ -1231,8 +1269,9 @@ private struct GeneralSettingsView: View {
 
             if model.isDevelopmentBuild {
                 HStack(spacing: SettingsDesign.Spacing.controls) {
-                    FeatureIcon(.automaticUpdates)
-                        .frame(width: SettingsDesign.Metrics.iconSize, height: SettingsDesign.Metrics.iconSize)
+                    CardIconTile(color: .neutral) {
+                        FeatureIcon(.automaticUpdates)
+                    }
                     VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
                         Text("Updates disabled in Dev")
                             .font(SettingsDesign.Typography.sectionTitle)
@@ -1437,7 +1476,7 @@ private struct CardIconTile<Content: View>: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: SettingsDesign.Radius.icon, style: .continuous)
-                .fill(color.tile.opacity(0.12))
+                .fill(color.tile.opacity(SettingsDesign.Palette.iconTileOpacity))
             content.foregroundStyle(color.symbol(in: colorScheme))
         }
         .frame(width: SettingsDesign.Metrics.iconSize, height: SettingsDesign.Metrics.iconSize)
@@ -1446,7 +1485,7 @@ private struct CardIconTile<Content: View>: View {
 
 private struct PauseFeatureIcon: View {
     var body: some View {
-        CardIconTile(color: .success) {
+        CardIconTile(color: .pause) {
             IconlyIcon(.pause, size: 24, isCardIcon: true)
         }
     }
@@ -1703,12 +1742,13 @@ private struct FeedbackButtonBody: View {
     let configuration: ButtonStyleConfiguration
     let kind: FeedbackButtonStyle.Kind
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var hover = HoverState()
 
     private var isPressed: Bool { isEnabled && configuration.isPressed }
     private var isHovered: Bool { isEnabled && hover.isHovered }
-    private var tint: Color { kind == .link ? .accentColor : .primary }
+    private var tint: Color { kind == .link ? SettingsDesign.Palette.link(in: colorScheme) : .primary }
 
     var body: some View {
         configuration.label
@@ -1829,7 +1869,7 @@ private struct SwitchFeedbackBody: View {
 
     var body: some View {
         Capsule()
-            .fill(isOn ? Color.accentColor : SettingsDesign.Palette.switchOff)
+            .fill(isOn ? SettingsDesign.Palette.primaryBlue : SettingsDesign.Palette.switchOff)
             .overlay {
                 Capsule().fill(isEnabled && isPressed ? Color.black.opacity(0.14) : Color.white.opacity(isEnabled && hover.isHovered ? 0.1 : 0))
             }
@@ -1858,6 +1898,7 @@ private struct AngleSlider: NSViewRepresentable {
     func makeNSView(context: Context) -> ThumbFeedbackSlider {
         let slider = ThumbFeedbackSlider()
         slider.cell = ThumbFeedbackSliderCell()
+        slider.trackFillColor = NSColor(SettingsDesign.Palette.primaryBlue)
         slider.minValue = 20
         slider.maxValue = 130
         slider.isContinuous = true
@@ -1925,6 +1966,7 @@ private enum AnalyticsConsentContent {
 
 private struct AnalyticsSidebarCard: View {
     @ObservedObject var model: SettingsModel
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
@@ -1932,6 +1974,7 @@ private struct AnalyticsSidebarCard: View {
                 Text(AnalyticsConsentContent.title)
                     .font(.system(size: 11, weight: .semibold))
                 Text(AnalyticsConsentContent.sidebarDetail)
+                    .tint(SettingsDesign.Palette.link(in: colorScheme))
                     .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -1950,6 +1993,7 @@ private struct AnalyticsSidebarCard: View {
 
 private struct AnalyticsSettingsCard: View {
     @ObservedObject var model: SettingsModel
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         HStack(spacing: SettingsDesign.Spacing.controls) {
@@ -1960,6 +2004,7 @@ private struct AnalyticsSettingsCard: View {
             VStack(alignment: .leading, spacing: SettingsDesign.Spacing.detail) {
                 Text(AnalyticsConsentContent.title).font(SettingsDesign.Typography.controlTitle)
                 Text(AnalyticsConsentContent.detail)
+                    .tint(SettingsDesign.Palette.link(in: colorScheme))
                     .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

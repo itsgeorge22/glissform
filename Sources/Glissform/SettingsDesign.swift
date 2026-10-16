@@ -43,50 +43,92 @@ enum SettingsDesign {
     }
 
     enum Palette {
+        // Shared sRGB accents from the website's _colors.scss and _feature-palette.scss.
+        // Keep app surfaces adaptive; website illustration backgrounds are separate.
+        private static let primaryHex: UInt32 = 0x0073FF
+        static let primaryBlue = srgb(primaryHex)
+        static let primaryStrong = srgb(0x0068DF)
+        static let primaryHover = srgb(primaryHex, shade: 0.10)
+        static let primaryPressed = srgb(primaryHex, shade: 0.20)
+        static let automaticAngle = srgb(0xA079DD)
+        static let automaticAngleStrong = srgb(0x8653CC)
+        static let blur = srgb(0x35B4AF)
+        static let connectionEffect = srgb(0xF39A43)
+        static let connectionStrong = srgb(0x96613C)
+        static let success = srgb(0x30D158)
+        // The existing permission symbol remains stronger on light app surfaces.
+        static let successStrong = srgb(0x2AB84D)
+
+        static let feature = primaryBlue
+        static let generalSidebar = neutral
+        static let aboutSidebar = srgb(0xED6258)
+        static let feedbackSidebar = connectionEffect
+        static let licenseSidebar = success
+        static let externalDisplay = blur
+        static let pause = success
+        static let attention = connectionEffect
+        static let onAccent = Color.white
+        static let iconTileOpacity = 0.12
+
         static let background = Color(nsColor: .windowBackgroundColor)
         static let card = Color(nsColor: .controlBackgroundColor)
         static let cardBorder = Color.primary.opacity(0.065)
         static let field = Color.primary.opacity(0.045)
-        static let focus = Color.accentColor.opacity(0.65)
+        static let focus = primaryBlue.opacity(0.65)
         static let switchOff = Color(nsColor: .tertiaryLabelColor)
-        static let feature = Color(red: 0x25 / 255, green: 0x8D / 255, blue: 0xEB / 255)
-        static let neutralSidebar = Color.gray
-        static let aboutSidebar = Color(red: 0xED / 255, green: 0x62 / 255, blue: 0x58 / 255)
-        static let licenseSidebar = Color(red: 0x4B / 255, green: 0xC7 / 255, blue: 0x6B / 255)
-        static let feedbackSidebar = Color(red: 1, green: 0x95 / 255, blue: 0)
-        static let success = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
-        static let attention = Color(red: 1, green: 159 / 255, blue: 10 / 255)
+        static let neutral = Color.gray
+        private static let detailLight = [Color(red: 0.985, green: 0.987, blue: 0.995),
+                                          Color(red: 0.956, green: 0.961, blue: 0.978)]
+        private static let detailDark = [Color(white: 0.12), Color(white: 0.105)]
+
+        static func detailGradient(in scheme: ColorScheme) -> [Color] {
+            scheme == .dark ? detailDark : detailLight
+        }
+
+        static func link(in scheme: ColorScheme) -> Color {
+            scheme == .light ? primaryStrong : primaryBlue
+        }
+
+        // Shade in sRGB to match the website's color-mix(..., black 10% / 20%).
+        private static func srgb(_ hex: UInt32, shade: Double = 0) -> Color {
+            let scale = (1 - shade) / 255
+            return Color(.sRGB, red: Double((hex >> 16) & 0xFF) * scale,
+                         green: Double((hex >> 8) & 0xFF) * scale,
+                         blue: Double(hex & 0xFF) * scale, opacity: 1)
+        }
         enum CardIconColor {
-            case feature, automaticAngle, connectionEffect, blur, feedback, success, attention, neutral
+            case feature, automaticAngle, connectionEffect, externalDisplay, blur, pause, feedback, success, attention, neutral
 
             var tile: Color {
                 switch self {
                 case .feature: return Palette.feature
-                case .connectionEffect: return Color(red: 1, green: 0x95 / 255, blue: 0)
-                case .automaticAngle: return Color(red: 0xAD / 255, green: 0x91 / 255, blue: 0xDC / 255)
-                case .blur: return Color(red: 0x70 / 255, green: 0xB9 / 255, blue: 0xEE / 255)
+                case .connectionEffect: return Palette.connectionEffect
+                case .externalDisplay: return Palette.externalDisplay
+                case .automaticAngle: return Palette.automaticAngle
+                case .blur: return Palette.blur
+                case .pause: return Palette.pause
                 case .feedback: return Palette.feedbackSidebar
                 case .success: return Palette.success
                 case .attention: return Palette.attention
-                case .neutral: return Color.gray
+                case .neutral: return Palette.neutral
                 }
             }
 
             func symbol(in scheme: ColorScheme) -> Color {
                 switch (self, scheme) {
-                case (.connectionEffect, .light): return Color(red: 0xD9 / 255, green: 0x77 / 255, blue: 0x06 / 255)
-                case (.automaticAngle, .light): return Color(red: 0x86 / 255, green: 0x63 / 255, blue: 0xC7 / 255)
-                case (.blur, .light): return Color(red: 0x3B / 255, green: 0x94 / 255, blue: 0xD0 / 255)
-                case (.success, .light): return Color(red: 0x2A / 255, green: 0xB8 / 255, blue: 0x4D / 255)
-                case (.attention, .light): return Color(red: 0xE0 / 255, green: 0x8C / 255, blue: 0x09 / 255)
+                case (.automaticAngle, .light): return Palette.automaticAngleStrong
+                case (.pause, .light), (.success, .light): return Palette.successStrong
+                case (.attention, .light): return Palette.connectionStrong
                 case (.feature, _): return Palette.feature
-                case (.connectionEffect, _): return Color(red: 1, green: 0xB3 / 255, blue: 0x40 / 255)
-                case (.automaticAngle, _): return Color(red: 0xC2 / 255, green: 0xA6 / 255, blue: 0xED / 255)
+                case (.connectionEffect, _): return Palette.connectionEffect
+                case (.externalDisplay, _): return Palette.externalDisplay
+                case (.automaticAngle, _): return Palette.automaticAngle
                 case (.feedback, _): return Palette.feedbackSidebar
-                case (.blur, _): return Color(red: 0x8C / 255, green: 0xCE / 255, blue: 0xFF / 255)
+                case (.blur, _): return Palette.blur
+                case (.pause, _): return Palette.pause
                 case (.success, _): return Palette.success
                 case (.attention, _): return Palette.attention
-                case (.neutral, _): return .secondary
+                case (.neutral, _): return Palette.neutral
                 }
             }
         }
