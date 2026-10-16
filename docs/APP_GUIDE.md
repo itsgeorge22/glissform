@@ -31,7 +31,7 @@ These controls are in the 0.1.0-rc.1 candidate source, not the published beta.7.
 | Closed-lid external-display use | The closing effect ends when the built-in screen becomes unavailable or the lid fully closes. Its screenshot is discarded; reopening shows the current desktop. |
 | Displays connected, removed, rearranged or reconfigured | Cancel the effect and pending screenshot, release mouse access and connection feedback, and wait for the setup to settle. Reopen above the starting angle before the next closing gesture. |
 
-The card and menu bar explain automatic pauses without switching off Seamless Close itself. Sleep with an external display also discards the closing image, so there is no cached opening animation in that setup. Laptop-only cached opening remains experimental. Glissform does not change display modes, rearrange application windows, force closed-lid operation, or prevent sleep. Physical monitor, dock and mirroring acceptance is still pending.
+The card and menu bar explain automatic pauses without switching off Seamless Close itself. Sleep with an external display also discards the closing image, so there is no cached opening animation in that setup. Laptop-only cached opening remains experimental. Glissform does not change display modes, rearrange application windows, force closed-lid operation, or prevent sleep. The owner confirmed successful external-display use, closing/reopening and sleep/wake on the development Mac on 2026-10-16. Broader monitor, dock and mirroring combinations remain unverified.
 
 ### Motion and controls
 

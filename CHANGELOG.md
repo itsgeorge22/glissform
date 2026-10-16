@@ -45,7 +45,7 @@ First release candidate for Glissform 0.1.0, focused on Seamless Close.
 
 ### Validation and limitations
 
-- Release build, full local regression suite, and local DMG integrity, resource, version and strict signature checks passed. Physical closing/reopening, sleep/wake and external-display acceptance for this candidate remain pending. Automated checks do not establish hardware compatibility.
+- Release build, full local regression suite, and local DMG integrity, resource, version and strict signature checks passed. The owner confirmed successful closing/reopening, sleep/wake and external-display use on the development Mac on 2026-10-16. Broader monitor, dock and mirroring combinations remain unverified.
 - This release candidate remains unnotarized. An actual beta.7-to-rc.1 Sparkle upgrade and production analytics delivery from a release installation remain unverified.
 
 ## 0.1.0-beta.7 — 2026-10-15

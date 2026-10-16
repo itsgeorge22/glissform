@@ -41,7 +41,8 @@ The current priority is improving Seamless Close as the app's sole experience.
 - [x] Keep extended-desktop effects on the MacBook, pause when its display is mirrored, and pause for any external display when support is off. Detect mirror followers through the online display list rather than relying only on AppKit screens.
 - [x] Cancel and release captures, overlays and feedback during display changes; resume only after settling and reopening above the starting angle. Skip cached opening after closed-lid external-display use, preserving the laptop-only wake path.
 - [x] Pass the local build and full regression suite, including display-policy and synthetic capture/lifecycle scenarios. Visually verify the new card in the running Dev app. These checks do not replace physical monitor testing.
-- [ ] Physically verify extended desktop with the external monitor as main display, both mirroring directions, closed-lid work and reopening, connection/disconnection during closing, resolution/arrangement changes, and pause/resume with the switch off/on. Automated checks do not establish hardware compatibility.
+- [x] Owner confirmed closing/reopening, sleep/wake and external-display use on the development Mac on 2026-10-16.
+- [ ] Broaden physical coverage to extended desktop with the external monitor as main display, both mirroring directions, closed-lid work and reopening, connection/disconnection during closing, resolution/arrangement changes, and pause/resume with the switch off/on. Automated checks do not establish hardware compatibility.
 
 ### Existing work
 
