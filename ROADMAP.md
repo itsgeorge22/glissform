@@ -37,13 +37,18 @@ The current priority is improving Seamless Close as the app's sole experience.
 
 Seamless Close remains an explicitly chosen motion experience. No reduced-motion replacement or automatic disabling of the effect is planned; existing accessibility behaviour in Settings remains in place.
 
-### Quiet launch at login — unreleased
+### Late closing stretch — rc.2 preparation
+
+- [x] Add a gradual increase in vertical stretch below 60° of lid opening, using the existing smoothed fold and preserving flat starts at low angles.
+- [x] Owner reported consistent everyday behaviour after the below-60° adjustment on 2026-10-16.
+
+### Quiet launch at login — rc.2 preparation
 
 - [x] Recognize macOS login-item launch events and start without opening Settings or retaining a Dock icon. Preserve the saved menu bar preference. Manual launch and explicit reopen select the Seamless Close page, even if another page was previously selected. Defer missing Screen Recording permission prompts until Settings is explicitly opened; keep runtime status available through the existing menu bar.
 - [x] Complete the local build and full regression suite, including synthetic login/manual-launch events, deferred permission prompts and explicit reopen after a quiet launch (2026-10-16).
 - [ ] Verify an actual sign-out/sign-in with Launch at login enabled, including missing screen access and a hidden menu bar icon. Synthetic event checks do not establish real login-session behaviour.
 
-### Automatic closing dead zone — unreleased
+### Automatic closing dead zone — rc.2 preparation
 
 Approved on 2026-10-16. Applies only after automatic detection has learned a resting angle; manual mode and the unlearned **Begin at** fallback remain unchanged.
 
@@ -54,9 +59,9 @@ Approved on 2026-10-16. Applies only after automatic detection has learned a res
 - [x] Complete the local build, motion/default-equivalence checks, settings persistence/reset checks and synthetic lifecycle suite, including capture cancellation and cached opening. Verified the revised field’s placement, typed-value commit, immediate activation-angle update and decrease arrow in the development app; restored 1° afterward (2026-10-16).
 - [x] Pass the revised-input build and full regression suite, including immediate retargeting, return to flat, resuming the same screenshot and cached opening (2026-10-16).
 - [x] Pass live overlay verification with both regular and background activation in the revised-input regression run (2026-10-16). The earlier run failed active-Space visibility; no overlay implementation change was made.
-- [ ] Physically compare the default 1° with the previous feel, then check larger values, slow/fast entry, pause, reversal and sleep/wake before release. Automated checks do not establish physical smoothness.
+- [x] Owner confirmed consistent everyday behaviour on 2026-10-16. Targeted extremes across the full 1–10° range remain covered by automated checks; broader physical coverage is unverified.
 
-This work remains local and unpublished. GitHub tracking/publication is pending authorization.
+Rc.2 (build 20) publication was authorized on 2026-10-16. Release build, installer and public artifact verification are in progress.
 
 ### Connected displays — rc.1
 
@@ -222,7 +227,7 @@ The broader investigations below and above are follow-up work, not a requirement
 
 - [x] Publish rc.1 (build 19) with the approved installer after the full local build/regression suite and owner checks of closing/reopening, sleep/wake and external-display use.
 
-- [ ] Confirm everyday use on the documented tested configuration, with no known release-blocking failures.
+- [x] Owner confirmed consistent everyday use on the development Mac on 2026-10-16; no new blocking failure was reported.
 - [ ] Reassess Developer ID signing and notarization; if the app remains ad-hoc signed, keep the installation warning and permission limitations explicit.
 - [x] Verify rc.1 on GitHub and the public download server: exact tag and commit, prerelease status, DMG/checksum assets, mounted app build 19, installer layout and artwork, strict app signature, and signed public update feed.
 - [ ] Verify an actual beta.7-to-rc.1 Sparkle upgrade and permission state afterward.

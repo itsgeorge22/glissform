@@ -474,6 +474,35 @@ import Foundation
         precondition(widthAt4 > 0.545 && widthAt4 < 0.555,
                      "Default-length closure must retain its intended final width")
         print("PASS: one continuous geometry response, bounded vertical stretch and late top narrowing")
+        for reference in [20.0, 45, 60, 85, 105, 130] {
+            precondition(ScreenProjection.imageRadians(for: 0, referenceAngle: reference) == 0,
+                         "Late stretch must preserve identity even with a low starting angle")
+            var previous: Float = 0
+            for lid in stride(from: reference - 0.25, through: 4, by: -0.25) {
+                let fold = ScreenProjection.foldRadians(lidAngle: lid, referenceAngle: reference)
+                let original = ScreenProjection.imageRadians(for: fold)
+                let revised = ScreenProjection.imageRadians(for: fold, referenceAngle: reference)
+                if lid >= 60 {
+                    precondition(revised == original, "Projection above 60° must be unchanged")
+                } else {
+                    precondition(revised > original, "Closing below 60° must add stretch")
+                }
+                precondition(revised > previous && revised - original <= 3.001 * radians,
+                             "Late stretch must stay continuous, monotonic and bounded")
+                let depth = sin(revised)
+                let top = (4 * cos(revised) - 1.1 * depth) / (4 - depth)
+                precondition(top > 0.39, "Deep closure must retain enough source image")
+                previous = revised
+            }
+            if reference >= 60 {
+                let boundary = ScreenProjection.foldRadians(lidAngle: 60, referenceAngle: reference)
+                let step = 0.01 * radians
+                let delta = ScreenProjection.imageRadians(for: boundary + step, referenceAngle: reference)
+                    - ScreenProjection.imageRadians(for: boundary + step)
+                precondition(abs(delta) < 0.000001, "Stretch must enter gently at 60°")
+            }
+        }
+        print("PASS: modest stretch below 60°, unchanged early projection and flat low-angle starts")
         var handoff = HandoffTransition()
         handoff.begin(from: 0)
         precondition(handoff.step(toward: 1, elapsed: 0) == 0, "Entrance starts at the unchanged image")

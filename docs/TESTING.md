@@ -239,3 +239,7 @@ The local release build and mounted installer passed version/build, signature an
 - Physical lid feel, final glow/click alignment, beta.5-to-beta.6 Sparkle upgrade and wider hardware compatibility remain unverified.
 
 - The public installer and feed signatures were verified against the app’s embedded Ed25519 public key. Website deployment `24457e0` is live, links beta.6 and no longer advertises Battery Ripple; unrelated work in the primary website checkout was preserved.
+
+## Rc.2 release preparation — 2026-10-16
+
+The owner reported consistent everyday behaviour after the dead-zone, quiet-startup and below-60° stretch work. This confirms everyday use on the development Mac, not each possible configuration. Targeted sign-out/sign-in behaviour and an actual rc.1-to-rc.2 Sparkle upgrade remain separate checks. `bash scripts/build.sh --release` and `bash scripts/test.sh --release` passed for build 20. The local DMG passed integrity, version, release identity, updater configuration, nested-resource, artwork, Applications shortcut and deep signature checks. A fresh copied app opened on Seamless Close, showed rc.2 in Privacy & about, and retained Screen Recording access on the development Mac. Public installer, feed and upgrade checks follow publication.

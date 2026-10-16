@@ -33,6 +33,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
     private var screenBlurMask: CIImage?
     private var sourceNeedsFiltering = true
     private var foldRadians: Float = 0
+    private var projectionReferenceAngle = 90.0
     private var fullClosureRadians: Float = 1
     private var smoothing = MotionSmoothing()
     private var lastDrawTime: TimeInterval?
@@ -263,6 +264,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
                      sampleTime: Double = ProcessInfo.processInfo.systemUptime) {
         guard angle.isFinite, referenceAngle.isFinite else { return }
         self.sampleTime = sampleTime
+        projectionReferenceAngle = referenceAngle
         fullClosureRadians = ScreenProjection.foldRadians(lidAngle: 4, referenceAngle: referenceAngle)
         let next = ScreenProjection.foldRadians(lidAngle: angle, referenceAngle: referenceAngle)
         smoothing.ingest(target: next, at: sampleTime)
@@ -812,7 +814,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             encoder.setFragmentBytes(&frost, length: MemoryLayout<Float>.stride, index: 1)
             var eye = SIMD2<Float>(ScreenProjection.eyeDistance, ScreenProjection.eyeHeight)
             encoder.setFragmentBytes(&eye, length: MemoryLayout<SIMD2<Float>>.stride, index: 2)
-            var imageShape = SIMD2<Float>(ScreenProjection.imageRadians(for: visibleAngle),
+            var imageShape = SIMD2<Float>(ScreenProjection.imageRadians(for: visibleAngle, referenceAngle: projectionReferenceAngle),
                                           ScreenProjection.topWidth(for: visibleAngle))
             encoder.setFragmentBytes(&imageShape, length: MemoryLayout<SIMD2<Float>>.stride, index: 5)
             var dither = ditherScale
@@ -1014,7 +1016,7 @@ final class EffectRenderer: NSObject, MTKViewDelegate, CAMetalDisplayLinkDelegat
             }
             if frost == 0 {
                 let physicalAngle = Float(amount) * 80 * .pi / 180
-                let theta = Double(ScreenProjection.imageRadians(for: physicalAngle))
+                let theta = Double(ScreenProjection.imageRadians(for: physicalAngle, referenceAngle: reference))
                 for (x, y) in [(17, 19), (911, 23), (29, 563), (901, 557), (340, 230), (620, 390)] {
                     // Independent ray/plane intersection in screen-height units.
                     let heightFromHinge = 1 - (Double(y) + 0.5) / Double(height)

@@ -25,6 +25,20 @@ enum ScreenProjection {
         return residual * positiveFold + (1 - residual) * softCap
     }
 
+    /// Add a modest late stretch below a 60° lid opening, using the displayed
+    /// fold so closing, reversal and animated returns share the same smoothing.
+    /// Subtract the starting contribution to keep low-angle starts flat.
+    static func imageRadians(for fold: Float, referenceAngle: Double) -> Float {
+        func lateStretch(at lid: Float) -> Float {
+            let t = min(1, max(0, (60 - lid) / 56))
+            return t * t * (3 - 2 * t)
+        }
+        let reference = Float(referenceAngle)
+        let lid = reference - max(0, fold) * 180 / .pi
+        let extra = lateStretch(at: lid) - lateStretch(at: reference)
+        return imageRadians(for: fold) + (3 * .pi / 180) * max(0, extra)
+    }
+
     /// Begin narrowing the upper edge immediately. This nearly matches the
     /// projected top source height from the middle onward, while allowing a
     /// stronger first response than the source-height curve alone provides.
