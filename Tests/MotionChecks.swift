@@ -917,6 +917,18 @@ import Foundation
         precondition(lowerThreshold.learnedStartAngle == 89,
                      "Setting Detect above to zero must allow learning below the previous threshold")
 
+        var defaultThreshold = ClosingMotion()
+        defaultThreshold.startAngle = 90
+        defaultThreshold.automaticStartAngle = true
+        for frame in 0...25 { _ = defaultThreshold.update(angle: 45, time: Double(frame) / 20) }
+        precondition(defaultThreshold.learnedStartAngle == nil,
+                     "The default must not learn at or below 45 degrees")
+        for frame in 26...51 { _ = defaultThreshold.update(angle: 46, time: Double(frame) / 20) }
+        precondition(defaultThreshold.learnedStartAngle == 45,
+                     "The default must allow learning strictly above 45 degrees")
+        precondition(ClosingMotion.validDetectionThreshold(20) == 20,
+                     "An existing saved 20-degree preference must remain valid")
+
         var higherThreshold = ClosingMotion()
         higherThreshold.startAngle = 100
         higherThreshold.automaticDetectionThreshold = 120
@@ -927,7 +939,7 @@ import Foundation
         for frame in 26...47 { _ = higherThreshold.update(angle: 125, time: Double(frame) / 20) }
         precondition(higherThreshold.learnedStartAngle == 124,
                      "Holding above a higher threshold must learn the new angle")
-        precondition(ClosingMotion.validDetectionThreshold(.nan) == 20
+        precondition(ClosingMotion.validDetectionThreshold(.nan) == 45
                      && ClosingMotion.validDetectionThreshold(0) == 0
                      && ClosingMotion.validDetectionThreshold(5) == 20
                      && ClosingMotion.validDetectionThreshold(150) == 130,

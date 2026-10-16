@@ -31,3 +31,7 @@ The menu bar uses a monochrome template derived from the ClearDark export of thi
 ## Blur preview wallpaper
 
 `BlurPreviewWallpaper.png` is a 960 × 600 centered crop of the wallpaper image supplied for the Seamless Close blur previews. It is a source asset, not a desktop screenshot or an app-bundled image. The app bundles only the three rendered High, Regular, and Subtle previews generated from it at a 42° fold.
+
+## Installer window
+
+`Installer/Starfield.png` preserves the owner's supplied background. `Installer/layout.json` defines the 720 × 400 artwork, window frame allowance, icon positions, copy and 60% arrow opacity. `scripts/render-dmg-background.swift` renders the wallpaper, heading, instructions and curved arrow at 1× and 2×; packaging combines them into one Retina-aware TIFF inside the DMG. Finder supplies the real draggable Glissform app, Applications shortcut and their labels. White 20-point-high capsules with fully rounded ends sit behind both native labels, sized to each filename with 8-point horizontal padding. Their vertical placement centers the visible native text. Finder owns filename rendering and uses black labels over custom backgrounds; white labels in the concept preview are not supported by Finder. The wallpaper is not bundled into the app.

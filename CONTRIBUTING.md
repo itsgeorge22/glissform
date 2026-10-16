@@ -1,6 +1,6 @@
 # Contributing to Glissform
 
-Glissform is an early-stage macOS app for subtle animations and quality-of-life improvements. Seamless Close is its first feature; the product is designed to grow beyond it. The source repository and its issue tracker are private. No open-source license has been selected yet.
+Glissform is a macOS app focused exclusively on Seamless Close and improvements to its animation, controls, setup and reliability. The source repository and its issue tracker are private. No open-source license has been selected yet.
 
 ## Report an issue
 

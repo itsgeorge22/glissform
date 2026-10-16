@@ -110,7 +110,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                   "resumeAfterPause": true,
                                                   "seamlessClosePauseDuration": 1.0,
                                                   "seamlessCloseAutomaticAngleDuration": 1.0,
-                                                  "seamlessCloseDetectionThreshold": 20.0,
+                                                  "seamlessCloseDetectionThreshold": ClosingMotion.defaultDetectionThreshold,
                                                   "seamlessCloseConnectionEffectEnabled": true,
                                                   "seamlessCloseExternalDisplaySupportEnabled": true,
                                                   "seamlessCloseBlurEnabled": true,
@@ -1782,12 +1782,12 @@ extension AppDelegate {
             model.resetSeamlessCloseToDefaults()
             try check(!model.seamlessCloseHasCustomSettings && model.animationEnabled
                       && model.startAngle == 90 && !model.automaticStartAngle
-                      && model.automaticDetectionThreshold == 20 && model.automaticAngleDuration == 1
+                      && model.automaticDetectionThreshold == 45 && model.automaticAngleDuration == 1
                       && model.resumeAfterPause && model.pauseDuration == 1
                       && model.connectionEffectEnabled && model.blurEnabled && model.blurStrength == .regular,
                       "Reset must restore every Seamless Close control")
             try check(app.motion.startAngle == 90 && !app.motion.automaticStartAngle
-                      && app.motion.automaticDetectionThreshold == 20 && app.motion.automaticAngleDuration == 1
+                      && app.motion.automaticDetectionThreshold == 45 && app.motion.automaticAngleDuration == 1
                       && app.motion.resumeAfterPause && app.motion.pauseDuration == 1
                       && app.renderer?.connectionEffectEnabled == true
                       && app.renderer?.blurEnabled == true && app.renderer?.blurStrength == .regular,
@@ -1798,7 +1798,7 @@ extension AppDelegate {
                       "Reset must save the start angle default")
             try check(!UserDefaults.standard.bool(forKey: "automaticStartAngleEnabled"),
                       "Reset must save the automatic detection switch default")
-            try check(UserDefaults.standard.double(forKey: "seamlessCloseDetectionThreshold") == 20,
+            try check(UserDefaults.standard.double(forKey: "seamlessCloseDetectionThreshold") == 45,
                       "Reset must save the detection threshold default")
             try check(UserDefaults.standard.double(forKey: "seamlessCloseAutomaticAngleDuration") == 1,
                       "Reset must save the detection wait default")

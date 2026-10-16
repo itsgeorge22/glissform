@@ -1,0 +1,14 @@
+{
+  "width": 720,
+  "height": 400,
+  "windowHeight": 432,
+  "iconSize": 116,
+  "textSize": 13,
+  "iconLocations": {
+    "Glissform.app": [173, 226],
+    "Applications": [547, 226]
+  },
+  "title": "Welcome to Glissform",
+  "subtitle": "Drag the app icon into the Applications folder",
+  "arrowOpacity": 0.6
+}

@@ -64,7 +64,7 @@ enum SettingsDesign {
         static let aboutSidebar = srgb(0xED6258)
         static let feedbackSidebar = connectionEffect
         static let licenseSidebar = success
-        static let externalDisplay = blur
+        static let externalDisplay = srgb(0xDB648A)
         static let pause = success
         static let attention = connectionEffect
         static let onAccent = Color.white

@@ -37,7 +37,7 @@ The current priority is improving Seamless Close as the app's sole experience.
 
 ### Connected displays — unreleased
 
-- [x] Add the saved External display support switch, default on, with a teal monitor-stand icon, automatic pause explanations and reset support.
+- [x] Add the saved External display support switch, default on, with a rose (#DB648A) monitor-stand icon, automatic pause explanations and reset support.
 - [x] Keep extended-desktop effects on the MacBook, pause when its display is mirrored, and pause for any external display when support is off. Detect mirror followers through the online display list rather than relying only on AppKit screens.
 - [x] Cancel and release captures, overlays and feedback during display changes; resume only after settling and reopening above the starting angle. Skip cached opening after closed-lid external-display use, preserving the laptop-only wake path.
 - [x] Pass the local build and full regression suite, including display-policy and synthetic capture/lifecycle scenarios. Visually verify the new card in the running Dev app. These checks do not replace physical monitor testing.
@@ -45,6 +45,7 @@ The current priority is improving Seamless Close as the app's sole experience.
 
 ### Existing work
 
+- [x] Add the starfield DMG installation window, drag-to-Applications layout and app icon for mounted disks. Native Finder labels remain black over the custom background; the concept preview’s white labels cannot be reproduced in this standard Finder window. This packaging work is unreleased; published installers remain unchanged.
 - [x] Remove Battery Ripple from the app, including event monitoring, settings and menu controls, previews, dedicated icons, and tests. Included in beta.6; beta.5 and older published builds still include it.
 
 - [x] Add sidebar navigation with separate Seamless Close and Privacy & about pages, plus a Send feedback placeholder grouped under More.
@@ -193,7 +194,7 @@ The broader investigations below and above are follow-up work, not a requirement
 - [x] Replace the **Send feedback** placeholder with an email action addressed to support@glissform.app that includes the current app and macOS versions, an icon to copy the address, and concise guidance. The source repository and GitHub forms remain private. The owner confirmed a test email arrived on 2026-09-30.
 - [x] Add Escape to exit an active Seamless Close animation whether **Resume desktop after pause** is on or off, with an always-visible shortcut hint in the first Seamless Close card. A visible image uses the pause feature's fold-to-flat return before releasing its capture; a pending capture is canceled immediately. Reopening above the start angle is required before another gesture. Synthetic checks cover pending and visible captures plus return interruption. On 2026-09-30, the owner confirmed the return with Pause enabled, a fresh close after reopening, and stable card layout when toggling Pause. Broader sleep, Space-change, and quit interruptions remain synthetic-only for this shortcut.
 
-## Release candidate and stable — 1.0.0-rc.1 → 1.0.0
+## Release candidate and stable — 0.1.0-rc.1 → 0.1.0
 
 - [ ] Confirm everyday use on the documented tested configuration, with no known release-blocking failures.
 - [ ] Reassess Developer ID signing and notarization; if the app remains ad-hoc signed, keep the installation warning and permission limitations explicit.
@@ -202,7 +203,7 @@ The broader investigations below and above are follow-up work, not a requirement
 - [ ] Confirm normal desktop access is restored after errors and interruptions.
 - [ ] Finalize privacy documentation, support instructions, and release notes.
 
-A release candidate is a complete proposed stable build. Publish 1.0.0 when those checks pass. A wake-opening animation is not a prerequisite.
+A release candidate is a complete proposed stable build. Publish 0.1.0 when those checks pass. A wake-opening animation is not a prerequisite.
 
 ## Further possibilities — not committed
 
@@ -217,7 +218,7 @@ A release candidate is a complete proposed stable build. Publish 1.0.0 when thos
 
 - Alpha: `0.1.0-alpha.1`, `0.1.0-alpha.2`, and so on for public test builds.
 - Beta: `0.1.0-beta.1`, then numbered beta builds.
-- Release candidate: `1.0.0-rc.1` and subsequent candidates if required.
-- Stable: `1.0.0`; fixes become `1.0.1`, compatible feature additions `1.1.0`, and breaking changes `2.0.0`.
+- Release candidate: `0.1.0-rc.1` and subsequent candidates if required.
+- First stable: `0.1.0`; fixes become `0.1.1`, with later feature versions chosen when their scope is approved.
 
 Not every commit needs a release. Move shipped work into the changelog and revise this roadmap whenever priorities or readiness criteria change.

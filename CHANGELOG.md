@@ -4,15 +4,6 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
-- Align Settings colours with the website through named sRGB palette values: primary blue for Seamless Close; purple automatic detection; shared teal for Blur and External display support; shared orange for Connection effect, feedback and permission attention; and permission-success green for pause and the preserved licensing prototype. Keep General grey, the Privacy sidebar red (#ED6258), and the three privacy-information items grey, applying each colour to its symbol and container while retaining white sidebar glyphs. Keep the stronger light-mode detection and permission symbols, adaptive native surfaces and neutral Esc key.
-- Centralize icon-tile tint strength and app materials. Match solid primary-button hover and pressed colours to the website's 10% and 20% darker blue, preserve white labels, and use the website's stronger blue for light-mode text links.
-
-- Add one saved **External display support** switch to Seamless Close, enabled by default, with the owner-supplied monitor-stand icon in teal. Extended desktops keep the effect on the MacBook; mirroring its display pauses the effect. Turning support off pauses while any external display is connected. Settings and the menu bar explain automatic pauses without changing the main enable switch. Reset to defaults restores support.
-- Clear pending captures, visible overlays, connection feedback and retained screenshots when display reconfiguration begins; wait for the setup to settle and the lid to reopen above the starting angle before the next gesture. Closed-lid external-display use and sleep with an external display discard the old image, so reopening shows the live desktop. Preserve the laptop-only cached wake path, one screenshot per gesture and normal system sleep. Physical external-display validation is pending; this is not a published release.
-- Align project guidance and current product descriptions with the decision to focus exclusively on Seamless Close and its improvements.
-
-- Clarify analytics documentation: local retry data is cleaned up when the app runs, and PostHog’s one-year reporting window does not guarantee deletion of older data. App behavior is unchanged.
-
 - Remove website brand-logo CSS corner rounding and use transparency-aware shadows in the navbar and footer to eliminate the rectangular corner artifact.
 
 - Move the approved website source into the separate private `glissform-website` repository and verify GitHub Actions production deployment, preserving app downloads and the update feed.
@@ -38,6 +29,24 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 - Correct the upside-down Apple mark on the website MacBook lid. Published to glissform.app on 2026-10-01.
 - Close the white gaps around the website MacBook’s outer lid and between its keyboard deck and front edge with continuous rounded aluminium walls. Soften the bright edge outlines while preserving the scroll motion. Published to glissform.app on 2026-10-01.
+
+## 0.1.0-rc.1 — 2026-10-16
+
+First release candidate for Glissform 0.1.0, focused on Seamless Close.
+
+### Changed
+
+- Add the approved starfield installation window with a welcome heading, drag-to-Applications instructions, a curved white arrow at 60% opacity, and compact white backgrounds behind the app and folder names. Include standard and Retina artwork. Mounted installer disks use the blue app icon. Local DMG files also receive a Finder icon, which ordinary web downloads do not preserve.
+- Add saved **External display support**, enabled by default. Extended desktops animate only on the MacBook; mirroring its display pauses Seamless Close. Turning support off pauses the effect whenever another display is connected. Settings and the menu bar explain automatic pauses without changing the main enable switch.
+- Cancel captures, overlays and connection feedback during display changes, then wait for the setup to settle and the lid to reopen above the starting angle. Closed-lid external-display use and sleep with an external display discard the old screenshot, so reopening shows the live desktop. Preserve the laptop-only cached opening path, one screenshot per gesture and normal system sleep.
+- Set **Detect above** to 45° for fresh installs and **Reset to defaults**, preserving existing saved preferences and the supported adjustment range.
+- Align Settings colours and button states with the website palette, including a rose External display support icon. Centralize icon tint strength and materials while preserving adaptive native surfaces and white primary-button labels.
+- Align product and contributor guidance with Glissform's exclusive focus on Seamless Close. Clarify analytics retention documentation without changing analytics behaviour.
+
+### Validation and limitations
+
+- Release build, full local regression suite, and local DMG integrity, resource, version and strict signature checks passed. Physical closing/reopening, sleep/wake and external-display acceptance for this candidate remain pending. Automated checks do not establish hardware compatibility.
+- This release candidate remains unnotarized. An actual beta.7-to-rc.1 Sparkle upgrade and production analytics delivery from a release installation remain unverified.
 
 ## 0.1.0-beta.7 — 2026-10-15
 

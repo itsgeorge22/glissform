@@ -23,7 +23,7 @@ final class SettingsModel: ObservableObject {
     @Published private(set) var animationEnabled = true
     @Published private(set) var startAngle = 90.0
     @Published private(set) var automaticStartAngle = false
-    @Published private(set) var automaticDetectionThreshold = 20.0
+    @Published private(set) var automaticDetectionThreshold = ClosingMotion.defaultDetectionThreshold
     var onAutomaticDetectionThresholdChange: ((Double) -> Void)?
     @Published private(set) var automaticAngleDuration = 1.0
     var onAutomaticAngleDurationChange: ((Double) -> Void)?
@@ -82,7 +82,7 @@ final class SettingsModel: ObservableObject {
     func configure(animationEnabled: Bool, startAngle: Double, screenCaptureAllowed: Bool,
                    resumeAfterPause: Bool = true, automaticStartAngle: Bool = false,
                    pauseDuration: Double = 1, automaticAngleDuration: Double = 1,
-                   automaticDetectionThreshold: Double = 20,
+                   automaticDetectionThreshold: Double = ClosingMotion.defaultDetectionThreshold,
                    connectionEffectEnabled: Bool = true, blurEnabled: Bool = true, blurStrength: BlurStrength = .defaultStrength,
                    externalDisplaySupportEnabled: Bool = true,
                    runInBackground: Bool = true, showMenuBarIcon: Bool = true) {
@@ -228,7 +228,7 @@ final class SettingsModel: ObservableObject {
 
     var seamlessCloseHasCustomSettings: Bool {
         !animationEnabled || startAngle != 90 || automaticStartAngle
-            || automaticDetectionThreshold != 20 || automaticAngleDuration != 1
+            || automaticDetectionThreshold != ClosingMotion.defaultDetectionThreshold || automaticAngleDuration != 1
             || !resumeAfterPause || pauseDuration != 1 || !connectionEffectEnabled || !blurEnabled
             || blurStrength != .defaultStrength || !externalDisplaySupportEnabled
     }
@@ -236,7 +236,7 @@ final class SettingsModel: ObservableObject {
     func resetSeamlessCloseToDefaults() {
         setAutomaticStartAngle(false)
         setStartAngle(90)
-        setAutomaticDetectionThreshold(20)
+        setAutomaticDetectionThreshold(ClosingMotion.defaultDetectionThreshold)
         setAutomaticAngleDuration(1)
         setResumeAfterPause(true)
         setPauseDuration(1)

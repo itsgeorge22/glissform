@@ -3,11 +3,12 @@ import Foundation
 /// A gesture keeps its original image plane through any direction changes.
 struct ClosingMotion {
     static let defaultStillDuration = 1.0
+    static let defaultDetectionThreshold = 45.0
     static func validStillDuration(_ value: Double) -> Double {
         value.isFinite ? min(10, max(0.5, (value * 2).rounded() / 2)) : defaultStillDuration
     }
     static func validDetectionThreshold(_ value: Double) -> Double {
-        guard value.isFinite else { return 20 }
+        guard value.isFinite else { return defaultDetectionThreshold }
         return value <= 0 ? 0 : min(130, max(20, value)).rounded()
     }
     private(set) var activationAngle: Double = 80
@@ -19,7 +20,7 @@ struct ClosingMotion {
             reset()
         }
     }
-    var automaticDetectionThreshold = 20.0 {
+    var automaticDetectionThreshold = Self.defaultDetectionThreshold {
         didSet {
             guard automaticDetectionThreshold != oldValue, automaticStartAngle else { return }
             learnedStartAngle = nil
