@@ -15,7 +15,7 @@ Glissform is a small, fully free passion project. Payment and licensing work is 
 - [ ] Replace development fixtures with production trial records, signed entitlements, hosted activation, verified payment notifications, automatic key delivery, recovery and refund/revocation handling.
 - [ ] Verify the customer flow on physical Macs and publish accurate licensing/privacy terms before enabling a paid release.
 
-## Public beta — 0.1.0-beta.7
+## Public release candidate — 0.1.0-rc.1
 
 The first feature, Seamless Close, implements screenshot-based closing animation with continuous hinge perspective and upper-edge narrowing through the full gesture, steadier adaptive smoothing, optional full-image blur and shadow, awake reversal, cached post-sleep opening, native settings with a configurable starting angle, optional desktop restoration after an adjustable still-lid pause, menu bar controls, and lifecycle cleanup. On 2026-09-21, the owner confirmed correct smoothness, speed, abrupt lid stops, reversals, and opening after sleep without locking on the development Mac. On 2026-09-28, the owner confirmed the revised geometry and Blur on/off during everyday gestures, plus the requested Space and sleep/wake checks. Locked-screen animation remains unavailable. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
 
@@ -35,7 +35,7 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 
 The current priority is improving Seamless Close as the app's sole experience.
 
-### Connected displays — unreleased
+### Connected displays — rc.1
 
 - [x] Add the saved External display support switch, default on, with a rose (#DB648A) monitor-stand icon, automatic pause explanations and reset support.
 - [x] Keep extended-desktop effects on the MacBook, pause when its display is mirrored, and pause for any external display when support is off. Detect mirror followers through the online display list rather than relying only on AppKit screens.
@@ -46,7 +46,7 @@ The current priority is improving Seamless Close as the app's sole experience.
 
 ### Existing work
 
-- [x] Add the starfield DMG installation window, drag-to-Applications layout and app icon for mounted disks. Native Finder labels remain black over the custom background; the concept preview’s white labels cannot be reproduced in this standard Finder window. This packaging work is unreleased; published installers remain unchanged.
+- [x] Add the starfield DMG installation window, drag-to-Applications layout and app icon for mounted disks. Use compact white pill-shaped backgrounds behind native black Finder labels and a curved white arrow at 60% opacity. Included in rc.1; earlier published installers remain unchanged.
 - [x] Remove Battery Ripple from the app, including event monitoring, settings and menu controls, previews, dedicated icons, and tests. Included in beta.6; beta.5 and older published builds still include it.
 
 - [x] Add sidebar navigation with separate Seamless Close and Privacy & about pages, plus a Send feedback placeholder grouped under More.
@@ -197,9 +197,12 @@ The broader investigations below and above are follow-up work, not a requirement
 
 ## Release candidate and stable — 0.1.0-rc.1 → 0.1.0
 
+- [x] Publish rc.1 (build 19) with the approved installer after the full local build/regression suite and owner checks of closing/reopening, sleep/wake and external-display use.
+
 - [ ] Confirm everyday use on the documented tested configuration, with no known release-blocking failures.
 - [ ] Reassess Developer ID signing and notarization; if the app remains ad-hoc signed, keep the installation warning and permission limitations explicit.
-- [ ] Verify the public `.dmg`, download links, installation instructions, and update path for the intended release.
+- [x] Verify rc.1 on GitHub and the public download server: exact tag and commit, prerelease status, DMG/checksum assets, mounted app build 19, installer layout and artwork, strict app signature, and signed public update feed.
+- [ ] Verify an actual beta.7-to-rc.1 Sparkle upgrade and permission state afterward.
 - [ ] Verify installation, upgrade, and removal on supported macOS versions.
 - [ ] Confirm normal desktop access is restored after errors and interruptions.
 - [ ] Finalize privacy documentation, support instructions, and release notes.

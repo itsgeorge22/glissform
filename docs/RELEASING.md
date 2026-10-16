@@ -22,7 +22,7 @@ If packaging, signing, or upload fails, the workflow leaves the GitHub Release a
 
 ## Installer appearance
 
-Newly packaged installers use the release app's compiled icon for the mounted disk and the local `.dmg` file. The mounted disk icon is embedded in the image and survives downloads. The `.dmg` file icon is Finder metadata outside the image's data; ordinary HTTP downloads from GitHub or the website do not preserve it. This packaging change is unreleased and does not alter existing published installers.
+Newly packaged installers use the release app's compiled icon for the mounted disk and the local `.dmg` file. The mounted disk icon is embedded in the image and survives downloads. The `.dmg` file icon is Finder metadata outside the image's data; ordinary HTTP downloads from GitHub or the website do not preserve it. This packaging is included from 0.1.0-rc.1 and does not alter earlier published installers.
 
 The installer opens a Finder icon view with 720 × 400 starfield artwork, a **Welcome to Glissform** heading, drag-to-Applications instructions and curved white arrow at 60% opacity. The app and Applications shortcut remain real Finder items. Both labels have white pill-shaped backings for contrast. Finder renders native filenames in black when a custom background is used; the white labels shown in the concept preview are not supported by this standard Finder installer. The window's title bar, labels and icon appearance follow macOS; Finder can show path/status bars or filename extensions according to the user's preferences. Background artwork and layout are maintained in [`Artwork/Installer`](../Artwork/Installer); packaging renders 1× and 2× artwork into an embedded TIFF and writes the Finder layout without launching Finder.
 
