@@ -849,6 +849,61 @@ import Foundation
         precondition(threshold.update(angle: 49) > 0 && threshold.activationAngle == 50)
         print("PASS: selected threshold, below-threshold startup, threshold reversal, changed threshold")
 
+        for zone in 1...10 {
+            var deadZone = ClosingMotion()
+            deadZone.startAngle = 95
+            deadZone.automaticDeadZone = Double(zone)
+            // The saved dead zone must affect neither manual mode nor fallback.
+            _ = deadZone.update(angle: 110, time: 0)
+            precondition(deadZone.effectiveStartAngle == 95)
+            deadZone.automaticStartAngle = true
+            precondition(deadZone.effectiveStartAngle == 95)
+            for sample in 0...20 { _ = deadZone.update(angle: 110, time: Double(sample) / 20) }
+            let boundary = 110 - Double(zone)
+            precondition(deadZone.learnedStartAngle == 110 && deadZone.effectiveStartAngle == boundary)
+            // Slow travel, including long stops within a large dead zone, must
+            // not move the resting reference downward and swallow the gesture.
+            for sample in 1...Int(Double(zone) * 100) + 1 {
+                let angle = max(boundary, 110 - Double(sample) / 100)
+                precondition(deadZone.update(angle: angle, time: 1 + Double(sample) / 20) == 0)
+                precondition(deadZone.learnedStartAngle == 110)
+            }
+            let time = 2 + Double(zone) * 5
+            precondition(deadZone.update(angle: boundary, time: time) == 0)
+            let first = deadZone.update(angle: boundary - 0.01, time: time + 0.02)
+            precondition(first > 0 && first < 0.000001 && deadZone.activationAngle == boundary,
+                         "Every dead zone must enter continuously from a flat reference")
+            let closing = deadZone.update(angle: boundary - 15, time: time + 0.04)
+            precondition(deadZone.update(angle: boundary - 2, time: time + 0.06) < closing)
+            precondition(deadZone.activationAngle == boundary, "Reversal must retain the same reference")
+            deadZone.reset()
+            precondition(deadZone.beginOpening(angle: 30, time: time + 0.1) > 0
+                         && deadZone.activationAngle == boundary, "Cached opening must not subtract the dead zone twice")
+            deadZone.automaticStartAngle = false
+            precondition(deadZone.effectiveStartAngle == 95, "Turning automatic detection off restores manual mode")
+        }
+        precondition(ClosingMotion.validAutomaticDeadZone(.nan) == 1
+                     && ClosingMotion.validAutomaticDeadZone(-1) == 1
+                     && ClosingMotion.validAutomaticDeadZone(0) == 1
+                     && ClosingMotion.validAutomaticDeadZone(20) == 10
+                     && ClosingMotion.validAutomaticDeadZone(4.6) == 5)
+        // At the default, the exact progress and reference equal the old 109°
+        // trigger throughout a gesture; the renderer receives identical inputs.
+        var defaultZone = ClosingMotion()
+        defaultZone.startAngle = 95
+        defaultZone.automaticStartAngle = true
+        for sample in 0...20 { _ = defaultZone.update(angle: 110, time: Double(sample) / 20) }
+        var oldReference = ClosingMotion()
+        oldReference.startAngle = 109
+        _ = oldReference.update(angle: 110, time: 1)
+        for (index, angle) in [109.0, 108.9, 100, 80, 20, 4, 25, 80, 95, 85, 105, 109, 110].enumerated() {
+            let time = 1.1 + Double(index) / 20
+            precondition(defaultZone.update(angle: angle, time: time) == oldReference.update(angle: angle, time: time))
+            precondition(defaultZone.activationAngle == oldReference.activationAngle
+                         && defaultZone.active == oldReference.active)
+        }
+        print("PASS: automatic-only dead zones 1–10°, slow travel, flat entry, reversal, wake reference and exact 1° default motion")
+
         var automatic = ClosingMotion()
         automatic.startAngle = 95
         automatic.automaticStartAngle = true
@@ -858,10 +913,10 @@ import Foundation
         }
         precondition(automatic.learnedStartAngle == nil, "A short or jittering rest must retain the manual fallback")
         _ = automatic.update(angle: 110, time: 1)
-        precondition(automatic.learnedStartAngle == 109,
+        precondition(automatic.learnedStartAngle == 110,
                      "Automatic selection must learn after one second of fresh readings")
         for frame in 21...62 { _ = automatic.update(angle: 110, time: Double(frame) / 20) }
-        precondition(automatic.learnedStartAngle == 109 && automatic.effectiveStartAngle == 109,
+        precondition(automatic.learnedStartAngle == 110 && automatic.effectiveStartAngle == 109,
                      "A one-second open-lid rest must start one degree below the held angle")
         precondition(automatic.update(angle: 109, time: 3.15) == 0 && !automatic.active)
         precondition(automatic.update(angle: 108, time: 3.17) > 0 && automatic.activationAngle == 109)
@@ -873,7 +928,7 @@ import Foundation
         precondition(automatic.active && automatic.activationAngle == 109,
                      "Crossing the custom angle must not replace the learned angle")
         automatic.reset()
-        precondition(automatic.learnedStartAngle == 109 && automatic.effectiveStartAngle == 109,
+        precondition(automatic.learnedStartAngle == 110 && automatic.effectiveStartAngle == 109,
                      "A lifecycle reset must preserve the learned reference")
         precondition(automatic.beginOpening(angle: 30, time: 3.35) > 0 && automatic.activationAngle == 109,
                      "Wake opening must use the closing reference")
@@ -893,7 +948,7 @@ import Foundation
         precondition(customDetection.learnedStartAngle == nil,
                      "Changing the detection time must restart its pending wait")
         _ = customDetection.update(angle: 110, time: 2.1)
-        precondition(customDetection.learnedStartAngle == 109 && customDetection.pauseDuration == 1,
+        precondition(customDetection.learnedStartAngle == 110 && customDetection.pauseDuration == 1,
                      "The new detection time must apply independently from the resume time")
 
         var lowerThreshold = ClosingMotion()
@@ -904,7 +959,7 @@ import Foundation
         precondition(lowerThreshold.effectiveStartAngle == 100,
                      "Begin at must remain the fallback before detection completes")
         _ = lowerThreshold.update(angle: 90, time: 1)
-        precondition(lowerThreshold.learnedStartAngle == 89 && lowerThreshold.effectiveStartAngle == 89,
+        precondition(lowerThreshold.learnedStartAngle == 90 && lowerThreshold.effectiveStartAngle == 89,
                      "A held lid above the threshold must learn even below Begin at")
         lowerThreshold.automaticDetectionThreshold = 100
         precondition(lowerThreshold.learnedStartAngle == nil && lowerThreshold.effectiveStartAngle == 100,
@@ -914,7 +969,7 @@ import Foundation
                      "A lid below the new threshold must not relearn")
         lowerThreshold.automaticDetectionThreshold = 0
         for frame in 46...66 { _ = lowerThreshold.update(angle: 90, time: Double(frame) / 20) }
-        precondition(lowerThreshold.learnedStartAngle == 89,
+        precondition(lowerThreshold.learnedStartAngle == 90,
                      "Setting Detect above to zero must allow learning below the previous threshold")
 
         var defaultThreshold = ClosingMotion()
@@ -924,7 +979,7 @@ import Foundation
         precondition(defaultThreshold.learnedStartAngle == nil,
                      "The default must not learn at or below 45 degrees")
         for frame in 26...51 { _ = defaultThreshold.update(angle: 46, time: Double(frame) / 20) }
-        precondition(defaultThreshold.learnedStartAngle == 45,
+        precondition(defaultThreshold.learnedStartAngle == 46,
                      "The default must allow learning strictly above 45 degrees")
         precondition(ClosingMotion.validDetectionThreshold(20) == 20,
                      "An existing saved 20-degree preference must remain valid")
@@ -937,7 +992,7 @@ import Foundation
         precondition(higherThreshold.effectiveStartAngle == 100,
                      "Begin at must control the band below a higher detection threshold")
         for frame in 26...47 { _ = higherThreshold.update(angle: 125, time: Double(frame) / 20) }
-        precondition(higherThreshold.learnedStartAngle == 124,
+        precondition(higherThreshold.learnedStartAngle == 125,
                      "Holding above a higher threshold must learn the new angle")
         precondition(ClosingMotion.validDetectionThreshold(.nan) == 45
                      && ClosingMotion.validDetectionThreshold(0) == 0
@@ -974,7 +1029,7 @@ import Foundation
         learnedThenPausedBelow.automaticStartAngle = true
         learnedThenPausedBelow.resumeAfterPause = true
         for frame in 0...20 { _ = learnedThenPausedBelow.update(angle: 110, time: Double(frame) / 20) }
-        precondition(learnedThenPausedBelow.learnedStartAngle == 109,
+        precondition(learnedThenPausedBelow.learnedStartAngle == 110,
                      "This pause case must start from a valid learned angle")
         for frame in 21...41 { _ = learnedThenPausedBelow.update(angle: 70, time: Double(frame) / 20) }
         _ = learnedThenPausedBelow.update(angle: 70, time: 2.1)
@@ -990,14 +1045,14 @@ import Foundation
         for frame in 0...20 { _ = disabledThresholdPause.update(angle: 110, time: Double(frame) / 20) }
         for frame in 21...41 { _ = disabledThresholdPause.update(angle: 70, time: Double(frame) / 20) }
         _ = disabledThresholdPause.update(angle: 70, time: 2.1)
-        precondition(disabledThresholdPause.desktopResumed && disabledThresholdPause.learnedStartAngle == 69,
+        precondition(disabledThresholdPause.desktopResumed && disabledThresholdPause.learnedStartAngle == 70,
                      "A zero threshold must let pause restoration learn within the supported angle range")
 
         var lowRest = ClosingMotion()
         lowRest.startAngle = 95
         lowRest.automaticStartAngle = true
         for frame in 0...40 { _ = lowRest.update(angle: 80, time: Double(frame) / 20) }
-        precondition(lowRest.learnedStartAngle == 79 && !lowRest.active,
+        precondition(lowRest.learnedStartAngle == 80 && !lowRest.active,
                      "A stable opening below the manual fallback may become the start angle")
         precondition(lowRest.update(angle: 79, time: 2.05) == 0 && !lowRest.active)
         precondition(lowRest.update(angle: 78, time: 2.1) > 0 && lowRest.activationAngle == 79)
@@ -1010,7 +1065,7 @@ import Foundation
         precondition(gaps.learnedStartAngle == nil, "Missing sensor samples cannot establish a rest")
         _ = gaps.update(angle: .nan, time: 2.15)
         for frame in 44...85 { _ = gaps.update(angle: 110, time: Double(frame) / 20) }
-        precondition(gaps.learnedStartAngle == 109, "Fresh samples can learn after an interruption")
+        precondition(gaps.learnedStartAngle == 110, "Fresh samples can learn after an interruption")
 
         var jitter = ClosingMotion()
         jitter.startAngle = 95
@@ -1019,13 +1074,13 @@ import Foundation
             _ = jitter.update(angle: frame.isMultiple(of: 2) ? 110 : 111,
                               time: Double(frame) / 20)
         }
-        precondition(jitter.learnedStartAngle == 109,
+        precondition(jitter.learnedStartAngle == 110,
                      "One-degree sensor chatter must not prevent learning")
         for frame in 41...90 {
             _ = jitter.update(angle: frame.isMultiple(of: 2) ? 110 : 111,
                               time: Double(frame) / 20)
         }
-        precondition(jitter.learnedStartAngle == 109,
+        precondition(jitter.learnedStartAngle == 110,
                      "One-degree sensor chatter must not repeatedly move the learned threshold")
         var unsupported = ClosingMotion()
         unsupported.startAngle = 95
@@ -1041,7 +1096,7 @@ import Foundation
         for frame in 0...40 { _ = restored.update(angle: 110, time: Double(frame) / 20) }
         _ = restored.update(angle: 80, time: 2.05)
         for frame in 42...82 { _ = restored.update(angle: 80, time: Double(frame) / 20) }
-        precondition(restored.desktopResumed && restored.learnedStartAngle == 79
+        precondition(restored.desktopResumed && restored.learnedStartAngle == 80
                      && restored.activationAngle == 109,
                      "An active pause restoration must adopt its new resting angle")
         for frame in 83...125 { _ = restored.update(angle: 80, time: Double(frame) / 20) }
@@ -1068,11 +1123,11 @@ import Foundation
         noRestore.automaticStartAngle = true
         for frame in 0...40 { _ = noRestore.update(angle: 110, time: Double(frame) / 20) }
         for frame in 41...95 { _ = noRestore.update(angle: 80, time: Double(frame) / 20) }
-        precondition(noRestore.active && noRestore.learnedStartAngle == 109,
+        precondition(noRestore.active && noRestore.learnedStartAngle == 110,
                      "Automatic selection must respect the separate pause-restoration toggle")
         noRestore.cancelUntilOpened(above: 109)
         for frame in 96...140 { _ = noRestore.update(angle: 80, time: Double(frame) / 20) }
-        precondition(!noRestore.active && noRestore.learnedStartAngle == 109,
+        precondition(!noRestore.active && noRestore.learnedStartAngle == 110,
                      "Escape must not learn a lower angle or rearm while the lid stays closed")
         _ = noRestore.update(angle: 110, time: 7.05)
         precondition(noRestore.update(angle: 80, time: 7.1) > 0,
@@ -1134,7 +1189,7 @@ import Foundation
         _ = assistedAutomatic.update(angle: 100, time: 0)
         _ = assistedAutomatic.update(angle: 70, time: 0.1)
         assistedAutomatic.completeAssistedOpening(at: 86)
-        precondition(assistedAutomatic.learnedStartAngle == 85 && assistedAutomatic.desktopResumed,
+        precondition(assistedAutomatic.learnedStartAngle == 86 && assistedAutomatic.desktopResumed,
                      "Automatic mode may learn the usable angle after an early finish")
         precondition(assistedAutomatic.update(angle: 86, time: 0.2) == 0)
         precondition(assistedAutomatic.update(angle: 84, time: 0.3) > 0,

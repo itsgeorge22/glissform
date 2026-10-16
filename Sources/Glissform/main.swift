@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let capture: DesktopScreenshotSource
     private let desktopAvailable: (CGDirectDisplayID) -> Bool
     private let screenAccessAllowed: () -> Bool
+    private let requestScreenAccess: () -> Void
     private let displayConfigurationSource: () -> DisplayConfiguration
     private var displayConfiguration: DisplayConfiguration
     private var connectedDisplayConfiguration: DisplayConfiguration?
@@ -79,6 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var retryAfter = Date.distantPast
     private var starting = false
     private var permissionRequested = false
+    private var isQuietLoginLaunch = false
     private var escapeHotKey: EventHotKeyRef?
     private var escapeHandler: EventHandlerRef?
     private var escapeReturning = false
@@ -86,18 +88,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     init(capture: DesktopScreenshotSource? = nil,
          desktopAvailable: @escaping (CGDirectDisplayID) -> Bool = DesktopAvailability.allowsCapture,
          screenAccessAllowed: @escaping () -> Bool = CGPreflightScreenCaptureAccess,
+         requestScreenAccess: @escaping () -> Void = { _ = CGRequestScreenCaptureAccess() },
          displayConfigurationSource: @escaping () -> DisplayConfiguration = DisplayConfiguration.current,
          connectionSound: ConnectionSoundPlayback? = nil) {
         self.capture = capture ?? DesktopCapture()
         self.desktopAvailable = desktopAvailable
         self.screenAccessAllowed = screenAccessAllowed
+        self.requestScreenAccess = requestScreenAccess
         self.displayConfigurationSource = displayConfigurationSource
         self.displayConfiguration = displayConfigurationSource()
         self.connectionSound = connectionSound ?? OpeningConnectionSound.shared
         super.init()
     }
 
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        configureLaunchPresentation(for: NSAppleEventManager.shared().currentAppleEvent)
+    }
+
+    private func configureLaunchPresentation(for event: NSAppleEventDescriptor?) {
+        // Read the launch event synchronously, before deferred startup work loses it.
+        guard event?.eventClass == kCoreEventClass, event?.eventID == kAEOpenApplication,
+              event?.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem else { return }
+        isQuietLoginLaunch = true
+        NSApp.setActivationPolicy(.accessory)
+    }
+
+    private func presentInitialSettings() {
+        guard !isQuietLoginLaunch else { return }
+        showSeamlessClose()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        configureLaunchPresentation(for: NSAppleEventManager.shared().currentAppleEvent)
         usageAnalytics = UsageAnalytics()
         settingsModel.syncAnalyticsConsent(usageAnalytics!.state.consent)
         settingsModel.onAnalyticsChoice = { [weak self] allowed in
@@ -110,6 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                   "resumeAfterPause": true,
                                                   "seamlessClosePauseDuration": 1.0,
                                                   "seamlessCloseAutomaticAngleDuration": 1.0,
+                                                  "seamlessCloseAutomaticDeadZone": ClosingMotion.defaultAutomaticDeadZone,
                                                   "seamlessCloseDetectionThreshold": ClosingMotion.defaultDetectionThreshold,
                                                   "seamlessCloseConnectionEffectEnabled": true,
                                                   "seamlessCloseExternalDisplaySupportEnabled": true,
@@ -129,6 +152,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         motion.pauseDuration = ClosingMotion.validStillDuration(UserDefaults.standard.double(forKey: "seamlessClosePauseDuration"))
         motion.automaticAngleDuration = ClosingMotion.validStillDuration(UserDefaults.standard.double(forKey: "seamlessCloseAutomaticAngleDuration"))
         motion.automaticDetectionThreshold = ClosingMotion.validDetectionThreshold(UserDefaults.standard.double(forKey: "seamlessCloseDetectionThreshold"))
+        motion.automaticDeadZone = ClosingMotion.validAutomaticDeadZone(UserDefaults.standard.double(forKey: "seamlessCloseAutomaticDeadZone"))
+        UserDefaults.standard.set(motion.automaticDeadZone, forKey: "seamlessCloseAutomaticDeadZone")
         motion.automaticStartAngle = UserDefaults.standard.bool(forKey: "automaticStartAngleEnabled")
         statusLine.isEnabled = false
         statusMenu.addItem(statusLine)
@@ -158,6 +183,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             pauseDuration: motion.pauseDuration,
             automaticAngleDuration: motion.automaticAngleDuration,
             automaticDetectionThreshold: motion.automaticDetectionThreshold,
+            automaticDeadZone: motion.automaticDeadZone,
             connectionEffectEnabled: UserDefaults.standard.bool(forKey: "seamlessCloseConnectionEffectEnabled"),
             blurEnabled: UserDefaults.standard.bool(forKey: "seamlessCloseBlurEnabled"),
             blurStrength: BlurStrength(rawValue: UserDefaults.standard.string(forKey: "seamlessCloseBlurStrength") ?? "") ?? .defaultStrength,
@@ -191,6 +217,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsModel.onAutomaticAngleDurationChange = { [weak self] duration in
             self?.motion.automaticAngleDuration = duration
             UserDefaults.standard.set(duration, forKey: "seamlessCloseAutomaticAngleDuration")
+        }
+        settingsModel.onAutomaticDeadZoneChange = { [weak self] degrees in
+            self?.applyAutomaticDeadZone(degrees)
         }
         settingsModel.onAutomaticDetectionThresholdChange = { [weak self] angle in
             self?.applyAutomaticDetectionThreshold(angle)
@@ -288,12 +317,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startSensor()
         connect()
         DispatchQueue.main.async { [weak self] in
-            self?.showSettings()
+            self?.presentInitialSettings()
         }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        showSettings()
+        showSeamlessClose()
         return true
     }
 
@@ -532,9 +561,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard displayPauseStatus == nil else { setStatus("Ready"); return }
         guard checkScreenAccess() else {
             setStatus("Screen Recording permission required")
-            if !permissionRequested {
+            if !permissionRequested && !isQuietLoginLaunch {
                 permissionRequested = true
-                CGRequestScreenCaptureAccess()
+                requestScreenAccess()
             }
             retryAfter = Date().addingTimeInterval(2)
             return
@@ -1165,6 +1194,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func applyAutomaticDeadZone(_ degrees: Double) {
+        let value = ClosingMotion.validAutomaticDeadZone(degrees)
+        UserDefaults.standard.set(value, forKey: "seamlessCloseAutomaticDeadZone")
+        guard motion.automaticDeadZone != value else { return }
+        motion.automaticDeadZone = value
+        guard motion.automaticStartAngle, motion.learnedStartAngle != nil,
+              !sleeping, !quitting, !escapeReturning, let angle = lastLidAngle else { return }
+        // Retarget the same screenshot through the existing smoothing. An
+        // assisted return must relinquish its old boundary before reevaluation.
+        if assistedOpeningPeakAngle != nil {
+            assistedOpeningPeakAngle = nil
+            finishingGesture = false
+            cleanupTimer?.invalidate()
+            cleanupTimer = nil
+            connectionSound.stop()
+            prepareConnectionSound()
+            renderer?.beginAnimation(opening: openingGesture)
+        }
+        openingAssist.reset()
+        handleLidReading(angle, time: lastLidTime)
+    }
+
     private func applyStartAngle(_ angle: Double) {
         guard motion.startAngle != angle else { return }
         let previousReference = motion.effectiveStartAngle
@@ -1300,7 +1351,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func showSeamlessClose() {
+        settingsModel.selectedPage = .infiniteScreen
+        showSettings()
+    }
+
     @objc private func showSettings() {
+        let wasQuietLoginLaunch = isQuietLoginLaunch
+        isQuietLoginLaunch = false
         invalidateCaptureMetadata()
         if settingsWindowController == nil {
             settingsWindowController = SettingsWindowController(model: settingsModel)
@@ -1311,6 +1369,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         settingsModel.refreshPermission()
         settingsWindowController?.present()
+        if wasQuietLoginLaunch && !screenAccessAllowed() { connect() }
         warmCaptureMetadata()
     }
 
@@ -1380,7 +1439,7 @@ extension AppDelegate {
     static func lifecycleSelfTest() async throws {
         let savedSettings = ["animationStartAngle", "animationEnabled", "automaticStartAngleEnabled",
                              "resumeAfterPause", "seamlessClosePauseDuration",
-                             "seamlessCloseAutomaticAngleDuration", "seamlessCloseDetectionThreshold",
+                             "seamlessCloseAutomaticAngleDuration", "seamlessCloseDetectionThreshold", "seamlessCloseAutomaticDeadZone",
                              "seamlessCloseConnectionEffectEnabled", "seamlessCloseBlurEnabled", "seamlessCloseBlurStrength",
                              "seamlessCloseExternalDisplaySupportEnabled",
                              "runInBackground", "showMenuBarIcon"].map {
@@ -1411,6 +1470,67 @@ extension AppDelegate {
                               userInfo: [NSLocalizedDescriptionKey: message])
             }
         }
+        func launchEvent(id: AEEventID = kAEOpenApplication, reason: OSType? = nil) -> NSAppleEventDescriptor {
+            let event = NSAppleEventDescriptor(eventClass: kCoreEventClass, eventID: id,
+                                              targetDescriptor: nil, returnID: AEReturnID(kAutoGenerateReturnID),
+                                              transactionID: AETransactionID(kAnyTransactionID))
+            if let reason { event.setParam(NSAppleEventDescriptor(enumCode: reason), forKeyword: keyAEPropData) }
+            return event
+        }
+        do {
+            var permissionRequests = 0
+            let app = AppDelegate(capture: SyntheticCapture(), screenAccessAllowed: { false },
+                                  requestScreenAccess: { permissionRequests += 1 },
+                                  displayConfigurationSource: { DisplayConfiguration(
+                                      displays: [DisplayConfiguration.Display(id: CGMainDisplayID(), isBuiltIn: true,
+                                          isInMirrorSet: false, mirrorsDisplay: 0, bounds: CGRect(x: 0, y: 0, width: 64, height: 64),
+                                          pixelWidth: 64, pixelHeight: 64, rotation: 0)], builtInIsActive: true) })
+            defer {
+                app.settingsWindowController?.window?.close()
+                app.shutdown()
+            }
+            app.settingsModel.setRunInBackground(false)
+            app.configureLaunchPresentation(for: launchEvent(reason: keyAELaunchedAsLogInItem))
+            app.configureLaunchPresentation(for: nil) // The event may be gone at didFinishLaunching.
+            app.presentInitialSettings()
+            try check(app.isQuietLoginLaunch && app.settingsWindowController == nil
+                      && NSApp.activationPolicy() == .accessory && !app.quitting,
+                      "Login launch must stay running without Settings or a Dock icon, even when close-to-quit is selected")
+            app.connect()
+            app.connect()
+            try check(permissionRequests == 0 && !app.permissionRequested && app.settingsWindowController == nil,
+                      "Login launch must defer missing screen-access prompts until the app is opened")
+            app.settingsModel.setRunInBackground(true)
+            app.settingsModel.selectedPage = .general
+            _ = app.applicationShouldHandleReopen(NSApp, hasVisibleWindows: false)
+            try check(!app.isQuietLoginLaunch && app.settingsWindowController?.window?.isVisible == true
+                      && NSApp.activationPolicy() == .regular && permissionRequests == 1
+                      && app.settingsModel.selectedPage == .infiniteScreen,
+                      "Explicit reopening after login must select Seamless Close and request missing access once")
+            app.connect()
+            try check(permissionRequests == 1, "Repeated connection attempts must not repeat the permission prompt")
+            print("PASS: quiet login launch, deferred permission request and explicit Settings reopen")
+        }
+        for event in [nil, launchEvent(), launchEvent(reason: keyAELaunchedAsServiceItem),
+                      launchEvent(id: kAEReopenApplication, reason: keyAELaunchedAsLogInItem)] {
+            let app = AppDelegate(capture: SyntheticCapture(), screenAccessAllowed: { true })
+            defer {
+                app.settingsWindowController?.window?.close()
+                app.shutdown()
+            }
+            app.configureLaunchPresentation(for: event)
+            app.settingsModel.selectedPage = .general
+            app.presentInitialSettings()
+            try check(!app.isQuietLoginLaunch && app.settingsWindowController?.window?.isVisible == true
+                      && app.settingsModel.selectedPage == .infiniteScreen,
+                      "Ordinary opening must show the Seamless Close page")
+            app.showAbout()
+            try check(app.settingsModel.selectedPage == .about, "The About command must still select About")
+            _ = app.applicationShouldHandleReopen(NSApp, hasVisibleWindows: true)
+            try check(app.settingsModel.selectedPage == .infiniteScreen,
+                      "Reopening a visible window must return to Seamless Close")
+        }
+        print("PASS: ordinary launch and non-login launch events preserve Settings access")
         let feedbackDraft = FeedbackEmail.draftURL
             .flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }
         let version = Bundle.main.object(forInfoDictionaryKey: "GlissformVersion") as? String ?? "Development"
@@ -1498,6 +1618,9 @@ extension AppDelegate {
             }
             app.settingsModel.onExternalDisplaySupportChange = { [weak app] enabled in
                 app?.applyExternalDisplaySupport(enabled)
+            }
+            app.settingsModel.onAutomaticDeadZoneChange = { [weak app] degrees in
+                app?.applyAutomaticDeadZone(degrees)
             }
             app.motion.startAngle = 100
             app.motion.resumeAfterPause = resumeAfterPause
@@ -1696,6 +1819,57 @@ extension AppDelegate {
             }
         }
         do {
+            let (app, source) = try makeGesture(startGesture: false)
+            defer { app.shutdown(); app.window?.close() }
+            app.motion.automaticStartAngle = true
+            app.settingsModel.setAutomaticStartAngle(true)
+            for sample in 0...20 { app.handleLidReading(110, time: Double(sample) / 20) }
+            app.settingsModel.setAutomaticDeadZone(5)
+            app.handleLidReading(107, time: 1.5)
+            try check(!app.motion.active && !app.snapshotRequested && source.count == 0,
+                      "Small adjustments inside the dead zone must leave the desktop live")
+            app.handleLidReading(104, time: 2)
+            try await waitForCapture(source)
+            app.settingsModel.setAutomaticDeadZone(0)
+            try check(app.motion.automaticDeadZone == 1 && app.motion.activationAngle == 109,
+                      "A dead-zone edit must immediately retarget pending capture")
+            let task = app.snapshotTask
+            source.pending?.resume(returning: buffer)
+            source.pending = nil
+            await task?.value
+            app.handleLidReading(100, time: 2.1)
+            app.handleLidReading(102, time: 2.2)
+            try check(app.hasSnapshot && source.count == 1 && app.motion.activationAngle == 109,
+                      "Immediate dead-zone edits and reversal must reuse one image")
+            app.settingsModel.setAutomaticDeadZone(5)
+            try check(app.motion.activationAngle == 105 && app.hasSnapshot && source.count == 1,
+                      "Visible gestures must immediately use the new boundary without recapture")
+            app.settingsModel.setAutomaticDeadZone(10)
+            try check(!app.motion.active && app.finishingGesture && app.hasSnapshot && source.count == 1,
+                      "Expanding the dead zone past the lid must smoothly return the existing image to flat")
+            app.settingsModel.setAutomaticDeadZone(5)
+            try check(app.motion.active && !app.finishingGesture && app.hasSnapshot && source.count == 1,
+                      "Shrinking the dead zone during return must resume the same image immediately")
+            // A cached image also uses the latest chosen boundary.
+            app.endGesture(retainingSnapshot: true)
+            app.motion.reset()
+            app.sleeping = true
+            app.settingsModel.setAutomaticDeadZone(2)
+            try check(app.retainedClosingSnapshot && app.motion.automaticDeadZone == 2,
+                      "A dead-zone edit must update the saved boundary without replaying cached pixels")
+            app.sleeping = false
+            try check(app.motion.beginOpening(angle: 30, time: 3) > 0 && app.motion.activationAngle == 108,
+                      "Cached opening must use the latest boundary without applying the offset twice")
+            app.endGesture()
+            app.motion.reset()
+            app.settingsModel.setAutomaticDeadZone(0)
+            app.handleLidReading(110, time: 4)
+            try check(app.motion.automaticDeadZone == 1 && app.motion.effectiveStartAngle == 109,
+                      "The next gesture must use the saved edit after the old image is released")
+            try checkCleared(app)
+            print("PASS: dead-zone capture boundary, immediate edits, reversal and cached reference")
+        }
+        do {
             let (app, source) = try makeGesture()
             defer { app.shutdown(); app.window?.close() }
             app.settingsModel.onBlurEnabledChange = { [weak app] enabled in
@@ -1765,6 +1939,14 @@ extension AppDelegate {
             model.setStartAngle(120)
             model.setAutomaticDetectionThreshold(80)
             model.setAutomaticAngleDuration(2)
+            model.setAutomaticDeadZone(5)
+            try check(model.automaticDeadZone == 5 && app.motion.automaticDeadZone == 5
+                      && UserDefaults.standard.double(forKey: "seamlessCloseAutomaticDeadZone") == 5,
+                      "Dead zone must save and apply while idle")
+            let restoredDeadZone = SettingsModel()
+            restoredDeadZone.configure(animationEnabled: true, startAngle: 90, screenCaptureAllowed: true,
+                automaticDeadZone: UserDefaults.standard.double(forKey: "seamlessCloseAutomaticDeadZone"))
+            try check(restoredDeadZone.automaticDeadZone == 5, "Dead zone must restore from saved preferences")
             model.setAutomaticStartAngle(true)
             model.setResumeAfterPause(false)
             model.setPauseDuration(3)
@@ -1783,11 +1965,14 @@ extension AppDelegate {
             try check(!model.seamlessCloseHasCustomSettings && model.animationEnabled
                       && model.startAngle == 90 && !model.automaticStartAngle
                       && model.automaticDetectionThreshold == 45 && model.automaticAngleDuration == 1
+                      && model.automaticDeadZone == 1
                       && model.resumeAfterPause && model.pauseDuration == 1
                       && model.connectionEffectEnabled && model.blurEnabled && model.blurStrength == .regular,
                       "Reset must restore every Seamless Close control")
             try check(app.motion.startAngle == 90 && !app.motion.automaticStartAngle
                       && app.motion.automaticDetectionThreshold == 45 && app.motion.automaticAngleDuration == 1
+                      && app.motion.automaticDeadZone == 1
+                      && UserDefaults.standard.double(forKey: "seamlessCloseAutomaticDeadZone") == 1
                       && app.motion.resumeAfterPause && app.motion.pauseDuration == 1
                       && app.renderer?.connectionEffectEnabled == true
                       && app.renderer?.blurEnabled == true && app.renderer?.blurStrength == .regular,
@@ -1828,7 +2013,7 @@ extension AppDelegate {
                 app?.applyAutomaticDetectionThreshold(angle)
             }
             for frame in 0...40 { app.handleLidReading(110, time: Double(frame) / 20) }
-            try check(app.motion.learnedStartAngle == 109 && app.settingsModel.learnedStartAngle == 109,
+            try check(app.motion.learnedStartAngle == 110 && app.settingsModel.learnedStartAngle == 110,
                       "The live settings model must show the automatically learned angle")
             app.handleLidReading(80, time: 2.05)
             try await waitForCapture(source)
@@ -1862,7 +2047,7 @@ extension AppDelegate {
                                         screenCaptureAllowed: true, automaticStartAngle: true,
                                         automaticDetectionThreshold: 80)
             for frame in 0...20 { app.handleLidReading(90, time: Double(frame) / 20) }
-            try check(app.motion.learnedStartAngle == 89 && app.settingsModel.learnedStartAngle == 89,
+            try check(app.motion.learnedStartAngle == 90 && app.settingsModel.learnedStartAngle == 90,
                       "The live app must learn above Detect above even below Begin at")
             app.handleLidReading(88, time: 1.05)
             try await waitForCapture(source)
@@ -1886,7 +2071,7 @@ extension AppDelegate {
                                         automaticStartAngle: true, pauseDuration: 0.5,
                                         automaticDetectionThreshold: 80)
             for frame in 0...20 { app.handleLidReading(110, time: Double(frame) / 20) }
-            try check(app.motion.learnedStartAngle == 109, "An eligible open lid must learn before closing")
+            try check(app.motion.learnedStartAngle == 110, "An eligible open lid must learn before closing")
             app.handleLidReading(70, time: 1.05)
             try await waitForCapture(source)
             let captureTask = app.snapshotTask
@@ -2210,7 +2395,7 @@ extension AppDelegate {
                     for frame in 0...20 {
                         app.handleLidReading(110, time: started - 1 + Double(frame) / 20)
                     }
-                    try check(app.motion.learnedStartAngle == 109,
+                    try check(app.motion.learnedStartAngle == 110,
                               "Fast automatic reopening must use a real learned reference")
                 } else {
                     app.handleLidReading(110, time: started)
@@ -2452,8 +2637,8 @@ extension AppDelegate {
             app.handleLidReading(80)
             try await beginAssistedReturn(app, source)
             try await waitForCleanup(app)
-            try check(app.motion.learnedStartAngle == 94
-                      && app.settingsModel.learnedStartAngle == 94,
+            try check(app.motion.learnedStartAngle == 95
+                      && app.settingsModel.learnedStartAngle == 95,
                       "Automatic mode must display the newly learned angle after early completion")
             app.handleLidReading(93)
             try await waitForCapture(source)
@@ -2552,7 +2737,7 @@ extension AppDelegate {
                 app.handleLidReading(80, time: started + 0.1 + Double(frame) * 0.05)
             }
             try check(app.finishingGesture && app.motion.desktopResumed
-                      && app.motion.learnedStartAngle == 79,
+                      && app.motion.learnedStartAngle == 80,
                       "Automatic Pause must begin a visible return and learn the lower start angle")
             if let view = app.window?.contentView as? MTKView { app.renderer?.draw(in: view) }
             let sound = app.connectionSound as! SyntheticSound

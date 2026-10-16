@@ -32,6 +32,10 @@ A compact sidebar groups General and Seamless Close in that order under Features
 
 Beta.6 removes Battery Ripple, its power/battery monitoring, controls, previews, and icons so development can focus on Seamless Close. It also adds connection feedback when a quick reopening reaches or passes the starting angle between sensor readings, preserving the existing lid-driven return and timing feedback to visible contact rather than its nearly invisible settling tail. Physical validation of the timing refinement remains pending.
 
+**Unreleased dead-zone control:** automatic detection learns the resting angle itself. A saved **Dead zone** input below its Wait time sets 1–10° of ignored closing travel; the default 1° replaces the previous fixed offset and preserves its trigger. Edits apply immediately, including during an active gesture. Manual mode and the unlearned **Begin at** fallback are unchanged. Motion smoothing is unchanged; physical feel verification remains pending.
+
+**Unreleased startup improvement:** login-item launches now start quietly without Settings or a Dock icon. Opening Glissform explicitly selects the **Seamless Close** page, including when reopening an existing window. A missing Screen Recording permission prompt waits until that explicit open. The published rc.1 still opens Settings at login; an actual sign-out/sign-in check of the new behaviour remains pending.
+
 ## Compatibility
 
 | Requirement | Current status |

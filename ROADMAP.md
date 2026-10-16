@@ -35,6 +35,29 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 
 The current priority is improving Seamless Close as the app's sole experience.
 
+Seamless Close remains an explicitly chosen motion experience. No reduced-motion replacement or automatic disabling of the effect is planned; existing accessibility behaviour in Settings remains in place.
+
+### Quiet launch at login — unreleased
+
+- [x] Recognize macOS login-item launch events and start without opening Settings or retaining a Dock icon. Preserve the saved menu bar preference. Manual launch and explicit reopen select the Seamless Close page, even if another page was previously selected. Defer missing Screen Recording permission prompts until Settings is explicitly opened; keep runtime status available through the existing menu bar.
+- [x] Complete the local build and full regression suite, including synthetic login/manual-launch events, deferred permission prompts and explicit reopen after a quiet launch (2026-10-16).
+- [ ] Verify an actual sign-out/sign-in with Launch at login enabled, including missing screen access and a hidden menu bar icon. Synthetic event checks do not establish real login-session behaviour.
+
+### Automatic closing dead zone — unreleased
+
+Approved on 2026-10-16. Applies only after automatic detection has learned a resting angle; manual mode and the unlearned **Begin at** fallback remain unchanged.
+
+- [x] Add a saved **Dead zone** input matching the Wait time field below automatic detection’s **Wait time**, from 1–10° in 1° steps. Default and Reset to defaults use 1°, replacing the old fixed offset. Values below 1° are raised to 1°.
+- [x] Learn the resting angle itself and show both the resting angle and resulting activation angle. At a 110° rest, a 5° dead zone starts below 105°.
+- [x] Keep the desktop live within the dead zone and prevent slow downward travel from repeatedly lowering the learned reference. Opening to a higher resting angle can update it; pause restoration can establish a lower one.
+- [x] Use the adjusted boundary as the flat reference, retaining existing smoothing, prediction and early capture. Preserve one screenshot through reversal and eligible cached opening, without applying the offset twice. Apply edits immediately to the current target through the existing smoothing; return to flat when the new dead zone contains the current lid position.
+- [x] Complete the local build, motion/default-equivalence checks, settings persistence/reset checks and synthetic lifecycle suite, including capture cancellation and cached opening. Verified the revised field’s placement, typed-value commit, immediate activation-angle update and decrease arrow in the development app; restored 1° afterward (2026-10-16).
+- [x] Pass the revised-input build and full regression suite, including immediate retargeting, return to flat, resuming the same screenshot and cached opening (2026-10-16).
+- [x] Pass live overlay verification with both regular and background activation in the revised-input regression run (2026-10-16). The earlier run failed active-Space visibility; no overlay implementation change was made.
+- [ ] Physically compare the default 1° with the previous feel, then check larger values, slow/fast entry, pause, reversal and sleep/wake before release. Automated checks do not establish physical smoothness.
+
+This work remains local and unpublished. GitHub tracking/publication is pending authorization.
+
 ### Connected displays — rc.1
 
 - [x] Add the saved External display support switch, default on, with a rose (#DB648A) monitor-stand icon, automatic pause explanations and reset support.
@@ -214,7 +237,6 @@ A release candidate is a complete proposed stable build. Publish 0.1.0 when thos
 - Lock Screen support for Seamless Close, if a privacy-safe design can be implemented and physically validated. It has no target version or date and is not advertised in Settings; no animation plays while the Mac is locked.
 - Broader wake-opening support after the prototype passes timing, privacy, and physical acceptance gates; no first-frame or locked-wake guarantee.
 - Carefully bounded blur, shadow, and motion preferences or presets.
-- Accessibility options and behavior that respects reduced-motion preferences.
 - Broader hardware support and calibration for different viewing angles.
 - Additional distribution channels after platform requirements are assessed.
 

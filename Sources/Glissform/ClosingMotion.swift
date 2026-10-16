@@ -4,6 +4,10 @@ import Foundation
 struct ClosingMotion {
     static let defaultStillDuration = 1.0
     static let defaultDetectionThreshold = 45.0
+    static let defaultAutomaticDeadZone = 1.0
+    static func validAutomaticDeadZone(_ value: Double) -> Double {
+        value.isFinite ? min(10, max(1, value)).rounded() : defaultAutomaticDeadZone
+    }
     static func validStillDuration(_ value: Double) -> Double {
         value.isFinite ? min(10, max(0.5, (value * 2).rounded() / 2)) : defaultStillDuration
     }
@@ -27,9 +31,12 @@ struct ClosingMotion {
             reset()
         }
     }
+    // Store the resting angle itself; the dead zone supplies the entire offset.
+    var automaticDeadZone = Self.defaultAutomaticDeadZone
     private(set) var learnedStartAngle: Double?
     var effectiveStartAngle: Double? {
-        automaticStartAngle ? (learnedStartAngle ?? startAngle) : startAngle
+        guard automaticStartAngle, let learnedStartAngle else { return startAngle }
+        return learnedStartAngle - Self.validAutomaticDeadZone(automaticDeadZone)
     }
     private var armed = false
     private var hasReference = false
@@ -55,10 +62,6 @@ struct ClosingMotion {
         restingLastSampleTime = nil
     }
 
-    private func automaticThreshold(below angle: Double) -> Double {
-        angle.rounded() - 1
-    }
-
     private mutating func learnRestingAngle(_ angle: Double, time: Double) {
         guard automaticStartAngle, !active, !desktopResumed,
               angle.isFinite, (20...130).contains(angle),
@@ -66,7 +69,11 @@ struct ClosingMotion {
             clearRestingTracking()
             return
         }
-        if let learnedStartAngle, abs((learnedStartAngle + 1) - angle) <= 1 {
+        // Keep the reference fixed through ignored closing travel, even a slow
+        // descent. A pause during an active gesture may still establish a lower rest.
+        if let learnedStartAngle,
+           abs(learnedStartAngle - angle) <= 1
+            || (armed && automaticDeadZone > 1 && angle < learnedStartAngle) {
             clearRestingTracking()
             return
         }
@@ -84,7 +91,7 @@ struct ClosingMotion {
         }
         restingLastSampleTime = time
         if time - (restingSince ?? time) >= Self.validStillDuration(automaticAngleDuration) {
-            learnedStartAngle = automaticThreshold(below: angle)
+            learnedStartAngle = angle.rounded()
             clearRestingTracking()
         }
     }
@@ -160,7 +167,7 @@ struct ClosingMotion {
         desktopResumeCanRearmByClosing = automaticStartAngle && (20...130).contains(angle)
             && angle > Self.validDetectionThreshold(automaticDetectionThreshold)
         if desktopResumeCanRearmByClosing {
-            learnedStartAngle = automaticThreshold(below: angle)
+            learnedStartAngle = angle.rounded()
         } else if automaticStartAngle {
             learnedStartAngle = nil
         }
@@ -200,7 +207,7 @@ struct ClosingMotion {
                 desktopResumeCanRearmByClosing = automaticStartAngle && (20...130).contains(angle)
                     && angle > Self.validDetectionThreshold(automaticDetectionThreshold)
                 if desktopResumeCanRearmByClosing {
-                    learnedStartAngle = automaticThreshold(below: angle)
+                    learnedStartAngle = angle.rounded()
                 } else if automaticStartAngle {
                     learnedStartAngle = nil
                 }

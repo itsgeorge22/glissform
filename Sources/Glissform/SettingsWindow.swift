@@ -27,8 +27,13 @@ final class SettingsModel: ObservableObject {
     var onAutomaticDetectionThresholdChange: ((Double) -> Void)?
     @Published private(set) var automaticAngleDuration = 1.0
     var onAutomaticAngleDurationChange: ((Double) -> Void)?
+    @Published private(set) var automaticDeadZone = ClosingMotion.defaultAutomaticDeadZone
+    var onAutomaticDeadZoneChange: ((Double) -> Void)?
     @Published private(set) var learnedStartAngle: Double?
-    var effectiveStartAngle: Double { automaticStartAngle ? (learnedStartAngle ?? startAngle) : startAngle }
+    var effectiveStartAngle: Double {
+        guard automaticStartAngle, let learnedStartAngle else { return startAngle }
+        return learnedStartAngle - automaticDeadZone
+    }
     private(set) var currentAngle: Double?
     @Published private(set) var displayedLidAngle: Double?
     private var lidAnglePresentation = LidAnglePresentation()
@@ -83,6 +88,7 @@ final class SettingsModel: ObservableObject {
                    resumeAfterPause: Bool = true, automaticStartAngle: Bool = false,
                    pauseDuration: Double = 1, automaticAngleDuration: Double = 1,
                    automaticDetectionThreshold: Double = ClosingMotion.defaultDetectionThreshold,
+                   automaticDeadZone: Double = ClosingMotion.defaultAutomaticDeadZone,
                    connectionEffectEnabled: Bool = true, blurEnabled: Bool = true, blurStrength: BlurStrength = .defaultStrength,
                    externalDisplaySupportEnabled: Bool = true,
                    runInBackground: Bool = true, showMenuBarIcon: Bool = true) {
@@ -94,6 +100,7 @@ final class SettingsModel: ObservableObject {
         self.automaticDetectionThreshold = ClosingMotion.validDetectionThreshold(automaticDetectionThreshold)
         self.pauseDuration = ClosingMotion.validStillDuration(pauseDuration)
         self.automaticAngleDuration = ClosingMotion.validStillDuration(automaticAngleDuration)
+        self.automaticDeadZone = ClosingMotion.validAutomaticDeadZone(automaticDeadZone)
         self.connectionEffectEnabled = connectionEffectEnabled
         self.externalDisplaySupportEnabled = externalDisplaySupportEnabled
         self.blurEnabled = blurEnabled
@@ -190,6 +197,13 @@ final class SettingsModel: ObservableObject {
         onAutomaticAngleDurationChange?(value)
     }
 
+    func setAutomaticDeadZone(_ degrees: Double) {
+        let value = ClosingMotion.validAutomaticDeadZone(degrees)
+        guard automaticDeadZone != value else { return }
+        automaticDeadZone = value
+        onAutomaticDeadZoneChange?(value)
+    }
+
     func setAutomaticDetectionThreshold(_ angle: Double) {
         let value = ClosingMotion.validDetectionThreshold(angle)
         guard automaticDetectionThreshold != value else { return }
@@ -229,6 +243,7 @@ final class SettingsModel: ObservableObject {
     var seamlessCloseHasCustomSettings: Bool {
         !animationEnabled || startAngle != 90 || automaticStartAngle
             || automaticDetectionThreshold != ClosingMotion.defaultDetectionThreshold || automaticAngleDuration != 1
+            || automaticDeadZone != ClosingMotion.defaultAutomaticDeadZone
             || !resumeAfterPause || pauseDuration != 1 || !connectionEffectEnabled || !blurEnabled
             || blurStrength != .defaultStrength || !externalDisplaySupportEnabled
     }
@@ -238,6 +253,7 @@ final class SettingsModel: ObservableObject {
         setStartAngle(90)
         setAutomaticDetectionThreshold(ClosingMotion.defaultDetectionThreshold)
         setAutomaticAngleDuration(1)
+        setAutomaticDeadZone(ClosingMotion.defaultAutomaticDeadZone)
         setResumeAfterPause(true)
         setPauseDuration(1)
         setConnectionEffectEnabled(true)
@@ -1172,6 +1188,24 @@ private struct AnimationSettingsView: View {
 
             HStack(spacing: SettingsDesign.Spacing.cards) {
                 VStack(alignment: .leading, spacing: SettingsDesign.Spacing.detail) {
+                    Text("Dead zone").font(SettingsDesign.Typography.controlTitle)
+                    Text("How far you can lower the lid before the animation starts.")
+                        .font(SettingsDesign.Typography.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                AngleEntry(title: "Dead zone", angle: model.automaticDeadZone,
+                           range: 1...10, isDisabled: !model.automaticStartAngle,
+                           setAngle: model.setAutomaticDeadZone)
+            }
+            .padding(SettingsDesign.Spacing.supportCardInsets)
+
+            Rectangle()
+                .fill(SettingsDesign.Palette.cardBorder)
+                .frame(height: 1)
+
+            HStack(spacing: SettingsDesign.Spacing.cards) {
+                VStack(alignment: .leading, spacing: SettingsDesign.Spacing.detail) {
                     Text("Detect above").font(SettingsDesign.Typography.controlTitle)
                     Text("Learn an angle when the lid is above this value. Set to 0 to disable.")
                         .font(SettingsDesign.Typography.caption)
@@ -1189,7 +1223,7 @@ private struct AnimationSettingsView: View {
 
     private var automaticAngleDescription: String {
         if model.automaticStartAngle, let angle = model.learnedStartAngle {
-            return "Using \(Int(angle))°. Updates after a still lid pause."
+            return "Resting angle \(Int(angle))°. Animation starts below \(Int(model.effectiveStartAngle))°."
         }
         if model.automaticStartAngle {
             if model.automaticDetectionThreshold == 0 {
@@ -1250,7 +1284,7 @@ private struct GeneralSettingsView: View {
 
             VStack(alignment: .leading, spacing: SettingsDesign.Spacing.label) {
                 FeatureToggleRow(title: "Launch at login",
-                                 detail: "Open Glissform when you sign in.",
+                                 detail: "Start quietly when you sign in.",
                                  color: .neutral,
                                  isEnabled: Binding(get: { model.launchAtLoginEnabled },
                                                     set: { model.setLaunchAtLogin($0) })) {
@@ -1308,6 +1342,7 @@ private struct AngleEntry: View {
     let title: String
     let angle: Double
     var allowsZero = false
+    var range: ClosedRange<Double> = 20...130
     var isDisabled = false
     let setAngle: (Double) -> Void
     @StateObject private var draft = AngleDraft()
@@ -1318,12 +1353,12 @@ private struct AngleEntry: View {
             VStack(spacing: 0) {
                 FieldStepArrow(rotation: 0, label: "Increase \(title.lowercased())",
                                help: "Increase \(title.lowercased()) by 1°", step: 1,
-                               isDisabled: isDisabled || angle >= 130) {
+                               isDisabled: isDisabled || angle >= range.upperBound) {
                     stepAngle(1)
                 }
                 FieldStepArrow(rotation: 180, label: "Decrease \(title.lowercased())",
                                help: "Decrease \(title.lowercased()) by 1°", step: -1,
-                               isDisabled: isDisabled || angle <= (allowsZero ? 0 : 20)) {
+                               isDisabled: isDisabled || angle <= (allowsZero ? 0 : range.lowerBound)) {
                     stepAngle(-1)
                 }
             }
@@ -1338,7 +1373,7 @@ private struct AngleEntry: View {
                     .accessibilityLabel("\(title) in degrees")
                     .help(allowsZero
                           ? "Enter 0° to disable the threshold, or an angle from 20° to 130°, then press Return."
-                          : "Enter an angle from 20° to 130°, then press Return.")
+                          : "Enter an angle from \(Int(range.lowerBound))° to \(Int(range.upperBound))°, then press Return.")
                     .onSubmit { commit() }
                 Text("°")
                     .font(SettingsDesign.Typography.angleUnit).foregroundStyle(.secondary)
@@ -1370,7 +1405,7 @@ private struct AngleEntry: View {
         } else if allowsZero && step > 0 && current == 0 {
             value = 20
         } else {
-            value = min(130, max(20, current + step))
+            value = min(range.upperBound, max(range.lowerBound, current + step))
         }
         setAngle(value)
         draft.text = String(Int(value))
@@ -1380,7 +1415,7 @@ private struct AngleEntry: View {
         guard let typed = Double(draft.text.trimmingCharacters(in: .whitespacesAndNewlines)),
               typed.isFinite else { return angle }
         if allowsZero && typed <= 0 { return 0 }
-        return min(130, max(20, typed)).rounded()
+        return min(range.upperBound, max(range.lowerBound, typed)).rounded()
     }
 }
 

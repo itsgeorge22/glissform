@@ -4,6 +4,10 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+- Add a saved **Dead zone** input with arrow controls (1–10°) below automatic detection’s Wait time. Learn the resting angle without a hidden offset; default to 1° for existing and new installations and Reset to defaults, preserving the previous trigger and motion inputs. Values below 1° are raised to 1°. Manual mode and the unlearned fallback are unchanged. Keep the desktop live inside the dead zone, prevent slow closing from moving the reference downward, and apply edits immediately through the existing smoothing while reusing the current screenshot. Increasing the dead zone past the current lid position returns the image smoothly to flat. Physical feel verification remains pending.
+
+- Start quietly when launched as a macOS login item, without opening Settings or keeping a Dock icon. Defer a missing Screen Recording permission prompt until the app is opened explicitly; manual launch and reopening select the Seamless Close page. Explicit Settings and About commands retain their destinations. Preserve Seamless Close motion and login-item preferences.
+
 - Remove website brand-logo CSS corner rounding and use transparency-aware shadows in the navbar and footer to eliminate the rectangular corner artifact.
 
 - Move the approved website source into the separate private `glissform-website` repository and verify GitHub Actions production deployment, preserving app downloads and the update feed.
