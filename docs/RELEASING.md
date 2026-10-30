@@ -2,7 +2,7 @@
 
 Active development is paused. The current release is 0.1.0 (build 21). Existing release tags and assets remain immutable.
 
-Installers and checksums are public GitHub Release assets. Cloudflare Pages serves the website and the exact signed feed at `https://glissform.app/updates/appcast.xml`. Existing `/downloads/` addresses redirect to their corresponding GitHub assets. The website source and hosting instructions are maintained in the separate private website repository.
+Installers and checksums are public GitHub Release assets. Vercel serves the website at `https://glissform.itsgeorge.pro/` and retains the exact signed legacy feed at `https://glissform.app/updates/appcast.xml`. Existing `/downloads/` addresses redirect to their corresponding GitHub assets. The website source and hosting instructions are maintained in the separate private website repository.
 
 ## Existing installations
 

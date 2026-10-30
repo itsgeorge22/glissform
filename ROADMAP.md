@@ -1,6 +1,6 @@
 # Roadmap
 
-**Development paused — 2026-10-30.** The latest release, website and source remain available. Unfinished items below are retained as historical context, not commitments or an active release schedule. The website is hosted on Cloudflare Pages with installers on GitHub Releases. Domain, download and signed-feed checks passed. The owner confirmed the installed rc.2 update check on 2026-10-30; the VPS remains running.
+**Development paused — 2026-10-30.** The latest release, website and source remain available. Unfinished items below are retained as historical context, not commitments or an active release schedule. The website is hosted on Vercel at https://glissform.itsgeorge.pro/ with installers on GitHub Releases. No further releases are planned. Domain, download and signed-feed checks passed. The owner confirmed the installed rc.2 update check on 2026-10-30; the VPS remains running.
 
 Glissform is focused exclusively on Seamless Close and improvements to its motion, controls, setup and reliability. Separate experiences are outside the current product scope.
 

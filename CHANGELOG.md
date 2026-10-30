@@ -4,6 +4,8 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+- Move website and public download links to glissform.itsgeorge.pro on Vercel. Existing installers and their signed update feed remain unchanged; no further releases are planned.
+
 - Change feedback and contact links to 4niklap@gmail.com after retiring the Glissform mailbox. Existing 0.1.0 installers retain the previous address.
 
 - Retire the automatic tag-to-VPS release workflow after moving distribution to GitHub Releases and Cloudflare Pages. Existing signed updates and release assets remain unchanged.

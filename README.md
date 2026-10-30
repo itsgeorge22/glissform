@@ -4,7 +4,7 @@
 
 Your desktop appears to stay in place as you close the lid, with perspective, frost and shadow responding to its movement. Glissform is a free macOS app built around this small everyday interaction.
 
-[Download for Mac](https://glissform.app/downloads/Glissform-0.1.0.dmg) · [Website](https://glissform.app/) · [App guide](docs/APP_GUIDE.md) · [Release notes](https://github.com/itsgeorge22/glissform/releases/tag/v0.1.0)
+[Download for Mac](https://glissform.itsgeorge.pro/downloads/Glissform-0.1.0.dmg) · [Website](https://glissform.itsgeorge.pro/) · [App guide](docs/APP_GUIDE.md) · [Release notes](https://github.com/itsgeorge22/glissform/releases/tag/v0.1.0)
 
 ## Project status
 
@@ -24,11 +24,11 @@ Normal system sleep remains enabled. Opening after lid-close sleep is experiment
 
 ## Install
 
-1. [Download Glissform 0.1.0](https://glissform.app/downloads/Glissform-0.1.0.dmg), open the DMG and drag Glissform into Applications.
+1. [Download Glissform 0.1.0](https://glissform.itsgeorge.pro/downloads/Glissform-0.1.0.dmg), open the DMG and drag Glissform into Applications.
 2. Open Glissform. This release is **not Apple notarized**. If macOS blocks the first launch, follow [Apple’s instructions](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac) and use **System Settings → Privacy & Security → Open Anyway** if you trust the download.
 3. Grant Screen Recording permission when prompted, then enable Seamless Close.
 
-Installed release builds check for updates through glissform.app. **Automatic updates** controls whether available updates download and install automatically; manual checking remains available.
+No further releases are planned. Installed release builds still check for updates through glissform.app; those checks may fail if the old domain is retired, without affecting the app’s animation. **Automatic updates** controls whether available updates download and install automatically; manual checking remains available.
 
 ## Compatibility
 
@@ -45,7 +45,7 @@ The lid sensor uses an undocumented protocol. Other Mac models and broader displ
 
 Glissform takes one screenshot per closing attempt and keeps it in memory. Screen images are never saved or transmitted. There is no continuous recording or audio capture.
 
-Optional usage sharing is off until you allow it. When enabled, installation identifiers, running days and daily Seamless Close counts go to PostHog EU. You can turn sharing off in **Settings → Privacy & about**, which also clears unsent counts. [Privacy policy](https://glissform.app/privacy/) · [Analytics details](docs/ANALYTICS.md)
+Optional usage sharing is off until you allow it. When enabled, installation identifiers, running days and daily Seamless Close counts go to PostHog EU. You can turn sharing off in **Settings → Privacy & about**, which also clears unsent counts. [Privacy policy](https://glissform.itsgeorge.pro/privacy/) · [Analytics details](docs/ANALYTICS.md)
 
 ## Feedback and development
 
