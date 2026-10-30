@@ -4,13 +4,13 @@
 
 Your desktop appears to stay in place as you close the lid, with perspective, frost and shadow responding to its movement. Glissform is a free macOS app built around this small everyday interaction.
 
-[Download for Mac](https://glissform.app/downloads/Glissform-0.1.0-rc.2.dmg) · [Website](https://glissform.app/) · [App guide](docs/APP_GUIDE.md) · [Release notes](https://github.com/itsgeorge22/glissform/releases/tag/v0.1.0-rc.2)
+[Download for Mac](https://glissform.app/downloads/Glissform-0.1.0.dmg) · [Website](https://glissform.app/) · [App guide](docs/APP_GUIDE.md) · [Release notes](https://github.com/itsgeorge22/glissform/releases/tag/v0.1.0)
 
 ## Project status
 
 Glissform is a personal passion project. Active development is paused; the website and the latest release remain available. There is no committed schedule for updates or support.
 
-The current release is **0.1.0-rc.2**, a release candidate. It is free to use, with no trial limits or payment requirement.
+The current release is **0.1.0**. It is free to use, with no trial limits or payment requirement.
 
 ## What it does
 
@@ -24,7 +24,7 @@ Normal system sleep remains enabled. Opening after lid-close sleep is experiment
 
 ## Install
 
-1. [Download Glissform 0.1.0-rc.2](https://glissform.app/downloads/Glissform-0.1.0-rc.2.dmg), open the DMG and drag Glissform into Applications.
+1. [Download Glissform 0.1.0](https://glissform.app/downloads/Glissform-0.1.0.dmg), open the DMG and drag Glissform into Applications.
 2. Open Glissform. This release is **not Apple notarized**. If macOS blocks the first launch, follow [Apple’s instructions](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac) and use **System Settings → Privacy & Security → Open Anyway** if you trust the download.
 3. Grant Screen Recording permission when prompted, then enable Seamless Close.
 

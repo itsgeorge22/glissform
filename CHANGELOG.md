@@ -34,6 +34,16 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 - Correct the upside-down Apple mark on the website MacBook lid. Published to glissform.app on 2026-10-01.
 - Close the white gaps around the website MacBook’s outer lid and between its keyboard deck and front edge with continuous rounded aluminium walls. Soften the bright edge outlines while preserving the scroll motion. Published to glissform.app on 2026-10-01.
 
+## 0.1.0 — 2026-10-30
+
+Finalize the current Seamless Close release. This release retains the app behavior of 0.1.0-rc.2; no new features or fixes are included.
+
+- Publish version 0.1.0 (build 21) on the stable update channel. Existing prerelease installations can upgrade through the signed update feed.
+- Provide the installer through public GitHub Releases and the website on Cloudflare Pages.
+- Active development remains paused. The app is still ad-hoc signed and not Apple notarized; existing compatibility and first-launch limitations remain.
+
+No new regression or physical-device testing was performed for this version finalization. Packaging, signatures and published distribution files were verified.
+
 ## 0.1.0-rc.2 — 2026-10-16
 
 Refine Seamless Close while preserving its familiar appearance and motion smoothing.

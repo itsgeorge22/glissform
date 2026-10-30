@@ -1,6 +1,6 @@
 # Roadmap
 
-**Development paused — 2026-10-30.** The latest release, website and source remain available. Unfinished items below are retained as historical context, not commitments or an active release schedule. The website is hosted on Cloudflare Pages with installers on GitHub Releases. Domain, download and signed-feed checks passed; the VPS remains running pending final acceptance.
+**Development paused — 2026-10-30.** The latest release, website and source remain available. Unfinished items below are retained as historical context, not commitments or an active release schedule. The website is hosted on Cloudflare Pages with installers on GitHub Releases. Domain, download and signed-feed checks passed. The owner confirmed the installed rc.2 update check on 2026-10-30; the VPS remains running.
 
 Glissform is focused exclusively on Seamless Close and improvements to its motion, controls, setup and reliability. Separate experiences are outside the current product scope.
 
@@ -17,7 +17,7 @@ Glissform is a small, fully free passion project. Payment and licensing work is 
 - [ ] Replace development fixtures with production trial records, signed entitlements, hosted activation, verified payment notifications, automatic key delivery, recovery and refund/revocation handling.
 - [ ] Verify the customer flow on physical Macs and publish accurate licensing/privacy terms before enabling a paid release.
 
-## Public release candidate — 0.1.0-rc.2
+## Current release — 0.1.0
 
 The first feature, Seamless Close, implements screenshot-based closing animation with continuous hinge perspective and upper-edge narrowing through the full gesture, steadier adaptive smoothing, optional full-image blur and shadow, awake reversal, cached post-sleep opening, native settings with a configurable starting angle, optional desktop restoration after an adjustable still-lid pause, menu bar controls, and lifecycle cleanup. On 2026-09-21, the owner confirmed correct smoothness, speed, abrupt lid stops, reversals, and opening after sleep without locking on the development Mac. On 2026-09-28, the owner confirmed the revised geometry and Blur on/off during everyday gestures, plus the requested Space and sleep/wake checks. Locked-screen animation remains unavailable. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
 
@@ -238,7 +238,7 @@ The broader investigations below and above are follow-up work, not a requirement
 - [ ] Confirm normal desktop access is restored after errors and interruptions.
 - [ ] Finalize privacy documentation, support instructions, and release notes.
 
-A release candidate is a complete proposed stable build. Publish 0.1.0 when those checks pass. A wake-opening animation is not a prerequisite.
+- [x] Finalize 0.1.0 (build 21) with unchanged app behavior from rc.2, public GitHub assets and a signed stable update entry. The owner explicitly waived new regression and physical-device testing for this version finalization on 2026-10-30. Unchecked verification items above remain unverified; publication does not mark them complete.
 
 ## Further possibilities — not committed
 
