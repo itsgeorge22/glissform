@@ -1,76 +1,64 @@
 # Glissform
 
-Seamless Close for your MacBook.
+**Seamless Close for your MacBook.**
 
-Your desktop appears to stay in place as you close your MacBook lid, with perspective, frost, and shadow responding to the movement. Glissform focuses on improving Seamless Close, its controls, and its reliability.
+Your desktop appears to stay in place as you close the lid, with perspective, frost and shadow responding to its movement. Glissform is a free macOS app built around this small everyday interaction.
 
-[Website](https://glissform.app/) · [Roadmap](ROADMAP.md)
-
-Website source and deployment are maintained separately in the private [glissform-website repository](https://github.com/itsgeorge22/glissform-website); its `main` branch publishes through GitHub Actions.
+[Download for Mac](https://glissform.app/downloads/Glissform-0.1.0-rc.2.dmg) · [Website](https://glissform.app/) · [App guide](docs/APP_GUIDE.md) · [Release notes](https://github.com/itsgeorge22/glissform/releases/tag/v0.1.0-rc.2)
 
 ## Project status
 
-**Release candidate:** [Download Glissform 0.1.0-rc.2](https://glissform.app/downloads/Glissform-0.1.0-rc.2.dmg) from [glissform.app](https://glissform.app/). The source repository is private.
+Glissform is a personal passion project. Active development is paused; the website and the latest release remain available. There is no committed schedule for updates or support.
 
-The website presents the same product information on desktop, tablet and phone, with responsive layouts and lightweight fallbacks for the MacBook animation.
+The current release is **0.1.0-rc.2**, a release candidate. It is free to use, with no trial limits or payment requirement.
 
-Open the DMG and drag Glissform into Applications. This release candidate is not Apple notarized, so macOS may block first launch; after a blocked attempt, use **System Settings → Privacy & Security → Open Anyway** if you trust the download. See [Apple's instructions](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac). Seamless Close needs Screen Recording permission. Future prerelease updates are checked through the app; Automatic updates controls whether they download and install automatically. The public DMG and signed update feed are live. Manual and automatic-on-quit upgrades from rc.1 to rc.2 passed on the development Mac with screen access retained; other installation locations and Macs may behave differently. Lock Screen animation is not available.
+## What it does
 
-Rc.2 adds an automatic-detection dead zone, quiet login startup and a gentle increase in stretch below 60°. Rc.1 added the starfield installer, External display support, a 45° detection default and refined Settings colours. Beta.7 added optional usage sharing and kept Glissform fully free. Beta.5 fixes the installed beta.4 crash when closing starts. Beta.4 adds shared connection feedback, refined opening motion, revised defaults and an About update-check button. Beta.3 repairs launch after the beta.2 packaging defect and improves update discovery. Beta.2 added an Esc return for Seamless Close and an email contact page. Beta.1 added signed updates and configurable Seamless Close blur strength. Earlier alpha releases used the name **Infinite Screen** for **Seamless Close**. See the [changelog](CHANGELOG.md) for version-specific changes and ongoing limitations.
+- Folds a single desktop screenshot with your MacBook lid, then returns to the live desktop when you reopen it.
+- Lets you choose a starting angle or detect it automatically, with an adjustable dead zone.
+- Offers three blur strengths, optional connection glow and sound, and restoration after a pause or with Esc.
+- Provides menu bar controls, background operation and launch-at-login settings.
+- Adapts to external displays: extended desktops animate on the MacBook; mirroring pauses the effect.
 
-## Current features
+Normal system sleep remains enabled. Opening after lid-close sleep is experimental, and animation while the Mac is locked is unavailable. See the [app guide](docs/APP_GUIDE.md) for controls and behaviour in detail.
 
-**External displays:** one **External display support** switch adapts Seamless Close to connected displays. It defaults to on: extended desktops animate only on the MacBook, mirroring the MacBook pauses the effect, and display changes clear the screenshot. Turning it off pauses Seamless Close whenever another display is connected. Reopening after closed-lid external-display use shows the live desktop without replaying an old image. The owner confirmed external-display use on the development Mac; broader configurations remain unverified. See the [display guide](docs/APP_GUIDE.md#connected-displays).
+## Install
 
-- Experience a lid-driven desktop animation with a continuous perspective fold, an upper edge that narrows throughout closure, optional High, Regular, or Subtle blur (Regular by default), and shadow.
-- Reverse the effect by reopening the lid, including experimental opening after lid-close sleep using the same screenshot. The visible image can finish the final 5° automatically, carrying its visible motion and recent lid pace into a soft landing, with a soft inner edge glow that spreads inward, blooms with the contact click, and softly fades over the live desktop. A short click marks that connection. One **Connection effect** switch controls the glow and click together, defaults to on, and preserves the desktop return when off. Pause and Esc show the same glow only during the final 5° of their visible return, with the click scheduled to peak with the glow’s brightness pulse. Audio is prepared during the gesture and adjusted for the selected output’s reported delay; physical alignment on Bluetooth remains subject to device timing.
-- Choose the starting angle manually or let a still-lid pause learn the resting angle and apply a configurable 1–10° dead zone (1° by default). Set a minimum lid angle for automatic detection (45° by default for fresh installs and reset; existing saved choices are preserved), or set it to 0° to disable the threshold; **Begin at** remains the fallback until an angle is learned. Begin at defaults to 90° and Resume desktop after pause is enabled by default. Previously saved choices are preserved. Set each wait independently from 0.5 to 10 seconds (1 second by default).
-- Keep Glissform running after its Settings window closes, with menu bar access by default.
-- Press Esc during Seamless Close to use the same fold-to-flat return as pause restoration, whether the pause feature is on or off. Reopen above the starting angle to start another gesture.
+1. [Download Glissform 0.1.0-rc.2](https://glissform.app/downloads/Glissform-0.1.0-rc.2.dmg), open the DMG and drag Glissform into Applications.
+2. Open Glissform. This release is **not Apple notarized**. If macOS blocks the first launch, follow [Apple’s instructions](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac) and use **System Settings → Privacy & Security → Open Anyway** if you trust the download.
+3. Grant Screen Recording permission when prompted, then enable Seamless Close.
 
-A compact sidebar groups General and Seamless Close in that order under Features, with Privacy & about and Send feedback under More. Privacy & about includes **Check for updates…** beside the app name and current version. General controls whether Glissform keeps running after Settings closes, whether its menu bar icon appears, whether macOS launches it at login, and whether updates download and install automatically. With automatic installation off, the sidebar shows the existing Update card only when a newer installable version is found; its button opens the installer. When background running is on, closing Settings removes Glissform from the Dock even if its menu bar icon is hidden; opening the app again restores Settings. Seamless Close keeps its switch, live lid reading, and manual angle together in one card, with separate automatic-selection and pause cards and a page reset for its settings.
-
-Beta.6 removes Battery Ripple, its power/battery monitoring, controls, previews, and icons so development can focus on Seamless Close. It also adds connection feedback when a quick reopening reaches or passes the starting angle between sensor readings, preserving the existing lid-driven return and timing feedback to visible contact rather than its nearly invisible settling tail. Physical validation of the timing refinement remains pending.
-
-**Automatic dead zone:** automatic detection learns the resting angle itself. A saved **Dead zone** input below its Wait time sets 1–10° of ignored closing travel; the default 1° replaces the previous fixed offset and preserves its trigger. Edits apply immediately, including during an active gesture. Manual mode and the unlearned **Begin at** fallback are unchanged. Motion smoothing is unchanged. The owner confirmed consistent everyday behaviour on 2026-10-16.
-
-**Quiet startup:** login-item launches now start quietly without Settings or a Dock icon. Opening Glissform explicitly selects the **Seamless Close** page, including when reopening an existing window. A missing Screen Recording permission prompt waits until that explicit open. An actual sign-out/sign-in check of this behaviour remains pending.
-
-Vertical stretch increases gently below a 60° lid opening while preserving the earlier perspective and motion smoothing.
+Installed release builds check for updates through glissform.app. **Automatic updates** controls whether available updates download and install automatically; manual checking remains available.
 
 ## Compatibility
 
-| Requirement | Current status |
+| Requirement | Details |
 | --- | --- |
-| macOS | 15 or later is the deployment minimum; this is not a guarantee of compatibility on every version. |
-| Hardware | A Metal-capable MacBook with a compatible lid-angle sensor. |
-| Tested hardware | MacBook Air M5 15-inch (Mac17,4), the development machine. Other models are unverified. |
-| Permission | Seamless Close needs Screen Recording access for individual desktop screenshots. |
+| macOS | 15 or later |
+| Hardware | A Metal-capable MacBook with a compatible lid-angle sensor |
+| Tested Mac | MacBook Air M5 15-inch (Mac17,4) |
+| Permission | Screen Recording, for individual desktop screenshots |
 
-The lid sensor uses an undocumented protocol. Glissform tries fractional angle readings and falls back to whole degrees when unavailable. Other Mac configurations remain unverified; future compatibility reports can help build coverage, but they are not hardware certification.
+The lid sensor uses an undocumented protocol. Other Mac models and broader display configurations are unverified; the minimum macOS version is not a compatibility guarantee.
 
 ## Privacy
 
-One screenshot is taken per closing attempt and kept in memory. On a fast close it may be requested just before the selected start angle; if the lid reverses or stops before that angle, the hidden image is discarded. A completed closing image may remain through lid-close sleep for the following opening; it stays hidden while locked or asleep and is released after completion or cancellation. There is no continuous recording, audio capture or screenshot saving. Beta.7 adds optional usage sharing, off until the user allows it: random installation IDs, running days and daily Seamless Close counts go to PostHog EU. Settings → Privacy & about can turn sharing off and discard unsent counts. See [analytics](docs/ANALYTICS.md) for counting and privacy boundaries. Update checks and downloads use glissform.app; screen images are never sent. Normal system sleep remains enabled.
+Glissform takes one screenshot per closing attempt and keeps it in memory. Screen images are never saved or transmitted. There is no continuous recording or audio capture.
 
-## Feedback and support
+Optional usage sharing is off until you allow it. When enabled, installation identifiers, running days and daily Seamless Close counts go to PostHog EU. You can turn sharing off in **Settings → Privacy & about**, which also clears unsent counts. [Privacy policy](https://glissform.app/privacy/) · [Analytics details](docs/ANALYTICS.md)
 
-The source repository and its [issue tracker](https://github.com/itsgeorge22/glissform/issues) are private, so public bug reports and feature suggestions are not available there. The Send feedback page opens an email addressed to [support@glissform.app](mailto:support@glissform.app) with the app and macOS versions in its editable body, and has an icon to copy the address for another email service. For detailed feature behaviour, see the [app guide](docs/APP_GUIDE.md).
+## Feedback and development
 
-## Development
+[Report a bug or compatibility result](https://github.com/itsgeorge22/glissform/issues) or contact [support@glissform.app](mailto:support@glissform.app). Please include your app version, macOS version and Mac model; do not include serial numbers or credentials. Responses and fixes are not guaranteed while development is paused.
 
-[Contributing](CONTRIBUTING.md) · [Testing](docs/TESTING.md) · [Releasing](docs/RELEASING.md) · [Architecture](docs/ARCHITECTURE.md) · [Design system](docs/DESIGN_SYSTEM.md) · [Changelog](CHANGELOG.md)
+[Contributing](CONTRIBUTING.md) · [Testing](docs/TESTING.md) · [Architecture](docs/ARCHITECTURE.md) · [Design system](docs/DESIGN_SYSTEM.md) · [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md)
 
-Developer build and verification steps are documented in [Contributing](CONTRIBUTING.md). CI does not verify physical lid behaviour.
-
-Local builds are **Glissform Dev**, with a red icon, separate app identity and settings, and no public update checks. The installed release from the DMG remains **Glissform**, with the blue icon and signed updates. Use an explicit release build only when preparing a versioned DMG; avoid running both apps' effects at once.
-
-Glissform is fully free to use. Trial limits, purchase prompts and license management are disabled in both normal and development launches. The [licensing prototype](docs/LICENSING_PREVIEW.md) is preserved in source for possible future reuse; its old preview flag is inactive.
+Build instructions are in [Contributing](CONTRIBUTING.md). Local builds use a separate **Glissform Dev** identity, red icon and settings, with public update checks disabled. The downloadable release uses the blue icon. Automated tests do not replace physical lid, sleep and wake checks.
 
 ## Credits and licensing
 
-The [LidAngleSensor project](https://github.com/samhenrigold/LidAngleSensor) and [Clamshell](https://github.com/danielradosa/clamshell) were consulted for the HID reports. Glissform's sensor implementation and visual effect were written independently. Updates use [Sparkle](https://sparkle-project.org/), whose [license and notices](docs/SPARKLE_LICENSE.txt) are included with the app. Some interface icons are by [Iconly](https://iconly.pro), used under the owner's paid license; see [provenance](docs/ICONLY.md). See [app artwork](Artwork/README.md) for the native icon sources.
+[LidAngleSensor](https://github.com/samhenrigold/LidAngleSensor) and [Clamshell](https://github.com/danielradosa/clamshell) informed the HID report research; Glissform’s sensor implementation and visual effect were written independently.
 
-The assisted-opening click uses a trimmed version of [“Videogame Menu BUTTON CLICK” by Christopherderp](https://freesound.org/people/Christopherderp/sounds/342200/), licensed CC0.
+Updates use [Sparkle](https://sparkle-project.org/), with its [license and notices](docs/SPARKLE_LICENSE.txt) included in the app. Interface icons include [Iconly](https://iconly.pro) artwork under a paid license; see [asset provenance and reuse restrictions](docs/ICONLY.md). The connection click is adapted from [“Videogame Menu BUTTON CLICK” by Christopherderp](https://freesound.org/people/Christopherderp/sounds/342200/), licensed CC0. See [app artwork](Artwork/README.md) for the native icon sources.
 
-**No open-source license has been selected.** The source repository is private. Third-party assets retain their own terms.
+**No open-source license has been selected.** Public availability of the source does not grant an open-source license. Third-party assets retain their own terms.
