@@ -4,6 +4,8 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+- Polish the project overview, installation and feedback links for public access, and clarify that active development is paused. Preserve release history and third-party asset notices.
+
 - Remove website brand-logo CSS corner rounding and use transparency-aware shadows in the navbar and footer to eliminate the rectangular corner artifact.
 
 - Move the approved website source into the separate private `glissform-website` repository and verify GitHub Actions production deployment, preserving app downloads and the update feed.

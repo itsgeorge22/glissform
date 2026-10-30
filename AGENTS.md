@@ -8,7 +8,7 @@
 - VERSION is the source for the current release; the first public version was 0.1.0-alpha.1.
 - Preserve menu bar access, Seamless Close’s one-screenshot-per-gesture model, normal system sleep, and privacy behaviour unless the user explicitly changes the scope.
 - Do not add continuous recording, networking, analytics, wake guarantees, or broad hardware claims implicitly.
-- The source repository is private, and no open-source license has been selected. Do not add a license without the owner's choice.
+- The source repository is public, and no open-source license has been selected. Do not add a license without the owner's choice.
 
 ## Design consistency
 

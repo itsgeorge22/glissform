@@ -175,7 +175,7 @@ The remaining Iconly interface icons are by [Iconly](https://iconly.pro), used u
 
 The assisted-opening click is a trimmed version of [“Videogame Menu BUTTON CLICK” by Christopherderp](https://freesound.org/people/Christopherderp/sounds/342200/), licensed CC0.
 
-An open-source license has not been selected. The source repository is private.
+An open-source license has not been selected. The source repository is public; active development is paused.
 
 ### Developer icon comparison
 

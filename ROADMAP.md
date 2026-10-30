@@ -1,5 +1,7 @@
 # Roadmap
 
+**Development paused — 2026-10-30.** The latest release, website and source remain available. Unfinished items below are retained as historical context, not commitments or an active release schedule. Hosting is moving to Cloudflare Pages with installers on GitHub Releases; the VPS remains running until migration verification is complete.
+
 Glissform is focused exclusively on Seamless Close and improvements to its motion, controls, setup and reliability. Separate experiences are outside the current product scope.
 
 Seamless Close improvements should feel native, stay lightweight, and respect privacy and normal system behaviour. This roadmap separates available work, near-term fixes, and ideas without committed release dates.
@@ -19,7 +21,7 @@ Glissform is a small, fully free passion project. Payment and licensing work is 
 
 The first feature, Seamless Close, implements screenshot-based closing animation with continuous hinge perspective and upper-edge narrowing through the full gesture, steadier adaptive smoothing, optional full-image blur and shadow, awake reversal, cached post-sleep opening, native settings with a configurable starting angle, optional desktop restoration after an adjustable still-lid pause, menu bar controls, and lifecycle cleanup. On 2026-09-21, the owner confirmed correct smoothness, speed, abrupt lid stops, reversals, and opening after sleep without locking on the development Mac. On 2026-09-28, the owner confirmed the revised geometry and Blur on/off during everyday gestures, plus the requested Space and sleep/wake checks. Locked-screen animation remains unavailable. See [README](README.md) for current behavior and [CHANGELOG](CHANGELOG.md) for completed work.
 
-## Current priority — Space-change verification
+## Completed Space-change verification
 
 - [x] Resolve [#1: Infinite Screen breaks when switching Spaces with a full-screen app open](https://github.com/itsgeorge22/glissform/issues/1) in code: keep visible pixels in their source Space instead of duplicating them across the transition, then cancel the animation, release input and discard its screenshot when the active Space changes; require reopening above the active starting angle before the next gesture.
 - [x] Owner confirmed normal and full-screen Space changes on the development Mac, with settings open and closed, on 2026-09-26. Issue #1 was already closed after the code fix; this owner check supplied the remaining physical acceptance.
@@ -33,7 +35,7 @@ The first feature, Seamless Close, implements screenshot-based closing animation
 
 ## Product development
 
-The current priority is improving Seamless Close as the app's sole experience.
+If development resumes, Seamless Close remains the app's sole experience; no additional work is currently scheduled.
 
 Seamless Close remains an explicitly chosen motion experience. No reduced-motion replacement or automatic disabling of the effect is planned; existing accessibility behaviour in Settings remains in place.
 
