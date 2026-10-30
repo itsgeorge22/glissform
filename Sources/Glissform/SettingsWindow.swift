@@ -1569,7 +1569,7 @@ private struct ScreenAccessCard: View {
 }
 
 enum FeedbackEmail {
-    static let address = "support@glissform.app"
+    static let address = "4niklap@gmail.com"
 
     static var draftURL: URL? {
         let version = Bundle.main.object(forInfoDictionaryKey: "GlissformVersion") as? String ?? "Development"

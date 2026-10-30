@@ -4,7 +4,7 @@ Glissform is a macOS app focused exclusively on Seamless Close and improvements 
 
 ## Report an issue
 
-Use the [submission chooser](https://github.com/itsgeorge22/glissform/issues/new/choose) for a bug report, feature suggestion, or compatibility report. Search existing issues before submitting a duplicate; add useful details to an existing report when appropriate. You can also email [support@glissform.app](mailto:support@glissform.app).
+Use the [submission chooser](https://github.com/itsgeorge22/glissform/issues/new/choose) for a bug report, feature suggestion, or compatibility report. Search existing issues before submitting a duplicate; add useful details to an existing report when appropriate. You can also email [4niklap@gmail.com](mailto:4niklap@gmail.com).
 
 Include the affected feature, Mac model, macOS version, Glissform version, steps to reproduce, and expected versus actual behaviour. For Seamless Close, include the chosen start angle, external displays, full-screen apps, and whether the Mac slept. Remove private desktop content from any media you choose to share.
 

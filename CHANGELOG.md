@@ -4,6 +4,8 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
+- Change feedback and contact links to 4niklap@gmail.com after retiring the Glissform mailbox. Existing 0.1.0 installers retain the previous address.
+
 - Retire the automatic tag-to-VPS release workflow after moving distribution to GitHub Releases and Cloudflare Pages. Existing signed updates and release assets remain unchanged.
 
 - Polish the project overview, installation and feedback links for public access, and clarify that active development is paused. Preserve release history and third-party asset notices.
@@ -169,7 +171,7 @@ Third beta: restore startup after the broken beta.2 package and improve update d
 
 Second beta: direct feedback by email, an Escape return during Seamless Close, clearer Settings cards, and website improvements.
 
-- Replace the Send feedback placeholder with a Send an email button that opens a draft addressed to support@glissform.app and prefills the Glissform and macOS versions, an icon beside the address that briefly turns into a green checkmark after copying, guidance on useful details, and a shield-marked note that no screenshots or diagnostic files are attached. Match the other Settings pages' header, card gaps, padding, and full-width dividers, with feedback copy written as “we” and “us.”
+- Replace the Send feedback placeholder with a Send an email button that opens a draft addressed to the then-current support mailbox and prefills the Glissform and macOS versions, an icon beside the address that briefly turns into a green checkmark after copying, guidance on useful details, and a shield-marked note that no screenshots or diagnostic files are attached. Match the other Settings pages' header, card gaps, padding, and full-width dividers, with feedback copy written as “we” and “us.”
 - Use two Settings card padding patterns throughout: main sections match Power connection (12 points on the top, left, and bottom; 24 on the right), while support sections use 24 points on the sides and 20 on the top and bottom.
 - Let Escape exit an active Seamless Close animation whether Resume desktop after pause is on or off. Keep the shortcut hint visible in the first Seamless Close card, use the pause feature's fold-to-flat return for a visible image, then release the screenshot and require reopening above the starting angle before another gesture. A pending capture is canceled immediately.
 - Add a period to the Seamless Close hero card description and remove the final period from each Customisable card title.
@@ -189,7 +191,7 @@ Second beta: direct feedback by email, an Escape return during Seamless Close, c
 
 - The beta.2 release build, full regression suite, and website build passed locally. A local beta.2 DMG was mounted, copied to a separate test location, and checked for signature, version, and build number.
 - On 2026-09-30, the owner confirmed Esc returns the desktop with Pause enabled, another close works after reopening, and the Settings card stays in place when Pause is toggled. Broader Esc interruption paths remain synthetic-only. Public-feed upgrades, permission after update, and compatibility beyond the development Mac still need physical verification.
-- The owner confirmed a test email arrived at support@glissform.app on 2026-09-30.
+- The owner confirmed a test email arrived at the then-current support mailbox on 2026-09-30.
 
 ## 0.1.0-beta.1 — 2026-09-28
 

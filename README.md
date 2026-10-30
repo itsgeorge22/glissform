@@ -49,7 +49,7 @@ Optional usage sharing is off until you allow it. When enabled, installation ide
 
 ## Feedback and development
 
-[Report a bug or compatibility result](https://github.com/itsgeorge22/glissform/issues) or contact [support@glissform.app](mailto:support@glissform.app). Please include your app version, macOS version and Mac model; do not include serial numbers or credentials. Responses and fixes are not guaranteed while development is paused.
+[Report a bug or compatibility result](https://github.com/itsgeorge22/glissform/issues) or contact [4niklap@gmail.com](mailto:4niklap@gmail.com). Please include your app version, macOS version and Mac model; do not include serial numbers or credentials. Responses and fixes are not guaranteed while development is paused.
 
 [Contributing](CONTRIBUTING.md) · [Testing](docs/TESTING.md) · [Architecture](docs/ARCHITECTURE.md) · [Design system](docs/DESIGN_SYSTEM.md) · [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md)
 
