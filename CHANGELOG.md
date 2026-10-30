@@ -4,7 +4,7 @@ User-visible changes are recorded here. Public versions use prerelease suffixes 
 
 ## Unreleased
 
-- Retire the automatic tag-to-VPS release workflow as distribution moves to GitHub Releases and Cloudflare Pages. Existing signed updates and release assets remain unchanged.
+- Retire the automatic tag-to-VPS release workflow after moving distribution to GitHub Releases and Cloudflare Pages. Existing signed updates and release assets remain unchanged.
 
 - Polish the project overview, installation and feedback links for public access, and clarify that active development is paused. Preserve release history and third-party asset notices.
 

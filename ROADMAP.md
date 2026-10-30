@@ -1,6 +1,6 @@
 # Roadmap
 
-**Development paused — 2026-10-30.** The latest release, website and source remain available. Unfinished items below are retained as historical context, not commitments or an active release schedule. Hosting is moving to Cloudflare Pages with installers on GitHub Releases; the VPS remains running until migration verification is complete.
+**Development paused — 2026-10-30.** The latest release, website and source remain available. Unfinished items below are retained as historical context, not commitments or an active release schedule. The website is hosted on Cloudflare Pages with installers on GitHub Releases. Domain, download and signed-feed checks passed; the VPS remains running pending final acceptance.
 
 Glissform is focused exclusively on Seamless Close and improvements to its motion, controls, setup and reliability. Separate experiences are outside the current product scope.
 
